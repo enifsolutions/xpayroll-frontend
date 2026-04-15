@@ -1,0 +1,13 @@
+@import "tailwindcss";
+
+@variant dark (&:where(.dark, .dark *));
+
+@layer base {
+  :root {
+    --sidebar-width: 240px;
+  }
+
+  body {
+    @apply bg-white text-gray-900;
+  }
+}
