@@ -9,61 +9,62 @@ import Switcher from '@/components/ui/Switcher';
 import { showSuccess, showError } from '@/lib/toast';
 import { PlusIcon, Pencil, Trash2 } from 'lucide-react';
 
-interface LeaveType {
-  id: number;
+interface BenefitType {
+  id: string;
   name: string;
   code: string;
-  accrualType: string;
-  daysPerYear: number;
-  isPaid: boolean;
-  carryForward: boolean;
-  maxCarryDays: number;
-  requiresApproval: boolean;
-  minNoticeDays: number;
-  genderRestriction: string | null;
+  type: string;
+  calculationType: string;
+  defaultAmount: number;
+  defaultPercentage: number;
+  isTaxable: boolean;
+  isPensionable: boolean;
+  isRecurring: boolean;
   isActive: boolean;
 }
 
-interface LeaveTypeForm {
+interface BenefitTypeForm {
   name: string;
   code: string;
-  accrualType: string;
-  daysPerYear: string;
-  isPaid: boolean;
-  carryForward: boolean;
-  maxCarryDays: string;
-  requiresApproval: boolean;
-  minNoticeDays: string;
-  genderRestriction: string;
+  type: string;
+  calculationType: string;
+  defaultAmount: string;
+  defaultPercentage: string;
+  isTaxable: boolean;
+  isPensionable: boolean;
+  isRecurring: boolean;
   isActive: boolean;
 }
 
-const EMPTY: LeaveTypeForm = {
+const EMPTY: BenefitTypeForm = {
   name: '',
   code: '',
-  accrualType: 'Annual',
-  daysPerYear: '',
-  isPaid: true,
-  carryForward: false,
-  maxCarryDays: '0',
-  requiresApproval: true,
-  minNoticeDays: '0',
-  genderRestriction: '-',
+  type: 'Allowance',
+  calculationType: 'FixedAmount',
+  defaultAmount: '0',
+  defaultPercentage: '0',
+  isTaxable: false,
+  isPensionable: false,
+  isRecurring: true,
   isActive: true,
 };
 
-const ACCRUAL_OPTIONS = [
-  { value: 'Annual',    label: 'Annual' },
-  { value: 'Monthly',   label: 'Monthly' },
-  { value: 'NoAccrual', label: 'No Accrual' },
+const TYPE_OPTIONS = [
+  { value: 'Allowance', label: 'Allowance' },
+  { value: 'Deduction', label: 'Deduction' },
 ];
 
-export default function LeaveTypesPage() {
-  const [items, setItems]           = useState<LeaveType[]>([]);
+const CALC_OPTIONS = [
+  { value: 'FixedAmount', label: 'Fixed Amount' },
+  { value: 'Percentage',  label: 'Percentage' },
+];
+
+export default function BenefitTypesPage() {
+  const [items, setItems]           = useState<BenefitType[]>([]);
   const [loading, setLoading]       = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editing, setEditing]       = useState<LeaveType | null>(null);
-  const [form, setForm]             = useState<LeaveTypeForm>(EMPTY);
+  const [editing, setEditing]       = useState<BenefitType | null>(null);
+  const [form, setForm]             = useState<BenefitTypeForm>(EMPTY);
   const [saving, setSaving]         = useState(false);
   const [error, setError]           = useState('');
   const initialized                 = useRef(false);
@@ -71,10 +72,10 @@ export default function LeaveTypesPage() {
   const load = async () => {
     try {
       setLoading(true);
-      const res = await api.get<LeaveType[]>('/leavetype');
+      const res = await api.get<BenefitType[]>('/BenefitType');
       setItems(res.data);
     } catch (err: any) {
-      showError('Load failed', err?.response?.data?.error ?? 'Could not load leave types.');
+      showError('Load failed', err?.response?.data?.error ?? 'Could not load benefit types.');
     } finally {
       setLoading(false);
     }
@@ -87,27 +88,24 @@ export default function LeaveTypesPage() {
   }, []);
 
   const openAdd = () => {
-    const fresh = { ...EMPTY };
-    console.log('openAdd fresh:', JSON.stringify(fresh));
     setEditing(null);
-    setForm(fresh);
+    setForm({ ...EMPTY });
     setError('');
     setDialogOpen(true);
-    };
+  };
 
-  const openEdit = (item: LeaveType) => {
+  const openEdit = (item: BenefitType) => {
     setEditing(item);
     setForm({
       name: item.name,
       code: item.code,
-      accrualType: item.accrualType,
-      daysPerYear: String(item.daysPerYear),
-      isPaid: item.isPaid,
-      carryForward: item.carryForward,
-      maxCarryDays: String(item.maxCarryDays),
-      requiresApproval: item.requiresApproval,
-      minNoticeDays: String(item.minNoticeDays),
-      genderRestriction: item.genderRestriction ?? '',  
+      type: item.type,
+      calculationType: item.calculationType,
+      defaultAmount: String(item.defaultAmount),
+      defaultPercentage: String(item.defaultPercentage),
+      isTaxable: item.isTaxable,
+      isPensionable: item.isPensionable,
+      isRecurring: item.isRecurring,
       isActive: item.isActive,
     });
     setError('');
@@ -121,42 +119,39 @@ export default function LeaveTypesPage() {
     }
     setSaving(true);
     setError('');
-    
     try {
-      await api.post('/leavetype/save', {
+      await api.post('/BenefitType/save', {
         action: editing ? 'UPDATE' : 'ADD',
         id: editing?.id ?? null,
         name: form.name.trim(),
         code: form.code.trim().toUpperCase(),
-        accrualType: form.accrualType,
-        daysPerYear: parseFloat(form.daysPerYear) || 0,
-        isPaid: form.isPaid,
-        carryForward: form.carryForward,
-        maxCarryDays: parseInt(form.maxCarryDays) || 0,
-        requiresApproval: form.requiresApproval,
-        minNoticeDays: parseInt(form.minNoticeDays) || 0,
-        genderRestriction: form.genderRestriction || null,
+        type: form.type,
+        calculationType: form.calculationType,
+        defaultAmount: parseFloat(form.defaultAmount) || 0,
+        defaultPercentage: parseFloat(form.defaultPercentage) || 0,
+        isTaxable: form.isTaxable,
+        isPensionable: form.isPensionable,
+        isRecurring: form.isRecurring,
         isActive: form.isActive,
-        userId: null,
       });
       setDialogOpen(false);
       await load();
-      showSuccess(editing ? 'Leave type updated' : 'Leave type created', form.name);
+      showSuccess(editing ? 'Benefit type updated' : 'Benefit type created', form.name);
     } catch (err: any) {
-      showError('Failed to save', err?.response?.data?.error ?? 'Could not save leave type.');
+      showError('Failed to save', err?.response?.data?.error ?? 'Could not save benefit type.');
     } finally {
       setSaving(false);
     }
   };
 
-  const handleDelete = async (item: LeaveType) => {
+  const handleDelete = async (item: BenefitType) => {
     if (!confirm(`Delete "${item.name}"?`)) return;
     try {
-      await api.post('/leavetype/save', { action: 'DELETE', id: item.id });
+      await api.post('/BenefitType/save', { action: 'DELETE', id: item.id });
       await load();
-      showSuccess('Leave type deleted', item.name);
+      showSuccess('Benefit type deleted', item.name);
     } catch (err: any) {
-      showError('Delete failed', err?.response?.data?.error ?? 'Could not delete leave type.');
+      showError('Delete failed', err?.response?.data?.error ?? 'Could not delete benefit type.');
     }
   };
 
@@ -165,13 +160,13 @@ export default function LeaveTypesPage() {
       {/* Page header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h3 className="h3">Leave Types</h3>
+          <h3 className="h3">Benefit Types</h3>
           <p className="text-gray-500 dark:text-gray-400 mt-1">
-            Define leave entitlements, accrual rules, and approval policies.
+            Define allowances and deductions applied to employee payroll.
           </p>
         </div>
         <Button variant="solid" icon={<PlusIcon size={16} />} onClick={openAdd}>
-          Add Leave Type
+          Add Benefit Type
         </Button>
       </div>
 
@@ -188,13 +183,12 @@ export default function LeaveTypesPage() {
                 <tr>
                   <th>Name</th>
                   <th>Code</th>
-                  <th>Accrual</th>
-                  <th>Days/Year</th>
-                  <th>Paid</th>
-                  <th>Carry Forward</th>
-                  <th>Approval</th>
-                  <th>Min Notice</th>
-                  <th>Gender</th>
+                  <th>Type</th>
+                  <th>Calculation</th>
+                  <th>Default Value</th>
+                  <th>Taxable</th>
+                  <th>Pensionable</th>
+                  <th>Recurring</th>
                   <th>Status</th>
                   <th className="w-24 text-center">Actions</th>
                 </tr>
@@ -202,8 +196,8 @@ export default function LeaveTypesPage() {
               <tbody>
                 {items.length === 0 ? (
                   <tr>
-                    <td colSpan={11} className="text-center py-8 text-gray-400">
-                      No leave types found
+                    <td colSpan={10} className="text-center py-8 text-gray-400">
+                      No benefit types found
                     </td>
                   </tr>
                 ) : items.map(item => (
@@ -214,28 +208,31 @@ export default function LeaveTypesPage() {
                         {item.code}
                       </code>
                     </td>
-                    <td>{ACCRUAL_OPTIONS.find(o => o.value === item.accrualType)?.label ?? item.accrualType}</td>
-                    <td>{item.daysPerYear}</td>
                     <td>
-                      <span className={`xp-badge ${item.isPaid ? 'xp-badge-success' : 'xp-badge-neutral'}`}>
-                        {item.isPaid ? 'Paid' : 'Unpaid'}
+                      <span className={`xp-badge ${item.type === 'Allowance' ? 'xp-badge-success' : 'xp-badge-warning'}`}>
+                        {item.type}
+                      </span>
+                    </td>
+                    <td>{CALC_OPTIONS.find(o => o.value === item.calculationType)?.label ?? item.calculationType}</td>
+                    <td>
+                      {item.calculationType === 'FixedAmount'
+                        ? item.defaultAmount.toFixed(2)
+                        : `${item.defaultPercentage.toFixed(2)}%`}
+                    </td>
+                    <td>
+                      <span className={`xp-badge ${item.isTaxable ? 'xp-badge-warning' : 'xp-badge-neutral'}`}>
+                        {item.isTaxable ? 'Yes' : 'No'}
                       </span>
                     </td>
                     <td>
-                      {item.carryForward
-                        ? <span className="xp-badge xp-badge-info">Up to {item.maxCarryDays}d</span>
-                        : <span className="xp-badge xp-badge-neutral">No</span>}
-                    </td>
-                    <td>
-                      <span className={`xp-badge ${item.requiresApproval ? 'xp-badge-warning' : 'xp-badge-neutral'}`}>
-                        {item.requiresApproval ? 'Required' : 'Auto'}
+                      <span className={`xp-badge ${item.isPensionable ? 'xp-badge-info' : 'xp-badge-neutral'}`}>
+                        {item.isPensionable ? 'Yes' : 'No'}
                       </span>
                     </td>
-                    <td>{item.minNoticeDays > 0 ? `${item.minNoticeDays}d` : '—'}</td>
                     <td>
-                    {item.genderRestriction
-                        ? <span className="xp-badge xp-badge-info">{item.genderRestriction}</span>
-                        : <span className="text-gray-400">—</span>}
+                      <span className={`xp-badge ${item.isRecurring ? 'xp-badge-info' : 'xp-badge-neutral'}`}>
+                        {item.isRecurring ? 'Yes' : 'No'}
+                      </span>
                     </td>
                     <td>
                       <span className={`xp-badge ${item.isActive ? 'xp-badge-success' : 'xp-badge-danger'}`}>
@@ -268,7 +265,7 @@ export default function LeaveTypesPage() {
         onClose={() => setDialogOpen(false)}
         onRequestClose={() => setDialogOpen(false)}
       >
-        <h5 className="h5 mb-4">{editing ? 'Edit Leave Type' : 'Add Leave Type'}</h5>
+        <h5 className="h5 mb-4">{editing ? 'Edit Benefit Type' : 'Add Benefit Type'}</h5>
 
         <div className="space-y-4">
           {/* Name + Code */}
@@ -276,7 +273,7 @@ export default function LeaveTypesPage() {
             <div>
               <label className="form-label">Name <span className="text-error">*</span></label>
               <Input
-                placeholder="e.g. Annual Leave"
+                placeholder="e.g. Housing Allowance"
                 value={form.name}
                 onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
               />
@@ -284,97 +281,91 @@ export default function LeaveTypesPage() {
             <div>
               <label className="form-label">Code <span className="text-error">*</span></label>
               <Input
-                placeholder="e.g. AL"
+                placeholder="e.g. HOU_ALLOW"
                 value={form.code}
                 onChange={e => setForm(f => ({ ...f, code: e.target.value.toUpperCase() }))}
               />
             </div>
           </div>
 
-          {/* Accrual + Days */}
+          {/* Type + Calculation Type */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="form-label">Accrual Type</label>
+              <label className="form-label">Type</label>
               <select
                 className="input w-full"
-                value={form.accrualType}
-                onChange={e => setForm(f => ({ ...f, accrualType: e.target.value }))}
+                value={form.type}
+                onChange={e => setForm(f => ({ ...f, type: e.target.value }))}
               >
-                {ACCRUAL_OPTIONS.map(o => (
+                {TYPE_OPTIONS.map(o => (
                   <option key={o.value} value={o.value}>{o.label}</option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="form-label">Days Per Year</label>
-              <Input
-                type="number"
-                placeholder="e.g. 14"
-                value={form.daysPerYear}
-                onChange={e => setForm(f => ({ ...f, daysPerYear: e.target.value }))}
-              />
+              <label className="form-label">Calculation Type</label>
+              <select
+                className="input w-full"
+                value={form.calculationType}
+                onChange={e => setForm(f => ({ ...f, calculationType: e.target.value }))}
+              >
+                {CALC_OPTIONS.map(o => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
             </div>
           </div>
 
-          {/* Notice + Max Carry */}
+          {/* Default Amount / Percentage — conditional */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="form-label">Min Notice Days</label>
+              <label className="form-label">Default Amount</label>
               <Input
                 type="number"
-                placeholder="0"
-                value={form.minNoticeDays}
-                onChange={e => setForm(f => ({ ...f, minNoticeDays: e.target.value }))}
+                min="0"
+                step="0.01"
+                placeholder="0.00"
+                value={form.defaultAmount}
+                onChange={e => setForm(f => ({ ...f, defaultAmount: e.target.value }))}
+                disabled={form.calculationType !== 'FixedAmount'}
               />
             </div>
             <div>
-              <label className="form-label">Max Carry Forward Days</label>
+              <label className="form-label">Default Percentage (%)</label>
               <Input
                 type="number"
-                placeholder="0"
-                value={form.maxCarryDays}
-                onChange={e => setForm(f => ({ ...f, maxCarryDays: e.target.value }))}
-                disabled={!form.carryForward}
+                min="0"
+                max="100"
+                step="0.01"
+                placeholder="0.00"
+                value={form.defaultPercentage}
+                onChange={e => setForm(f => ({ ...f, defaultPercentage: e.target.value }))}
+                disabled={form.calculationType !== 'Percentage'}
               />
             </div>
           </div>
 
-          {/* Gender Restriction */}
-            <div>
-            <label className="form-label">Gender Restriction</label>
-            <select
-                className="input w-full"
-                value={form.genderRestriction}
-                onChange={e => setForm(f => ({ ...f, genderRestriction: e.target.value }))}
-            >
-                <option value="">No Restriction</option>
-                <option value="Male">Male</option>
-                <option value="Female">Female</option>
-                <option value="All">All</option>
-            </select>
-            </div>
-
-          {/* Toggles — explicit setForm to avoid generic inference issues */}
+          {/* Toggles */}
           <div className="grid grid-cols-2 gap-3">
             <div className="flex items-center gap-3">
-              <span className="text-sm font-medium">Paid Leave</span>
+              <span className="text-sm font-medium">Taxable</span>
               <Switcher
-                checked={form.isPaid}
-                onChange={val => setForm(f => ({ ...f, isPaid: val }))}
+                checked={form.isTaxable}
+                onChange={val => setForm(f => ({ ...f, isTaxable: val }))}
               />
             </div>
             <div className="flex items-center gap-3">
-              <span className="text-sm font-medium">Carry Forward</span>
+              <span className="text-sm font-medium">Pensionable</span>
               <Switcher
-                checked={form.carryForward}
-                onChange={val => setForm(f => ({ ...f, carryForward: val }))}
+                checked={form.isPensionable}
+                onChange={val => setForm(f => ({ ...f, isPensionable: val }))}
               />
             </div>
             <div className="flex items-center gap-3">
-              <span className="text-sm font-medium">Requires Approval</span>
+              <span className="text-sm font-medium">Recurring</span>
               <Switcher
-                checked={form.requiresApproval}
-                onChange={val => setForm(f => ({ ...f, requiresApproval: val }))}
+                checked={form.isRecurring}
+                onChange={val => setForm(f => ({ ...f, isRecurring: val }))}
               />
             </div>
             <div className="flex items-center gap-3">
