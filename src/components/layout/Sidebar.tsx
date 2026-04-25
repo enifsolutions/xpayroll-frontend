@@ -39,6 +39,9 @@ const NAV: (NavItem | NavGroup)[] = [
     group: true,
     children: [
       { href: '/master/branches', label: 'Branches', icon: GitBranch },
+      { href: '/master/departments', label: 'Departments', icon: GitBranch },
+      { href: '/master/designations', label: 'Designations', icon: GitBranch },
+      { href: '/master/leave-types', label: 'Leave Types', icon: GitBranch },
     ],
   },
   { href: '/settings', label: 'Settings', icon: Settings },
