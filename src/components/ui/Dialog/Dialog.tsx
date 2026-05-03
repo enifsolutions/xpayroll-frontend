@@ -4,7 +4,9 @@ import CloseButton from '../CloseButton'
 import { motion } from 'framer-motion'
 import useWindowSize from '../hooks/useWindowSize'
 import type ReactModal from 'react-modal'
-import type { MouseEvent } from 'react'
+import type { MouseEvent, ReactNode } from 'react'
+
+
 
 export interface DialogProps extends ReactModal.Props {
     closable?: boolean
@@ -12,7 +14,9 @@ export interface DialogProps extends ReactModal.Props {
     height?: string | number
     onClose?: (e: MouseEvent<HTMLSpanElement>) => void
     width?: number
+    children?: ReactNode   // ← add this line
 }
+
 
 const Dialog = (props: DialogProps) => {
     const currentSize = useWindowSize()

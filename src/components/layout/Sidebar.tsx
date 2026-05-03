@@ -5,7 +5,10 @@ import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, Users, CreditCard, Clock,
   Calendar, Gift, FileText, Settings, LogOut,
-  Database, GitBranch, ChevronDown,
+  Database, GitBranch, ChevronDown, Building2,
+  Layers, BadgeCheck, Umbrella, Coins, Minus,
+  AlarmClock, SunDim, ShieldCheck, ScanLine,
+  Percent, BellRing,
 } from 'lucide-react';
 import { clearTokens } from '@/lib/auth';
 import { SIDE_NAV_WIDTH, HEADER_HEIGHT } from '@/constants/theme.constant';
@@ -26,23 +29,32 @@ type NavGroup = {
 };
 
 const NAV: (NavItem | NavGroup)[] = [
-  { href: '/dashboard',       label: 'Dashboard',    icon: LayoutDashboard },
-  { href: '/employees',       label: 'Employees',    icon: Users },
-  { href: '/payroll',         label: 'Payroll Runs', icon: CreditCard },
-  { href: '/attendance',      label: 'Attendance',   icon: Clock },
-  { href: '/leave',           label: 'Leave',        icon: Calendar },
-  { href: '/benefits',        label: 'Benefits',     icon: Gift },
-  { href: '/reports',         label: 'Reports',      icon: FileText },
+  { href: '/dashboard',  label: 'Dashboard',    icon: LayoutDashboard },
+  { href: '/employees',  label: 'Employees',    icon: Users },
+  { href: '/payroll',    label: 'Payroll Runs', icon: CreditCard },
+  { href: '/attendance', label: 'Attendance',   icon: Clock },
+  { href: '/leave',      label: 'Leave',        icon: Calendar },
+  { href: '/benefits',   label: 'Benefits',     icon: Gift },
+  { href: '/reports',    label: 'Reports',      icon: FileText },
   {
     label: 'Master Data',
     icon: Database,
     group: true,
     children: [
-      { href: '/master/branches', label: 'Branches', icon: GitBranch },
-      { href: '/master/departments', label: 'Departments', icon: GitBranch },
-      { href: '/master/designations', label: 'Designations', icon: GitBranch },
-      { href: '/master/leave-types', label: 'Leave Types', icon: GitBranch },
-      { href: '/master/benefit-types', label: 'Benefit Types', icon: GitBranch },
+      { href: '/master/attendance-policies',    label: 'Attendance Policies',    icon: Minus  },
+      { href: '/master/benefit-types',          label: 'Benefit Types',          icon: Minus        },
+      { href: '/master/branches',               label: 'Branches',               icon: Minus   },
+      { href: '/master/deduction-types',        label: 'Deduction Types',        icon: Minus        },
+      { href: '/master/departments',            label: 'Departments',            icon: Minus       },
+      { href: '/master/designations',           label: 'Designations',           icon: Minus   },
+      { href: '/master/devices',                label: 'Devices',                icon: Minus     },
+      { href: '/master/leave-types',            label: 'Leave Types',            icon: Minus     },
+      { href: '/master/notification-templates', label: 'Notification Templates', icon: Minus     },
+      { href: '/master/public-holidays',        label: 'Public Holidays',        icon: Minus       },
+      { href: '/master/shifts',                 label: 'Shifts',                 icon: Minus   },
+      { href: '/master/statutory-rates',        label: 'Statutory Rates',        icon: Minus      },
+      { href: '/master/tax-config',             label: 'Tax Configuration',      icon: Minus    },
+      
     ],
   },
   { href: '/settings', label: 'Settings', icon: Settings },
@@ -106,7 +118,7 @@ export function Sidebar() {
                   {/* Children */}
                   <div
                     className={`overflow-hidden transition-all duration-200 ${
-                      isOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
+                      isOpen ? 'max-h-[600px] opacity-100' : 'max-h-0 opacity-0'
                     }`}
                   >
                     <div className="ml-4 mt-0.5 space-y-0.5 border-l border-gray-200 dark:border-gray-700 pl-3">
