@@ -10,7 +10,7 @@ import {
   AlarmClock, SunDim, ShieldCheck, ScanLine,
   Percent, BellRing,
 } from 'lucide-react';
-import { clearTokens } from '@/lib/auth';
+import { logout as clearTokens } from '@/lib/auth';
 import { SIDE_NAV_WIDTH, HEADER_HEIGHT } from '@/constants/theme.constant';
 import { useState } from 'react';
 

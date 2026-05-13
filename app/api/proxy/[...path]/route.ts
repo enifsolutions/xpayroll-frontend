@@ -26,25 +26,43 @@ export async function PATCH(req: NextRequest, ctx: RouteContext) {
 }
 
 async function forwardRequest(req: NextRequest, pathSegments: string[], method: string) {
-  const joined = pathSegments.join('/')
-  const search = req.nextUrl.search
-  const url = `${API_TARGET}/api/${joined}${search}`
+  const joined  = pathSegments.join('/')
+  const search  = req.nextUrl.search
+  const url     = `${API_TARGET}/api/${joined}${search}`
 
   console.log(`[proxy] ${method} ${url}`)
 
-  const headers: HeadersInit = { 'Content-Type': 'application/json' }
+  const contentType = req.headers.get('content-type') ?? ''
+  const isMultipart = contentType.includes('multipart/form-data')
+
+  // Build forward headers — always pass auth, only set Content-Type for JSON
+  const headers: Record<string, string> = {}
   const authHeader = req.headers.get('authorization')
   if (authHeader) headers['Authorization'] = authHeader
 
-  const body = method !== 'GET' && method !== 'DELETE' ? await req.text() : undefined
+  let body: BodyInit | undefined
+
+  if (method === 'GET' || method === 'DELETE') {
+    body = undefined
+  } else if (isMultipart) {
+    // Forward raw bytes + original Content-Type header (preserves boundary)
+    body = await req.blob()
+    headers['Content-Type'] = contentType   // includes boundary parameter
+  } else {
+    // JSON — existing behaviour
+    body = await req.text()
+    headers['Content-Type'] = 'application/json'
+  }
 
   try {
     const response = await fetch(url, { method, headers, body })
     const data = await response.text()
     console.log(`[proxy] ${response.status}: ${data.slice(0, 300)}`)
+
+    const responseContentType = response.headers.get('content-type') ?? 'application/json'
     return new NextResponse(data, {
       status: response.status,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': responseContentType },
     })
   } catch (err) {
     console.error('[proxy] fetch error:', err)

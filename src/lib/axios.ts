@@ -6,9 +6,17 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
+// Auth header
 api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   const token = getAccessToken();
   if (token) config.headers.Authorization = `Bearer ${token}`;
+
+  // If body is FormData, delete the default Content-Type so the browser
+  // sets it automatically with the correct multipart boundary
+  if (config.data instanceof FormData) {
+    delete config.headers['Content-Type'];
+  }
+
   return config;
 });
 
