@@ -8,6 +8,9 @@ import Input from '@/components/ui/Input';
 import Switcher from '@/components/ui/Switcher';
 import { showSuccess, showError } from '@/lib/toast';
 import { PlusIcon, Pencil, Trash2 } from 'lucide-react';
+import { useRequirePermission } from '@/hooks/useRequirePermission'
+import { usePermission } from '@/hooks/usePermission'
+import { Permissions } from '@/lib/permissions'
 
 interface LeaveType {
   id: number;
@@ -59,6 +62,9 @@ const ACCRUAL_OPTIONS = [
 ];
 
 export default function LeaveTypesPage() {
+  useRequirePermission(Permissions.MasterData.DeductionTypes.View)
+  const canManage = usePermission(Permissions.MasterData.DeductionTypes.Manage)
+
   const [items, setItems]           = useState<LeaveType[]>([]);
   const [loading, setLoading]       = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -87,13 +93,11 @@ export default function LeaveTypesPage() {
   }, []);
 
   const openAdd = () => {
-    const fresh = { ...EMPTY };
-    console.log('openAdd fresh:', JSON.stringify(fresh));
     setEditing(null);
-    setForm(fresh);
+    setForm({ ...EMPTY });
     setError('');
     setDialogOpen(true);
-    };
+  };
 
   const openEdit = (item: LeaveType) => {
     setEditing(item);
@@ -107,7 +111,7 @@ export default function LeaveTypesPage() {
       maxCarryDays: String(item.maxCarryDays),
       requiresApproval: item.requiresApproval,
       minNoticeDays: String(item.minNoticeDays),
-      genderRestriction: item.genderRestriction ?? '',  
+      genderRestriction: item.genderRestriction ?? '',
       isActive: item.isActive,
     });
     setError('');
@@ -121,7 +125,6 @@ export default function LeaveTypesPage() {
     }
     setSaving(true);
     setError('');
-    
     try {
       await api.post('/leavetype/save', {
         action: editing ? 'UPDATE' : 'ADD',
@@ -170,9 +173,11 @@ export default function LeaveTypesPage() {
             Define leave entitlements, accrual rules, and approval policies.
           </p>
         </div>
-        <Button variant="solid" icon={<PlusIcon size={16} />} onClick={openAdd}>
-          Add Leave Type
-        </Button>
+        {canManage && (
+          <Button variant="solid" icon={<PlusIcon size={16} />} onClick={openAdd}>
+            Add Leave Type
+          </Button>
+        )}
       </div>
 
       {/* Table */}
@@ -233,7 +238,7 @@ export default function LeaveTypesPage() {
                     </td>
                     <td>{item.minNoticeDays > 0 ? `${item.minNoticeDays}d` : '—'}</td>
                     <td>
-                    {item.genderRestriction
+                      {item.genderRestriction
                         ? <span className="xp-badge xp-badge-info">{item.genderRestriction}</span>
                         : <span className="text-gray-400">—</span>}
                     </td>
@@ -244,14 +249,24 @@ export default function LeaveTypesPage() {
                     </td>
                     <td className="text-center">
                       <div className="flex items-center justify-center gap-1">
-                        <button
-                          onClick={() => openEdit(item)}
-                          className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-primary dark:hover:bg-gray-700 transition-colors"
-                          title="Edit"
-                        >
-                          <Pencil size={15} />
-                        </button>
-                        
+                        {canManage && (
+                          <button
+                            onClick={() => openEdit(item)}
+                            className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-primary dark:hover:bg-gray-700 transition-colors"
+                            title="Edit"
+                          >
+                            <Pencil size={15} />
+                          </button>
+                        )}
+                        {canManage && (
+                          <button
+                            onClick={() => handleDelete(item)}
+                            className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-error dark:hover:bg-gray-700 transition-colors"
+                            title="Delete"
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -271,7 +286,6 @@ export default function LeaveTypesPage() {
         <h5 className="h5 mb-4">{editing ? 'Edit Leave Type' : 'Add Leave Type'}</h5>
 
         <div className="space-y-4">
-          {/* Name + Code */}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="form-label">Name <span className="text-error">*</span></label>
@@ -291,7 +305,6 @@ export default function LeaveTypesPage() {
             </div>
           </div>
 
-          {/* Accrual + Days */}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="form-label">Accrual Type</label>
@@ -316,7 +329,6 @@ export default function LeaveTypesPage() {
             </div>
           </div>
 
-          {/* Notice + Max Carry */}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="form-label">Min Notice Days</label>
@@ -339,50 +351,36 @@ export default function LeaveTypesPage() {
             </div>
           </div>
 
-          {/* Gender Restriction */}
-            <div>
+          <div>
             <label className="form-label">Gender Restriction</label>
             <select
-                className="input w-full"
-                value={form.genderRestriction}
-                onChange={e => setForm(f => ({ ...f, genderRestriction: e.target.value }))}
+              className="input w-full"
+              value={form.genderRestriction}
+              onChange={e => setForm(f => ({ ...f, genderRestriction: e.target.value }))}
             >
-                <option value="">No Restriction</option>
-                <option value="Male">Male</option>
-                <option value="Female">Female</option>
-                <option value="All">All</option>
+              <option value="">No Restriction</option>
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
+              <option value="All">All</option>
             </select>
-            </div>
+          </div>
 
-          {/* Toggles — explicit setForm to avoid generic inference issues */}
           <div className="grid grid-cols-2 gap-3">
             <div className="flex items-center gap-3">
               <span className="text-sm font-medium">Paid Leave</span>
-              <Switcher
-                checked={form.isPaid}
-                onChange={val => setForm(f => ({ ...f, isPaid: val }))}
-              />
+              <Switcher checked={form.isPaid} onChange={val => setForm(f => ({ ...f, isPaid: val }))} />
             </div>
             <div className="flex items-center gap-3">
               <span className="text-sm font-medium">Carry Forward</span>
-              <Switcher
-                checked={form.carryForward}
-                onChange={val => setForm(f => ({ ...f, carryForward: val }))}
-              />
+              <Switcher checked={form.carryForward} onChange={val => setForm(f => ({ ...f, carryForward: val }))} />
             </div>
             <div className="flex items-center gap-3">
               <span className="text-sm font-medium">Requires Approval</span>
-              <Switcher
-                checked={form.requiresApproval}
-                onChange={val => setForm(f => ({ ...f, requiresApproval: val }))}
-              />
+              <Switcher checked={form.requiresApproval} onChange={val => setForm(f => ({ ...f, requiresApproval: val }))} />
             </div>
             <div className="flex items-center gap-3">
               <span className="text-sm font-medium">Active</span>
-              <Switcher
-                checked={form.isActive}
-                onChange={val => setForm(f => ({ ...f, isActive: val }))}
-              />
+              <Switcher checked={form.isActive} onChange={val => setForm(f => ({ ...f, isActive: val }))} />
             </div>
           </div>
 
@@ -390,9 +388,7 @@ export default function LeaveTypesPage() {
         </div>
 
         <div className="flex justify-end gap-2 mt-6">
-          <Button variant="plain" onClick={() => setDialogOpen(false)}>
-            Cancel
-          </Button>
+          <Button variant="plain" onClick={() => setDialogOpen(false)}>Cancel</Button>
           <Button variant="solid" loading={saving} onClick={handleSave}>
             {editing ? 'Update' : 'Create'}
           </Button>

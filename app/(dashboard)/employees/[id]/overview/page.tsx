@@ -143,12 +143,19 @@ export default function OverviewPage() {
 
   const loadAll = async () => {
     try {
-      const [empRes, contractRes, shiftRes, leaveRes] = await Promise.allSettled([
-        api.get<Employee>(`/employees/${employeeId}`),
-        api.get<Contract[]>(`/employees/contracts?employeeId=${employeeId}&isActive=true`),
-        api.get<ShiftAssignment[]>(`shift-assignments/${employeeId}`),
-        api.get<LeaveBalance[]>(`employee-leave-balances/${employeeId}?year=${CURRENT_YEAR}`),
-      ])
+      const [empRes, contractRes, shiftRes, leaveRes] =
+        await Promise.allSettled([
+          api.get<Employee>(`/employees/${employeeId}`),
+          api.get<Contract[]>(
+            `/employees/contracts?employeeId=${employeeId}&isActive=true`,
+          ),
+          api.get<ShiftAssignment[]>(
+            `shift-assignments?employeeId=${employeeId}`,
+          ),
+          api.get<LeaveBalance[]>(
+            `employee-leave-balances/${employeeId}?year=${CURRENT_YEAR}`,
+          ),
+        ]);
 
       if (empRes.status === 'fulfilled') setEmployee(empRes.value.data)
       if (contractRes.status === 'fulfilled') setContract(contractRes.value.data?.[0] ?? null)

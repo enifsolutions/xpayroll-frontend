@@ -8,6 +8,9 @@ import Input from '@/components/ui/Input';
 import Switcher from '@/components/ui/Switcher';
 import { showSuccess, showError } from '@/lib/toast';
 import { PlusIcon, Pencil, Trash2, Eye } from 'lucide-react';
+import { useRequirePermission } from "@/hooks/useRequirePermission";
+import { usePermission } from "@/hooks/usePermission";
+import { Permissions } from "@/lib/permissions";
 
 interface NotificationTemplate {
   id: string;
@@ -51,6 +54,11 @@ const CHANNEL_COLORS: Record<string, string> = {
 };
 
 export default function NotificationTemplatesPage() {
+  useRequirePermission(Permissions.MasterData.NotificationTemplates.View);
+  const canManage = usePermission(
+    Permissions.MasterData.NotificationTemplates.Manage,
+  );
+
   const [items, setItems]             = useState<NotificationTemplate[]>([]);
   const [loading, setLoading]         = useState(true);
   const [dialogOpen, setDialogOpen]   = useState(false);
@@ -66,7 +74,9 @@ export default function NotificationTemplatesPage() {
   const load = async () => {
     try {
       setLoading(true);
-      const res = await api.get<NotificationTemplate[]>('/NotificationTemplates');
+      const res = await api.get<NotificationTemplate[]>(
+        "/notification-templates",
+      );
       setItems(res.data);
     } catch (err: any) {
       showError('Load failed', err?.response?.data?.error ?? 'Could not load notification templates.');
@@ -116,14 +126,14 @@ export default function NotificationTemplatesPage() {
     setSaving(true);
     setError('');
     try {
-      await api.post('/NotificationTemplates/save', {
-        action:       editing ? 'UPDATE' : 'ADD',
-        id:           editing?.id ?? null,
-        code:         form.code.trim().toUpperCase().replace(/\s+/g, '_'),
-        channel:      form.channel,
-        subject:      form.subject.trim() || null,
+      await api.post("/notification-templates/save", {
+        action: editing ? "UPDATE" : "ADD",
+        id: editing?.id ?? null,
+        code: form.code.trim().toUpperCase().replace(/\s+/g, "_"),
+        channel: form.channel,
+        subject: form.subject.trim() || null,
         bodyTemplate: form.bodyTemplate.trim(),
-        isActive:     form.isActive,
+        isActive: form.isActive,
       });
       setDialogOpen(false);
       await load();
@@ -138,7 +148,10 @@ export default function NotificationTemplatesPage() {
   const handleDelete = async (item: NotificationTemplate) => {
     if (!confirm(`Delete template "${item.code}"?`)) return;
     try {
-      await api.post('/NotificationTemplates/save', { action: 'DELETE', id: item.id });
+      await api.post("/notification-templates/save", {
+        action: "DELETE",
+        id: item.id,
+      });
       await load();
       showSuccess('Template deleted', item.code);
     } catch (err: any) {
@@ -158,23 +171,32 @@ export default function NotificationTemplatesPage() {
         <div>
           <h3 className="h3">Notification Templates</h3>
           <p className="text-gray-500 dark:text-gray-400 mt-1">
-            Email, SMS and push notification templates for automated payroll notifications.
+            Email, SMS and push notification templates for automated payroll
+            notifications.
           </p>
         </div>
         <div className="flex items-center gap-3">
           <select
             className="input"
             value={channelFilter}
-            onChange={e => setChannelFilter(e.target.value)}
+            onChange={(e) => setChannelFilter(e.target.value)}
           >
             <option value="">All Channels</option>
-            {CHANNEL_OPTIONS.map(o => (
-              <option key={o.value} value={o.value}>{o.label}</option>
+            {CHANNEL_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
             ))}
           </select>
-          <Button variant="solid" icon={<PlusIcon size={16} />} onClick={openAdd}>
-            Add Template
-          </Button>
+          {canManage && (
+            <Button
+              variant="solid"
+              icon={<PlusIcon size={16} />}
+              onClick={openAdd}
+            >
+              Add Template
+            </Button>
+          )}
         </div>
       </div>
 
@@ -204,50 +226,59 @@ export default function NotificationTemplatesPage() {
                       No notification templates found
                     </td>
                   </tr>
-                ) : filtered.map(item => (
-                  <tr key={item.id}>
-                    <td>
-                      <code className="text-xs bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">
-                        {item.code}
-                      </code>
-                    </td>
-                    <td>
-                      <span className={`xp-badge ${CHANNEL_COLORS[item.channel] ?? 'xp-badge-neutral'}`}>
-                        {channelLabel(item.channel)}
-                      </span>
-                    </td>
-                    <td className="max-w-xs truncate text-gray-500 text-sm">
-                      {item.subject ?? '—'}
-                    </td>
-                    <td>
-                      <span className={`xp-badge ${item.isActive ? 'xp-badge-success' : 'xp-badge-danger'}`}>
-                        {item.isActive ? 'Active' : 'Inactive'}
-                      </span>
-                    </td>
-                    <td className="text-gray-500 text-sm">
-                      {item.updatedAt ? new Date(item.updatedAt).toLocaleDateString() : '—'}
-                    </td>
-                    <td className="text-center">
-                      <div className="flex items-center justify-center gap-1">
-                        <button
-                          onClick={() => openPreview(item)}
-                          className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-primary dark:hover:bg-gray-700 transition-colors"
-                          title="Preview"
+                ) : (
+                  filtered.map((item) => (
+                    <tr key={item.id}>
+                      <td>
+                        <code className="text-xs bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">
+                          {item.code}
+                        </code>
+                      </td>
+                      <td>
+                        <span
+                          className={`xp-badge ${CHANNEL_COLORS[item.channel] ?? "xp-badge-neutral"}`}
                         >
-                          <Eye size={15} />
-                        </button>
-                        <button
-                          onClick={() => openEdit(item)}
-                          className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-primary dark:hover:bg-gray-700 transition-colors"
-                          title="Edit"
+                          {channelLabel(item.channel)}
+                        </span>
+                      </td>
+                      <td className="max-w-xs truncate text-gray-500 text-sm">
+                        {item.subject ?? "—"}
+                      </td>
+                      <td>
+                        <span
+                          className={`xp-badge ${item.isActive ? "xp-badge-success" : "xp-badge-danger"}`}
                         >
-                          <Pencil size={15} />
-                        </button>
-                        
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                          {item.isActive ? "Active" : "Inactive"}
+                        </span>
+                      </td>
+                      <td className="text-gray-500 text-sm">
+                        {item.updatedAt
+                          ? new Date(item.updatedAt).toLocaleDateString()
+                          : "—"}
+                      </td>
+                      <td className="text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          <button
+                            onClick={() => openPreview(item)}
+                            className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-primary dark:hover:bg-gray-700 transition-colors"
+                            title="Preview"
+                          >
+                            <Eye size={15} />
+                          </button>
+                          {canManage && (
+                            <button
+                              onClick={() => openEdit(item)}
+                              className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-primary dark:hover:bg-gray-700 transition-colors"
+                              title="Edit"
+                            >
+                              <Pencil size={15} />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           )}
@@ -260,16 +291,25 @@ export default function NotificationTemplatesPage() {
         onClose={() => setDialogOpen(false)}
         onRequestClose={() => setDialogOpen(false)}
       >
-        <h5 className="h5 mb-4">{editing ? 'Edit Template' : 'Add Notification Template'}</h5>
+        <h5 className="h5 mb-4">
+          {editing ? "Edit Template" : "Add Notification Template"}
+        </h5>
 
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="form-label">Template Code <span className="text-error">*</span></label>
+              <label className="form-label">
+                Template Code <span className="text-error">*</span>
+              </label>
               <Input
                 placeholder="e.g. PAYSLIP_READY"
                 value={form.code}
-                onChange={e => setForm(f => ({ ...f, code: e.target.value.toUpperCase().replace(/\s+/g, '_') }))}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    code: e.target.value.toUpperCase().replace(/\s+/g, "_"),
+                  }))
+                }
                 disabled={!!editing}
               />
             </div>
@@ -278,36 +318,49 @@ export default function NotificationTemplatesPage() {
               <select
                 className="input w-full"
                 value={form.channel}
-                onChange={e => setForm(f => ({ ...f, channel: e.target.value }))}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, channel: e.target.value }))
+                }
               >
-                {CHANNEL_OPTIONS.map(o => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
+                {CHANNEL_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
                 ))}
               </select>
             </div>
           </div>
 
-          {form.channel === 'Email' && (
+          {form.channel === "Email" && (
             <div>
-              <label className="form-label">Subject <span className="text-error">*</span></label>
+              <label className="form-label">
+                Subject <span className="text-error">*</span>
+              </label>
               <Input
                 placeholder="e.g. Your payslip for {{month}} is ready"
                 value={form.subject}
-                onChange={e => setForm(f => ({ ...f, subject: e.target.value }))}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, subject: e.target.value }))
+                }
               />
             </div>
           )}
 
           <div>
-            <label className="form-label">Body Template <span className="text-error">*</span></label>
+            <label className="form-label">
+              Body Template <span className="text-error">*</span>
+            </label>
             <textarea
               className="input w-full h-36 resize-none font-mono text-sm"
               placeholder={`Hi {{employee_name}},\n\nYour payslip for {{period}} is ready...`}
               value={form.bodyTemplate}
-              onChange={e => setForm(f => ({ ...f, bodyTemplate: e.target.value }))}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, bodyTemplate: e.target.value }))
+              }
             />
             <p className="text-xs text-gray-400 mt-1">
-              Available placeholders: {'{{employee_name}}'}, {'{{company_name}}'}, {'{{period}}'}, {'{{amount}}'}
+              Available placeholders: {"{{employee_name}}"},{" "}
+              {"{{company_name}}"}, {"{{period}}"}, {"{{amount}}"}
             </p>
           </div>
 
@@ -315,7 +368,7 @@ export default function NotificationTemplatesPage() {
             <span className="text-sm font-medium">Active</span>
             <Switcher
               checked={form.isActive}
-              onChange={val => setForm(f => ({ ...f, isActive: val }))}
+              onChange={(val) => setForm((f) => ({ ...f, isActive: val }))}
             />
           </div>
 
@@ -323,9 +376,11 @@ export default function NotificationTemplatesPage() {
         </div>
 
         <div className="flex justify-end gap-2 mt-6">
-          <Button variant="plain" onClick={() => setDialogOpen(false)}>Cancel</Button>
+          <Button variant="plain" onClick={() => setDialogOpen(false)}>
+            Cancel
+          </Button>
           <Button variant="solid" loading={saving} onClick={handleSave}>
-            {editing ? 'Update' : 'Create'}
+            {editing ? "Update" : "Create"}
           </Button>
         </div>
       </Dialog>
@@ -341,23 +396,31 @@ export default function NotificationTemplatesPage() {
         {previewItem && (
           <div className="space-y-4">
             <div className="flex items-center gap-3">
-              <span className={`xp-badge ${CHANNEL_COLORS[previewItem.channel] ?? 'xp-badge-neutral'}`}>
+              <span
+                className={`xp-badge ${CHANNEL_COLORS[previewItem.channel] ?? "xp-badge-neutral"}`}
+              >
                 {channelLabel(previewItem.channel)}
               </span>
-              <span className={`xp-badge ${previewItem.isActive ? 'xp-badge-success' : 'xp-badge-danger'}`}>
-                {previewItem.isActive ? 'Active' : 'Inactive'}
+              <span
+                className={`xp-badge ${previewItem.isActive ? "xp-badge-success" : "xp-badge-danger"}`}
+              >
+                {previewItem.isActive ? "Active" : "Inactive"}
               </span>
             </div>
 
             {previewItem.subject && (
               <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Subject</p>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
+                  Subject
+                </p>
                 <p className="text-sm heading-text">{previewItem.subject}</p>
               </div>
             )}
 
             <div>
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Body</p>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
+                Body
+              </p>
               <pre className="text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-3 rounded-lg whitespace-pre-wrap font-mono">
                 {previewItem.bodyTemplate}
               </pre>
@@ -366,7 +429,9 @@ export default function NotificationTemplatesPage() {
         )}
 
         <div className="flex justify-end mt-6">
-          <Button variant="plain" onClick={() => setPreviewOpen(false)}>Close</Button>
+          <Button variant="plain" onClick={() => setPreviewOpen(false)}>
+            Close
+          </Button>
         </div>
       </Dialog>
     </div>

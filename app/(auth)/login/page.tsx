@@ -4,12 +4,15 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import api from '@/lib/axios';
 import { setTokens } from '@/lib/auth';
+import { useAuthStore } from '@/store/authStore';
 import type { AuthResponse, LoginRequest } from '@/types/auth';
 
 export default function LoginPage() {
-  const router = useRouter();
-  const [form, setForm] = useState<LoginRequest>({ email: '', password: '' });
-  const [error, setError] = useState('');
+  const router  = useRouter();
+  const setAuth = useAuthStore((s) => s.setAuth);
+
+  const [form, setForm]     = useState<LoginRequest>({ email: '', password: '' });
+  const [error, setError]   = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -18,13 +21,30 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const { data } = await api.post<AuthResponse>('/auth/login', form);
-      console.log('login response:', data);
+
+      // Persist tokens for axios interceptor
       setTokens(data.tokens.accessToken, data.tokens.refreshToken);
-      console.log('tokens set, redirecting...');
+
+      // Hydrate Zustand store with user + permissions
+      setAuth(
+        data.tokens.accessToken,
+        {
+          userId:     String(data.userId),
+          email:      data.email,
+          firstName:  data.firstName ?? '',
+          lastName:   data.lastName ?? '',
+          systemRole: data.role,
+          permHash:   data.permHash,
+        },
+        data.permissions ?? []
+      );
+
       router.push('/dashboard');
     } catch (err) {
       console.error('login error:', err);
       setError('Invalid email or password.');
+    } finally {
+      setLoading(false);
     }
   };
 

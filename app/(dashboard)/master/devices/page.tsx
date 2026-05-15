@@ -8,6 +8,9 @@ import Input from '@/components/ui/Input';
 import Switcher from '@/components/ui/Switcher';
 import { showSuccess, showError } from '@/lib/toast';
 import { PlusIcon, Pencil, Trash2 } from 'lucide-react';
+import { useRequirePermission } from "@/hooks/useRequirePermission";
+import { usePermission } from "@/hooks/usePermission";
+import { Permissions } from "@/lib/permissions";
 
 interface Branch {
   id: string;
@@ -60,6 +63,9 @@ const TYPE_COLORS: Record<string, string> = {
 };
 
 export default function DevicesPage() {
+  useRequirePermission(Permissions.MasterData.Devices.View);
+  const canManage = usePermission(Permissions.MasterData.Devices.Manage);
+
   const [items, setItems]             = useState<Device[]>([]);
   const [branches, setBranches]       = useState<Branch[]>([]);
   const [loading, setLoading]         = useState(true);
@@ -75,8 +81,8 @@ export default function DevicesPage() {
     try {
       setLoading(true);
       const [devRes, brRes] = await Promise.all([
-        api.get<Device[]>('/Device'),
-        api.get<Branch[]>('/branches'),
+        api.get<Device[]>("/devices"),
+        api.get<Branch[]>("/branches"),
       ]);
       setItems(devRes.data);
       setBranches(brRes.data);
@@ -122,16 +128,16 @@ export default function DevicesPage() {
     setSaving(true);
     setError('');
     try {
-      await api.post('/Device/save', {
-        action:       editing ? 'UPDATE' : 'ADD',
-        id:           editing?.id ?? null,
-        name:         form.name.trim(),
-        deviceCode:   form.deviceCode.trim(),
-        deviceType:   form.deviceType,
-        branchId:     form.branchId || null,
-        locationTag:  form.locationTag.trim() || null,
+      await api.post("/devices/save", {
+        action: editing ? "UPDATE" : "ADD",
+        id: editing?.id ?? null,
+        name: form.name.trim(),
+        deviceCode: form.deviceCode.trim(),
+        deviceType: form.deviceType,
+        branchId: form.branchId || null,
+        locationTag: form.locationTag.trim() || null,
         apiTokenHash: form.apiToken || undefined,
-        isActive:     form.isActive,
+        isActive: form.isActive,
       });
       setDialogOpen(false);
       await load();
@@ -146,7 +152,7 @@ export default function DevicesPage() {
   const handleDelete = async (item: Device) => {
     if (!confirm(`Delete device "${item.name}"?`)) return;
     try {
-      await api.post('/Device/save', { action: 'DELETE', id: item.id });
+      await api.post("/devices/save", { action: "DELETE", id: item.id });
       await load();
       showSuccess('Device deleted', item.name);
     } catch (err: any) {
@@ -173,16 +179,24 @@ export default function DevicesPage() {
           <select
             className="input"
             value={typeFilter}
-            onChange={e => setTypeFilter(e.target.value)}
+            onChange={(e) => setTypeFilter(e.target.value)}
           >
             <option value="">All Types</option>
-            {DEVICE_TYPE_OPTIONS.map(o => (
-              <option key={o.value} value={o.value}>{o.label}</option>
+            {DEVICE_TYPE_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
             ))}
           </select>
-          <Button variant="solid" icon={<PlusIcon size={16} />} onClick={openAdd}>
-            Register Device
-          </Button>
+          {canManage && (
+            <Button
+              variant="solid"
+              icon={<PlusIcon size={16} />}
+              onClick={openAdd}
+            >
+              Register Device
+            </Button>
+          )}
         </div>
       </div>
 
@@ -214,43 +228,56 @@ export default function DevicesPage() {
                       No devices found
                     </td>
                   </tr>
-                ) : filtered.map(item => (
-                  <tr key={item.id}>
-                    <td className="font-medium heading-text">{item.name}</td>
-                    <td>
-                      <code className="text-xs bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">
-                        {item.deviceCode}
-                      </code>
-                    </td>
-                    <td>
-                      <span className={`xp-badge ${TYPE_COLORS[item.deviceType] ?? 'xp-badge-neutral'}`}>
-                        {typeLabel(item.deviceType)}
-                      </span>
-                    </td>
-                    <td className="text-gray-500">{item.branchName ?? '—'}</td>
-                    <td className="text-gray-500">{item.locationTag ?? '—'}</td>
-                    <td className="text-gray-500 text-sm">
-                      {item.lastSyncAt ? new Date(item.lastSyncAt).toLocaleString() : 'Never'}
-                    </td>
-                    <td>
-                      <span className={`xp-badge ${item.isActive ? 'xp-badge-success' : 'xp-badge-danger'}`}>
-                        {item.isActive ? 'Active' : 'Inactive'}
-                      </span>
-                    </td>
-                    <td className="text-center">
-                      <div className="flex items-center justify-center gap-1">
-                        <button
-                          onClick={() => openEdit(item)}
-                          className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-primary dark:hover:bg-gray-700 transition-colors"
-                          title="Edit"
+                ) : (
+                  filtered.map((item) => (
+                    <tr key={item.id}>
+                      <td className="font-medium heading-text">{item.name}</td>
+                      <td>
+                        <code className="text-xs bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">
+                          {item.deviceCode}
+                        </code>
+                      </td>
+                      <td>
+                        <span
+                          className={`xp-badge ${TYPE_COLORS[item.deviceType] ?? "xp-badge-neutral"}`}
                         >
-                          <Pencil size={15} />
-                        </button>
-                        
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                          {typeLabel(item.deviceType)}
+                        </span>
+                      </td>
+                      <td className="text-gray-500">
+                        {item.branchName ?? "—"}
+                      </td>
+                      <td className="text-gray-500">
+                        {item.locationTag ?? "—"}
+                      </td>
+                      <td className="text-gray-500 text-sm">
+                        {item.lastSyncAt
+                          ? new Date(item.lastSyncAt).toLocaleString()
+                          : "Never"}
+                      </td>
+                      <td>
+                        <span
+                          className={`xp-badge ${item.isActive ? "xp-badge-success" : "xp-badge-danger"}`}
+                        >
+                          {item.isActive ? "Active" : "Inactive"}
+                        </span>
+                      </td>
+                      <td className="text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          {canManage && (
+                            <button
+                              onClick={() => openEdit(item)}
+                              className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-primary dark:hover:bg-gray-700 transition-colors"
+                              title="Edit"
+                            >
+                              <Pencil size={15} />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           )}
@@ -263,24 +290,34 @@ export default function DevicesPage() {
         onClose={() => setDialogOpen(false)}
         onRequestClose={() => setDialogOpen(false)}
       >
-        <h5 className="h5 mb-4">{editing ? 'Edit Device' : 'Register Device'}</h5>
+        <h5 className="h5 mb-4">
+          {editing ? "Edit Device" : "Register Device"}
+        </h5>
 
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="form-label">Device Name <span className="text-error">*</span></label>
+              <label className="form-label">
+                Device Name <span className="text-error">*</span>
+              </label>
               <Input
                 placeholder="e.g. Main Entrance"
                 value={form.name}
-                onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, name: e.target.value }))
+                }
               />
             </div>
             <div>
-              <label className="form-label">Device Code <span className="text-error">*</span></label>
+              <label className="form-label">
+                Device Code <span className="text-error">*</span>
+              </label>
               <Input
                 placeholder="e.g. BIO-001"
                 value={form.deviceCode}
-                onChange={e => setForm(f => ({ ...f, deviceCode: e.target.value }))}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, deviceCode: e.target.value }))
+                }
               />
             </div>
           </div>
@@ -290,10 +327,14 @@ export default function DevicesPage() {
             <select
               className="input w-full"
               value={form.deviceType}
-              onChange={e => setForm(f => ({ ...f, deviceType: e.target.value }))}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, deviceType: e.target.value }))
+              }
             >
-              {DEVICE_TYPE_OPTIONS.map(o => (
-                <option key={o.value} value={o.value}>{o.label}</option>
+              {DEVICE_TYPE_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
               ))}
             </select>
           </div>
@@ -304,11 +345,15 @@ export default function DevicesPage() {
               <select
                 className="input w-full"
                 value={form.branchId}
-                onChange={e => setForm(f => ({ ...f, branchId: e.target.value }))}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, branchId: e.target.value }))
+                }
               >
                 <option value="">— None —</option>
-                {branches.map(b => (
-                  <option key={b.id} value={b.id}>{b.name}</option>
+                {branches.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name}
+                  </option>
                 ))}
               </select>
             </div>
@@ -317,7 +362,9 @@ export default function DevicesPage() {
               <Input
                 placeholder="e.g. Floor 2, Reception"
                 value={form.locationTag}
-                onChange={e => setForm(f => ({ ...f, locationTag: e.target.value }))}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, locationTag: e.target.value }))
+                }
               />
             </div>
           </div>
@@ -328,12 +375,20 @@ export default function DevicesPage() {
             </label>
             <Input
               type="password"
-              placeholder={editing ? 'Leave blank to keep existing token' : 'Enter device API token'}
+              placeholder={
+                editing
+                  ? "Leave blank to keep existing token"
+                  : "Enter device API token"
+              }
               value={form.apiToken}
-              onChange={e => setForm(f => ({ ...f, apiToken: e.target.value }))}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, apiToken: e.target.value }))
+              }
             />
             {editing && (
-              <p className="text-xs text-gray-400 mt-1">Only fill in to rotate the existing token.</p>
+              <p className="text-xs text-gray-400 mt-1">
+                Only fill in to rotate the existing token.
+              </p>
             )}
           </div>
 
@@ -341,7 +396,7 @@ export default function DevicesPage() {
             <span className="text-sm font-medium">Active</span>
             <Switcher
               checked={form.isActive}
-              onChange={val => setForm(f => ({ ...f, isActive: val }))}
+              onChange={(val) => setForm((f) => ({ ...f, isActive: val }))}
             />
           </div>
 
@@ -349,9 +404,11 @@ export default function DevicesPage() {
         </div>
 
         <div className="flex justify-end gap-2 mt-6">
-          <Button variant="plain" onClick={() => setDialogOpen(false)}>Cancel</Button>
+          <Button variant="plain" onClick={() => setDialogOpen(false)}>
+            Cancel
+          </Button>
           <Button variant="solid" loading={saving} onClick={handleSave}>
-            {editing ? 'Update' : 'Register'}
+            {editing ? "Update" : "Register"}
           </Button>
         </div>
       </Dialog>

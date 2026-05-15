@@ -8,6 +8,9 @@ import Input from '@/components/ui/Input';
 import Switcher from '@/components/ui/Switcher';
 import { showSuccess, showError } from '@/lib/toast';
 import { PlusIcon, Pencil, Trash2 } from 'lucide-react';
+import { useRequirePermission } from "@/hooks/useRequirePermission";
+import { usePermission } from "@/hooks/usePermission";
+import { Permissions } from "@/lib/permissions";
 
 interface PublicHoliday {
   id: string;
@@ -41,6 +44,9 @@ function getDayOfWeek(d: string) {
 }
 
 export default function PublicHolidaysPage() {
+  useRequirePermission(Permissions.MasterData.PublicHolidays.View);
+  const canManage = usePermission(Permissions.MasterData.PublicHolidays.Manage);
+
   const [items, setItems]           = useState<PublicHoliday[]>([]);
   const [loading, setLoading]       = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -139,20 +145,31 @@ export default function PublicHolidaysPage() {
         <div>
           <h3 className="h3">Public Holidays</h3>
           <p className="text-gray-500 dark:text-gray-400 mt-1">
-            Manage company-wide public holidays used in payroll and leave calculations.
+            Manage company-wide public holidays used in payroll and leave
+            calculations.
           </p>
         </div>
         <div className="flex items-center gap-3">
           <select
             className="input"
             value={yearFilter}
-            onChange={e => setYearFilter(Number(e.target.value))}
+            onChange={(e) => setYearFilter(Number(e.target.value))}
           >
-            {years.map(y => <option key={y} value={y}>{y}</option>)}
+            {years.map((y) => (
+              <option key={y} value={y}>
+                {y}
+              </option>
+            ))}
           </select>
-          <Button variant="solid" icon={<PlusIcon size={16} />} onClick={openAdd}>
-            Add Holiday
-          </Button>
+          {canManage && (
+            <Button
+              variant="solid"
+              icon={<PlusIcon size={16} />}
+              onClick={openAdd}
+            >
+              Add Holiday
+            </Button>
+          )}
         </div>
       </div>
 
@@ -161,19 +178,29 @@ export default function PublicHolidaysPage() {
         <div className="grid grid-cols-3 gap-4 mb-6">
           <div className="card">
             <div className="card-body py-4">
-              <p className="text-xs text-gray-500 uppercase tracking-wider">Total</p>
-              <p className="text-2xl font-bold heading-text mt-1">{items.length}</p>
+              <p className="text-xs text-gray-500 uppercase tracking-wider">
+                Total
+              </p>
+              <p className="text-2xl font-bold heading-text mt-1">
+                {items.length}
+              </p>
             </div>
           </div>
           <div className="card">
             <div className="card-body py-4">
-              <p className="text-xs text-gray-500 uppercase tracking-wider">Mandatory</p>
-              <p className="text-2xl font-bold heading-text mt-1">{mandatory}</p>
+              <p className="text-xs text-gray-500 uppercase tracking-wider">
+                Mandatory
+              </p>
+              <p className="text-2xl font-bold heading-text mt-1">
+                {mandatory}
+              </p>
             </div>
           </div>
           <div className="card">
             <div className="card-body py-4">
-              <p className="text-xs text-gray-500 uppercase tracking-wider">Optional</p>
+              <p className="text-xs text-gray-500 uppercase tracking-wider">
+                Optional
+              </p>
               <p className="text-2xl font-bold heading-text mt-1">{optional}</p>
             </div>
           </div>
@@ -205,36 +232,48 @@ export default function PublicHolidaysPage() {
                       No public holidays for {yearFilter}
                     </td>
                   </tr>
-                ) : items.map(item => (
-                  <tr key={item.id}>
-                    <td className="font-medium text-primary">{formatDate(item.holidayDate)}</td>
-                    <td className="text-gray-500 text-sm">{getDayOfWeek(item.holidayDate)}</td>
-                    <td className="font-medium heading-text">{item.name}</td>
-                    <td>
-                      <span className={`xp-badge ${item.isOptional ? 'xp-badge-warning' : 'xp-badge-info'}`}>
-                        {item.isOptional ? 'Optional' : 'Mandatory'}
-                      </span>
-                    </td>
-                    <td className="text-center">
-                      <div className="flex items-center justify-center gap-1">
-                        <button
-                          onClick={() => openEdit(item)}
-                          className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-primary dark:hover:bg-gray-700 transition-colors"
-                          title="Edit"
+                ) : (
+                  items.map((item) => (
+                    <tr key={item.id}>
+                      <td className="font-medium text-primary">
+                        {formatDate(item.holidayDate)}
+                      </td>
+                      <td className="text-gray-500 text-sm">
+                        {getDayOfWeek(item.holidayDate)}
+                      </td>
+                      <td className="font-medium heading-text">{item.name}</td>
+                      <td>
+                        <span
+                          className={`xp-badge ${item.isOptional ? "xp-badge-warning" : "xp-badge-info"}`}
                         >
-                          <Pencil size={15} />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(item)}
-                          className="p-1.5 rounded-lg text-gray-500 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20 transition-colors"
-                          title="Delete"
-                        >
-                          <Trash2 size={15} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                          {item.isOptional ? "Optional" : "Mandatory"}
+                        </span>
+                      </td>
+                      <td className="text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          {canManage && (
+                            <button
+                              onClick={() => openEdit(item)}
+                              className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-primary dark:hover:bg-gray-700 transition-colors"
+                              title="Edit"
+                            >
+                              <Pencil size={15} />
+                            </button>
+                          )}
+                          {canManage && (
+                            <button
+                              onClick={() => handleDelete(item)}
+                              className="p-1.5 rounded-lg text-gray-500 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20 transition-colors"
+                              title="Delete"
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           )}
@@ -247,33 +286,43 @@ export default function PublicHolidaysPage() {
         onClose={() => setDialogOpen(false)}
         onRequestClose={() => setDialogOpen(false)}
       >
-        <h5 className="h5 mb-4">{editing ? 'Edit Holiday' : 'Add Public Holiday'}</h5>
+        <h5 className="h5 mb-4">
+          {editing ? "Edit Holiday" : "Add Public Holiday"}
+        </h5>
 
         <div className="space-y-4">
           <div>
-            <label className="form-label">Name <span className="text-error">*</span></label>
+            <label className="form-label">
+              Name <span className="text-error">*</span>
+            </label>
             <Input
               placeholder="e.g. Independence Day"
               value={form.name}
-              onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
             />
           </div>
           <div>
-            <label className="form-label">Date <span className="text-error">*</span></label>
+            <label className="form-label">
+              Date <span className="text-error">*</span>
+            </label>
             <Input
               type="date"
               value={form.holidayDate}
-              onChange={e => setForm(f => ({ ...f, holidayDate: e.target.value }))}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, holidayDate: e.target.value }))
+              }
             />
           </div>
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium">Optional Holiday</p>
-              <p className="text-xs text-gray-500 mt-0.5">Employees can choose whether to take this day off</p>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Employees can choose whether to take this day off
+              </p>
             </div>
             <Switcher
               checked={form.isOptional}
-              onChange={val => setForm(f => ({ ...f, isOptional: val }))}
+              onChange={(val) => setForm((f) => ({ ...f, isOptional: val }))}
             />
           </div>
 
@@ -281,9 +330,11 @@ export default function PublicHolidaysPage() {
         </div>
 
         <div className="flex justify-end gap-2 mt-6">
-          <Button variant="plain" onClick={() => setDialogOpen(false)}>Cancel</Button>
+          <Button variant="plain" onClick={() => setDialogOpen(false)}>
+            Cancel
+          </Button>
           <Button variant="solid" loading={saving} onClick={handleSave}>
-            {editing ? 'Update' : 'Add Holiday'}
+            {editing ? "Update" : "Add Holiday"}
           </Button>
         </div>
       </Dialog>

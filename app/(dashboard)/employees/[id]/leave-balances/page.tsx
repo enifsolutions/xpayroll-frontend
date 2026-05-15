@@ -9,6 +9,8 @@ import Input from '@/components/ui/Input'
 import ConfirmDialog from '@/components/ui/ConfirmDialog'
 import { showSuccess, showError } from '@/lib/toast'
 import api from '@/lib/axios'
+import { usePermission } from "@/hooks/usePermission";
+import { Permissions } from "@/lib/permissions";
 import {
   EmployeeLeaveBalance, LeaveTypeOption, LeaveBalanceForm, defaultForm,
 } from './leave-balances.types'
@@ -34,6 +36,8 @@ function BalanceBar({ used, entitled, carried }: { used: number; entitled: numbe
 export default function LeaveBalancesPage() {
   const { id: employeeId } = useParams<{ id: string }>()
   const initialized = useRef(false)
+  const canManage = usePermission(Permissions.HR.Leave.Manage);
+
 
   const [balances,    setBalances]    = useState<EmployeeLeaveBalance[]>([])
   const [leaveTypes,  setLeaveTypes]  = useState<LeaveTypeOption[]>([])
@@ -59,9 +63,9 @@ export default function LeaveBalancesPage() {
   const load = async (year = yearFilter) => {
     try {
       const [bRes, ltRes] = await Promise.all([
-        api.get(`employee-leave-balances/${employeeId}?year=${year}`),
-        api.get('leavetype'),
-      ])
+        api.get(`employee-leave-balances?employeeId=${employeeId}`),
+        api.get("leave-types"),
+      ]);
       setBalances(bRes.data)
       setLeaveTypes(ltRes.data)
     } catch {
@@ -167,7 +171,9 @@ export default function LeaveBalancesPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h5 className="h5">Leave Balances</h5>
-          <p className="text-sm text-gray-500 mt-0.5">Manage leave entitlements and balances by year.</p>
+          <p className="text-sm text-gray-500 mt-0.5">
+            Manage leave entitlements and balances by year.
+          </p>
         </div>
         <div className="flex items-center gap-3">
           {/* Year filter */}
@@ -177,12 +183,20 @@ export default function LeaveBalancesPage() {
             onChange={(e) => handleYearChange(parseInt(e.target.value))}
           >
             {years.map((y) => (
-              <option key={y} value={y}>{y}</option>
+              <option key={y} value={y}>
+                {y}
+              </option>
             ))}
           </select>
-          <Button variant="solid" icon={<PlusIcon size={16} />} onClick={openAdd}>
-            Add Balance
-          </Button>
+          {canManage && (
+            <Button
+              variant="solid"
+              icon={<PlusIcon size={16} />}
+              onClick={openAdd}
+            >
+              Add Balance
+            </Button>
+          )}
         </div>
       </div>
 
@@ -193,7 +207,8 @@ export default function LeaveBalancesPage() {
         </div>
       ) : balances.length === 0 ? (
         <div className="text-center py-16 text-gray-400">
-          No leave balances for {yearFilter}. Click <strong>Add Balance</strong> to get started.
+          No leave balances for {yearFilter}. Click <strong>Add Balance</strong>{" "}
+          to get started.
         </div>
       ) : (
         <table className="table-default table-hover w-full">
@@ -213,11 +228,23 @@ export default function LeaveBalancesPage() {
             {balances.map((b) => (
               <tr key={b.id}>
                 <td>
-                  <span className="heading-text font-medium">{b.leaveTypeName}</span>
-                  <span className="ml-2 text-xs text-gray-400">{b.leaveTypeCode}</span>
+                  <span className="heading-text font-medium">
+                    {b.leaveTypeName}
+                  </span>
+                  <span className="ml-2 text-xs text-gray-400">
+                    {b.leaveTypeCode}
+                  </span>
                   <div className="flex gap-1 mt-0.5">
-                    {b.isPaid && <span className="xp-badge xp-badge-success text-xs">Paid</span>}
-                    {b.carryForward && <span className="xp-badge xp-badge-info text-xs">Carry Fwd</span>}
+                    {b.isPaid && (
+                      <span className="xp-badge xp-badge-success text-xs">
+                        Paid
+                      </span>
+                    )}
+                    {b.carryForward && (
+                      <span className="xp-badge xp-badge-info text-xs">
+                        Carry Fwd
+                      </span>
+                    )}
                   </div>
                 </td>
                 <td className="text-gray-500">{b.year}</td>
@@ -225,29 +252,45 @@ export default function LeaveBalancesPage() {
                 <td className="text-right text-gray-500">{b.carriedForward}</td>
                 <td className="text-right text-gray-500">{b.used}</td>
                 <td className="text-right font-medium">
-                  <span className={b.remaining < 0 ? 'text-red-500' : b.remaining === 0 ? 'text-gray-400' : 'text-primary'}>
+                  <span
+                    className={
+                      b.remaining < 0
+                        ? "text-red-500"
+                        : b.remaining === 0
+                          ? "text-gray-400"
+                          : "text-primary"
+                    }
+                  >
                     {b.remaining}
                   </span>
                 </td>
                 <td>
-                  <BalanceBar used={b.used} entitled={b.entitled} carried={b.carriedForward} />
+                  <BalanceBar
+                    used={b.used}
+                    entitled={b.entitled}
+                    carried={b.carriedForward}
+                  />
                 </td>
                 <td>
                   <div className="flex justify-end gap-1">
-                    <button
-                      onClick={() => openEdit(b)}
-                      className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 hover:text-primary transition-colors"
-                      title="Edit"
-                    >
-                      <Pencil size={15} />
-                    </button>
-                    <button
-                      onClick={() => promptDelete(b)}
-                      className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-gray-500 hover:text-red-500 transition-colors"
-                      title="Remove"
-                    >
-                      <Trash2 size={15} />
-                    </button>
+                    {canManage && (
+                      <button
+                        onClick={() => openEdit(b)}
+                        className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 hover:text-primary transition-colors"
+                        title="Edit"
+                      >
+                        <Pencil size={15} />
+                      </button>
+                    )}
+                    {canManage && (
+                      <button
+                        onClick={() => promptDelete(b)}
+                        className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-gray-500 hover:text-red-500 transition-colors"
+                        title="Remove"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>
@@ -257,35 +300,52 @@ export default function LeaveBalancesPage() {
       )}
 
       {/* Add / Edit Dialog */}
-      <Dialog isOpen={dialogOpen} onClose={closeDialog} onRequestClose={closeDialog}>
+      <Dialog
+        isOpen={dialogOpen}
+        onClose={closeDialog}
+        onRequestClose={closeDialog}
+      >
         <div className="p-6 w-full max-w-md">
-          <h5 className="h5 mb-4">{editing ? 'Edit Leave Balance' : 'Add Leave Balance'}</h5>
+          <h5 className="h5 mb-4">
+            {editing ? "Edit Leave Balance" : "Add Leave Balance"}
+          </h5>
           <div className="space-y-4">
-
             <div>
-              <label className="form-label">Leave Type <span className="text-red-500">*</span></label>
+              <label className="form-label">
+                Leave Type <span className="text-red-500">*</span>
+              </label>
               <select
                 className="input w-full"
                 value={form.leaveTypeId}
-                onChange={(e) => setForm({ ...form, leaveTypeId: e.target.value })}
+                onChange={(e) =>
+                  setForm({ ...form, leaveTypeId: e.target.value })
+                }
                 disabled={!!editing}
               >
                 <option value="">Select leave type…</option>
                 {leaveTypes.map((lt) => (
-                  <option key={lt.id} value={lt.id}>{lt.name} ({lt.code})</option>
+                  <option key={lt.id} value={lt.id}>
+                    {lt.name} ({lt.code})
+                  </option>
                 ))}
               </select>
             </div>
 
             <div>
-              <label className="form-label">Year <span className="text-red-500">*</span></label>
+              <label className="form-label">
+                Year <span className="text-red-500">*</span>
+              </label>
               <select
                 className="input w-full"
                 value={form.year}
                 onChange={(e) => setForm({ ...form, year: e.target.value })}
                 disabled={!!editing}
               >
-                {years.map((y) => <option key={y} value={y}>{y}</option>)}
+                {years.map((y) => (
+                  <option key={y} value={y}>
+                    {y}
+                  </option>
+                ))}
               </select>
             </div>
 
@@ -297,7 +357,9 @@ export default function LeaveBalancesPage() {
                   step="0.5"
                   min="0"
                   value={form.entitled}
-                  onChange={(e) => setForm({ ...form, entitled: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, entitled: e.target.value })
+                  }
                 />
               </div>
               <div>
@@ -307,7 +369,9 @@ export default function LeaveBalancesPage() {
                   step="0.5"
                   min="0"
                   value={form.carriedForward}
-                  onChange={(e) => setForm({ ...form, carriedForward: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, carriedForward: e.target.value })
+                  }
                 />
               </div>
               <div>
@@ -324,8 +388,12 @@ export default function LeaveBalancesPage() {
 
             {/* Computed remaining */}
             <div className="flex justify-between items-center px-4 py-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-              <span className="text-sm text-gray-500">Remaining (computed)</span>
-              <span className={`font-semibold text-lg ${formRemaining < 0 ? 'text-red-500' : 'text-primary'}`}>
+              <span className="text-sm text-gray-500">
+                Remaining (computed)
+              </span>
+              <span
+                className={`font-semibold text-lg ${formRemaining < 0 ? "text-red-500" : "text-primary"}`}
+              >
                 {formRemaining.toFixed(1)} days
               </span>
             </div>
@@ -333,9 +401,11 @@ export default function LeaveBalancesPage() {
             {error && <p className="text-error text-sm">{error}</p>}
 
             <div className="flex justify-end gap-2 pt-2">
-              <Button variant="plain" onClick={closeDialog} disabled={saving}>Cancel</Button>
+              <Button variant="plain" onClick={closeDialog} disabled={saving}>
+                Cancel
+              </Button>
               <Button variant="solid" loading={saving} onClick={handleSave}>
-                {editing ? 'Update' : 'Add Balance'}
+                {editing ? "Update" : "Add Balance"}
               </Button>
             </div>
           </div>
@@ -347,13 +417,20 @@ export default function LeaveBalancesPage() {
         open={confirmOpen}
         variant="danger"
         title="Remove Leave Balance"
-        message={deleteTarget ? `Are you sure you want to remove the "${deleteTarget.leaveTypeName}" balance for ${deleteTarget.year}?` : ''}
+        message={
+          deleteTarget
+            ? `Are you sure you want to remove the "${deleteTarget.leaveTypeName}" balance for ${deleteTarget.year}?`
+            : ""
+        }
         confirmLabel="Yes, Remove"
         cancelLabel="Keep It"
         loading={deleting}
         onConfirm={handleDelete}
-        onCancel={() => { setConfirmOpen(false); setDeleteTarget(null) }}
+        onCancel={() => {
+          setConfirmOpen(false);
+          setDeleteTarget(null);
+        }}
       />
     </>
-  )
+  );
 }

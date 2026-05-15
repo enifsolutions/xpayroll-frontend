@@ -10,6 +10,9 @@ import Switcher from '@/components/ui/Switcher';
 import { Pencil, Trash2 } from 'lucide-react';
 import Badge from '@/components/ui/Badge';
 import { showSuccess, showError } from '@/lib/toast';
+import { useRequirePermission } from "@/hooks/useRequirePermission";
+import { usePermission } from "@/hooks/usePermission";
+import { Permissions } from "@/lib/permissions";
 
 interface Branch {
   id: number;
@@ -43,6 +46,9 @@ const EMPTY_FORM: BranchForm = {
 };
 
 export default function BranchesPage() {
+  useRequirePermission(Permissions.MasterData.Branches.View);
+  const canManage = usePermission(Permissions.MasterData.Branches.Manage);
+
   const [branches, setBranches]   = useState<Branch[]>([]);
   const [loading, setLoading]     = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -132,9 +138,15 @@ export default function BranchesPage() {
             Manage your company branches
           </p>
         </div>
-        <Button variant="solid" icon={<PlusIcon size={16} />} onClick={openAdd}>
-          Add Branch
-        </Button>
+        {canManage && (
+          <Button
+            variant="solid"
+            icon={<PlusIcon size={16} />}
+            onClick={openAdd}
+          >
+            Add Branch
+          </Button>
+        )}
       </div>
 
       {error && (
@@ -174,27 +186,31 @@ export default function BranchesPage() {
                   branches.map((b) => (
                     <tr key={b.id}>
                       <td className="font-medium heading-text">{b.name}</td>
-                      <td>{b.code ?? '—'}</td>
-                      <td>{b.phone ?? '—'}</td>
-                      <td>{b.email ?? '—'}</td>
+                      <td>{b.code ?? "—"}</td>
+                      <td>{b.phone ?? "—"}</td>
+                      <td>{b.email ?? "—"}</td>
                       <td>
                         {b.isHeadOffice && (
                           <span className="badge badge-info">Head Office</span>
                         )}
                       </td>
                       <td>
-                        <span className={`xp-badge ${b.isActive ? 'xp-badge-success' : 'xp-badge-danger'}`}>
-                          {b.isActive ? 'Active' : 'Inactive'}
+                        <span
+                          className={`xp-badge ${b.isActive ? "xp-badge-success" : "xp-badge-danger"}`}
+                        >
+                          {b.isActive ? "Active" : "Inactive"}
                         </span>
                       </td>
                       <td className="text-center">
-                        <button
-                          onClick={() => openEdit(b)}
-                          className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-primary dark:hover:bg-gray-700 transition-colors"
-                          title="Edit"
-                        >
-                          <Pencil size={15} />
-                        </button>
+                        {canManage && (
+                          <button
+                            onClick={() => openEdit(b)}
+                            className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-primary dark:hover:bg-gray-700 transition-colors"
+                            title="Edit"
+                          >
+                            <Pencil size={15} />
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))
@@ -211,12 +227,13 @@ export default function BranchesPage() {
         onClose={() => setDialogOpen(false)}
         onRequestClose={() => setDialogOpen(false)}
       >
-        <h5 className="h5 mb-4">{editing ? 'Edit Branch' : 'Add Branch'}</h5>
-
+        <h5 className="h5 mb-4">{editing ? "Edit Branch" : "Add Branch"}</h5>
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="form-label">Branch Name <span className="text-error">*</span></label>
+              <label className="form-label">
+                Branch Name <span className="text-error">*</span>
+              </label>
               <Input
                 placeholder="e.g. Colombo Head Office"
                 value={form.name}
@@ -278,7 +295,7 @@ export default function BranchesPage() {
                 onChange={(val) => setForm({ ...form, isActive: val })}
               />
             </label>
-          </div>                 
+          </div>
 
           {error && <p className="text-error text-sm">{error}</p>}
         </div>
@@ -287,12 +304,8 @@ export default function BranchesPage() {
           <Button variant="plain" onClick={() => setDialogOpen(false)}>
             Cancel
           </Button>
-          <Button
-            variant="solid"
-            loading={saving}
-            onClick={handleSave}
-          >
-            {editing ? 'Update' : 'Create'}
+          <Button variant="solid" loading={saving} onClick={handleSave}>
+            {editing ? "Update" : "Create"}
           </Button>
         </div>
       </Dialog>

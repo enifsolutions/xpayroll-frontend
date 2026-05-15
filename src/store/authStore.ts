@@ -1,5 +1,6 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
+
+const STORAGE_KEY = 'xp_auth'
 
 interface AuthUser {
   userId: string
@@ -13,73 +14,55 @@ interface AuthUser {
 interface AuthState {
   token: string | null
   user: AuthUser | null
-  permissions: Set<string>
+  permissions: string[]
 
   setAuth: (token: string, user: AuthUser, permissions: string[]) => void
   clearAuth: () => void
   hasPermission: (key: string) => boolean
 }
 
-export const useAuthStore = create<AuthState>()(
-  persist(
-    (set, get) => ({
-      token:       null,
-      user:        null,
-      permissions: new Set<string>(),
+// Read initial state from localStorage on store creation
+function loadFromStorage(): { token: string | null; user: AuthUser | null; permissions: string[] } {
+  if (typeof window === 'undefined') return { token: null, user: null, permissions: [] }
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (!raw) return { token: null, user: null, permissions: [] }
+    return JSON.parse(raw)
+  } catch {
+    return { token: null, user: null, permissions: [] }
+  }
+}
 
-      setAuth: (token, user, permissionsArray) => {
-        set({
-          token,
-          user,
-          permissions: new Set(permissionsArray),
-        })
-        // Also write token to xp_access key for axios interceptor compatibility
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('xp_access', token)
-        }
-      },
+function saveToStorage(token: string | null, user: AuthUser | null, permissions: string[]) {
+  if (typeof window === 'undefined') return
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ token, user, permissions }))
+  } catch {}
+}
 
-      clearAuth: () => {
-        set({ token: null, user: null, permissions: new Set() })
-        if (typeof window !== 'undefined') {
-          localStorage.removeItem('xp_access')
-        }
-      },
+const initial = loadFromStorage()
 
-      hasPermission: (key: string) => {
-        const { user, permissions } = get()
-        // SuperAdmin bypasses all checks (mirrors backend short-circuit)
-        if (user?.systemRole === 'SuperAdmin') return true
-        return permissions.has(key)
-      },
-    }),
-    {
-      name: 'xp_auth',
-      // Custom serializer — Set is not JSON-serializable by default
-      storage: {
-        getItem: (name) => {
-          const str = localStorage.getItem(name)
-          if (!str) return null
-          const parsed = JSON.parse(str)
-          // Re-hydrate permissions as Set
-          if (parsed?.state?.permissions) {
-            parsed.state.permissions = new Set(parsed.state.permissions)
-          }
-          return parsed
-        },
-        setItem: (name, value) => {
-          const toStore = {
-            ...value,
-            state: {
-              ...value.state,
-              // Serialize Set to array for storage
-              permissions: Array.from(value.state.permissions ?? []),
-            },
-          }
-          localStorage.setItem(name, JSON.stringify(toStore))
-        },
-        removeItem: (name) => localStorage.removeItem(name),
-      },
-    }
-  )
-)
+export const useAuthStore = create<AuthState>()((set, get) => ({
+  token:       initial.token,
+  user:        initial.user,
+  permissions: initial.permissions,
+
+  setAuth: (token, user, permissions) => {
+    set({ token, user, permissions })
+    localStorage.setItem('xp_access', token)
+    saveToStorage(token, user, permissions)
+  },
+
+  clearAuth: () => {
+    set({ token: null, user: null, permissions: [] })
+    localStorage.removeItem('xp_access')
+    localStorage.removeItem('xp_refresh')
+    localStorage.removeItem(STORAGE_KEY)
+  },
+
+  hasPermission: (key: string) => {
+    const { user, permissions } = get()
+    if (user?.systemRole === 'SuperAdmin') return true
+    return permissions.includes(key)
+  },
+}))

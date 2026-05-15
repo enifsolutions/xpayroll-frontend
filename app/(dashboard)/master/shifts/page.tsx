@@ -8,6 +8,9 @@ import Input from '@/components/ui/Input';
 import Switcher from '@/components/ui/Switcher';
 import { showSuccess, showError } from '@/lib/toast';
 import { PlusIcon, Pencil, Trash2, Clock, Moon } from 'lucide-react';
+import { useRequirePermission } from "@/hooks/useRequirePermission";
+import { usePermission } from "@/hooks/usePermission";
+import { Permissions } from "@/lib/permissions";
 
 interface Shift {
   id: string;
@@ -58,6 +61,9 @@ const fmt12 = (t: string) => {
 };
 
 export default function ShiftsPage() {
+  useRequirePermission(Permissions.MasterData.Shifts.View);
+  const canManage = usePermission(Permissions.MasterData.Shifts.Manage);
+
   const [items, setItems]           = useState<Shift[]>([]);
   const [loading, setLoading]       = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -163,9 +169,15 @@ export default function ShiftsPage() {
             Manage work shift schedules and their timings.
           </p>
         </div>
-        <Button variant="solid" icon={<PlusIcon size={16} />} onClick={openAdd}>
-          Add Shift
-        </Button>
+        {canManage && (
+          <Button
+            variant="solid"
+            icon={<PlusIcon size={16} />}
+            onClick={openAdd}
+          >
+            Add Shift
+          </Button>
+        )}
       </div>
 
       {/* Table */}
@@ -196,46 +208,57 @@ export default function ShiftsPage() {
                       No shifts found
                     </td>
                   </tr>
-                ) : items.map(item => (
-                  <tr key={item.id}>
-                    <td className="font-medium heading-text">{item.name}</td>
-                    <td>
-                      <code className="text-xs bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">
-                        {item.code}
-                      </code>
-                    </td>
-                    <td className="tabular-nums text-sm">
-                      {fmt12(item.expectedStart)} – {fmt12(item.expectedEnd)}
-                    </td>
-                    <td>{item.breakDurationMinutes} min</td>
-                    <td>{Number(item.workingHoursPerDay).toFixed(1)} hrs</td>
-                    <td>
-                      <span className={`xp-badge ${item.isNightShift ? 'xp-badge-info' : 'xp-badge-warning'}`}>
-                        <span className="inline-flex items-center gap-1">
-                          {item.isNightShift ? <Moon size={11} /> : <Clock size={11} />}
-                          {item.isNightShift ? 'Night' : 'Day'}
-                        </span>
-                      </span>
-                    </td>
-                    <td>
-                      <span className={`xp-badge ${item.isActive ? 'xp-badge-success' : 'xp-badge-danger'}`}>
-                        {item.isActive ? 'Active' : 'Inactive'}
-                      </span>
-                    </td>
-                    <td className="text-center">
-                      <div className="flex items-center justify-center gap-1">
-                        <button
-                          onClick={() => openEdit(item)}
-                          className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-primary dark:hover:bg-gray-700 transition-colors"
-                          title="Edit"
+                ) : (
+                  items.map((item) => (
+                    <tr key={item.id}>
+                      <td className="font-medium heading-text">{item.name}</td>
+                      <td>
+                        <code className="text-xs bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">
+                          {item.code}
+                        </code>
+                      </td>
+                      <td className="tabular-nums text-sm">
+                        {fmt12(item.expectedStart)} – {fmt12(item.expectedEnd)}
+                      </td>
+                      <td>{item.breakDurationMinutes} min</td>
+                      <td>{Number(item.workingHoursPerDay).toFixed(1)} hrs</td>
+                      <td>
+                        <span
+                          className={`xp-badge ${item.isNightShift ? "xp-badge-info" : "xp-badge-warning"}`}
                         >
-                          <Pencil size={15} />
-                        </button>
-                        
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                          <span className="inline-flex items-center gap-1">
+                            {item.isNightShift ? (
+                              <Moon size={11} />
+                            ) : (
+                              <Clock size={11} />
+                            )}
+                            {item.isNightShift ? "Night" : "Day"}
+                          </span>
+                        </span>
+                      </td>
+                      <td>
+                        <span
+                          className={`xp-badge ${item.isActive ? "xp-badge-success" : "xp-badge-danger"}`}
+                        >
+                          {item.isActive ? "Active" : "Inactive"}
+                        </span>
+                      </td>
+                      <td className="text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          {canManage && (
+                            <button
+                              onClick={() => openEdit(item)}
+                              className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-primary dark:hover:bg-gray-700 transition-colors"
+                              title="Edit"
+                            >
+                              <Pencil size={15} />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           )}
@@ -248,25 +271,33 @@ export default function ShiftsPage() {
         onClose={() => setDialogOpen(false)}
         onRequestClose={() => setDialogOpen(false)}
       >
-        <h5 className="h5 mb-4">{editing ? 'Edit Shift' : 'Add Shift'}</h5>
+        <h5 className="h5 mb-4">{editing ? "Edit Shift" : "Add Shift"}</h5>
 
         <div className="space-y-4">
           {/* Name + Code */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="form-label">Name <span className="text-error">*</span></label>
+              <label className="form-label">
+                Name <span className="text-error">*</span>
+              </label>
               <Input
                 placeholder="e.g. Morning Shift"
                 value={form.name}
-                onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, name: e.target.value }))
+                }
               />
             </div>
             <div>
-              <label className="form-label">Code <span className="text-error">*</span></label>
+              <label className="form-label">
+                Code <span className="text-error">*</span>
+              </label>
               <Input
                 placeholder="e.g. MORN"
                 value={form.code}
-                onChange={e => setForm(f => ({ ...f, code: e.target.value.toUpperCase() }))}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, code: e.target.value.toUpperCase() }))
+                }
                 maxLength={50}
               />
             </div>
@@ -275,19 +306,27 @@ export default function ShiftsPage() {
           {/* Start + End time */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="form-label">Start Time <span className="text-error">*</span></label>
+              <label className="form-label">
+                Start Time <span className="text-error">*</span>
+              </label>
               <Input
                 type="time"
                 value={form.expectedStart}
-                onChange={e => setForm(f => ({ ...f, expectedStart: e.target.value }))}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, expectedStart: e.target.value }))
+                }
               />
             </div>
             <div>
-              <label className="form-label">End Time <span className="text-error">*</span></label>
+              <label className="form-label">
+                End Time <span className="text-error">*</span>
+              </label>
               <Input
                 type="time"
                 value={form.expectedEnd}
-                onChange={e => setForm(f => ({ ...f, expectedEnd: e.target.value }))}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, expectedEnd: e.target.value }))
+                }
               />
             </div>
           </div>
@@ -301,7 +340,12 @@ export default function ShiftsPage() {
                 min="0"
                 placeholder="60"
                 value={form.breakDurationMinutes}
-                onChange={e => setForm(f => ({ ...f, breakDurationMinutes: e.target.value }))}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    breakDurationMinutes: e.target.value,
+                  }))
+                }
               />
             </div>
             <div>
@@ -313,7 +357,9 @@ export default function ShiftsPage() {
                 step="0.5"
                 placeholder="8"
                 value={form.workingHoursPerDay}
-                onChange={e => setForm(f => ({ ...f, workingHoursPerDay: e.target.value }))}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, workingHoursPerDay: e.target.value }))
+                }
               />
             </div>
           </div>
@@ -324,14 +370,16 @@ export default function ShiftsPage() {
               <span className="text-sm font-medium">Night Shift</span>
               <Switcher
                 checked={form.isNightShift}
-                onChange={val => setForm(f => ({ ...f, isNightShift: val }))}
+                onChange={(val) =>
+                  setForm((f) => ({ ...f, isNightShift: val }))
+                }
               />
             </div>
             <div className="flex items-center gap-3">
               <span className="text-sm font-medium">Active</span>
               <Switcher
                 checked={form.isActive}
-                onChange={val => setForm(f => ({ ...f, isActive: val }))}
+                onChange={(val) => setForm((f) => ({ ...f, isActive: val }))}
               />
             </div>
           </div>
@@ -344,7 +392,7 @@ export default function ShiftsPage() {
             Cancel
           </Button>
           <Button variant="solid" loading={saving} onClick={handleSave}>
-            {editing ? 'Update' : 'Create'}
+            {editing ? "Update" : "Create"}
           </Button>
         </div>
       </Dialog>

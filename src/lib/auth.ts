@@ -1,25 +1,30 @@
 import api from './axios'
 import { useAuthStore } from '@/store/authStore'
 
+// Matches C# AuthResponse record exactly:
+// AuthResponse(UserId, Email, FirstName, LastName, Role, Tokens, PermHash, Permissions)
+// TokenPair(AccessToken, RefreshToken, ExpiresAt, RefreshTokenExpiresAt)
+interface TokenPair {
+  accessToken:            string
+  refreshToken:           string
+  expiresAt:              string
+  refreshTokenExpiresAt:  string
+}
+
 export interface LoginResponse {
-  accessToken:  string
-  refreshToken: string
-  userId:       string
-  email:        string
-  firstName:    string
-  lastName:     string
-  systemRole:   string
-  permHash:     string
-  permissions:  string[]
+  userId:      number       // comes as number from JSON — we stringify it
+  email:       string
+  firstName:   string | null
+  lastName:    string | null
+  role:        string       // "Role" in C# record
+  tokens:      TokenPair    // nested TokenPair object
+  permHash:    string
+  permissions: string[]
 }
 
 // -------------------------------------------------------
 // Token helpers — used by axios.ts interceptors
-// All reads/writes go through localStorage so the axios
-// interceptor (which runs outside React) can access them.
-// The Zustand store is also kept in sync on login/logout.
 // -------------------------------------------------------
-
 const ACCESS_KEY  = 'xp_access'
 const REFRESH_KEY = 'xp_refresh'
 
@@ -49,21 +54,23 @@ export function clearTokens(): void {
 export async function login(email: string, password: string): Promise<LoginResponse> {
   const { data } = await api.post<LoginResponse>('/auth/login', { email, password })
 
-  // Persist tokens for axios interceptor
-  setTokens(data.accessToken, data.refreshToken)
+  console.log('LOGIN RESPONSE:', data)
 
-  // Hydrate Zustand store with user + permission set
+  // Persist tokens for axios interceptor
+  setTokens(data.tokens.accessToken, data.tokens.refreshToken)
+
+  // Hydrate Zustand store
   useAuthStore.getState().setAuth(
-    data.accessToken,
+    data.tokens.accessToken,
     {
-      userId:     data.userId,
+      userId:     String(data.userId),
       email:      data.email,
-      firstName:  data.firstName,
-      lastName:   data.lastName,
-      systemRole: data.systemRole,
+      firstName:  data.firstName ?? '',
+      lastName:   data.lastName ?? '',
+      systemRole: data.role,
       permHash:   data.permHash,
     },
-    data.permissions
+    data.permissions ?? []
   )
 
   return data

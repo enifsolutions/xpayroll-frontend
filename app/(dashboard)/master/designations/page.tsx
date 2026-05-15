@@ -8,6 +8,9 @@ import Input from '@/components/ui/Input';
 import Switcher from '@/components/ui/Switcher';
 import { showSuccess, showError } from '@/lib/toast';
 import { PlusIcon, Pencil, Trash2 } from 'lucide-react';
+import { useRequirePermission } from "@/hooks/useRequirePermission";
+import { usePermission } from "@/hooks/usePermission";
+import { Permissions } from "@/lib/permissions";
 
 interface Designation {
   id: number;
@@ -32,6 +35,9 @@ const EMPTY: DesignationForm = {
 };
 
 export default function DesignationsPage() {
+  useRequirePermission(Permissions.MasterData.Designations.View);
+  const canManage = usePermission(Permissions.MasterData.Designations.Manage);
+
   const [items, setItems]           = useState<Designation[]>([]);
   const [loading, setLoading]       = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -43,7 +49,7 @@ export default function DesignationsPage() {
   const load = async () => {
     try {
       setLoading(true);
-      const res = await api.get<Designation[]>('/designation');
+      const res = await api.get<Designation[]>("/designations");
       setItems(res.data);
     } catch (err: any) {
       showError('Load failed', err?.response?.data?.error ?? 'Could not load designations.');
@@ -79,8 +85,8 @@ export default function DesignationsPage() {
     if (!form.title.trim()) return;
     setSaving(true);
     try {
-      await api.post('/designation/save', {
-        action: editing ? 'UPDATE' : 'ADD',
+      await api.post("/designations/save", {
+        action: editing ? "UPDATE" : "ADD",
         id: editing?.id ?? null,
         title: form.title.trim(),
         level: form.level.trim() || null,
@@ -101,7 +107,7 @@ export default function DesignationsPage() {
   const handleDelete = async (d: Designation) => {
     if (!confirm(`Delete "${d.title}"?`)) return;
     try {
-      await api.post('/designation/save', { action: 'DELETE', id: d.id });
+      await api.post("/designations/save", { action: "DELETE", id: d.id });
       await load();
       showSuccess('Designation deleted', d.title);
     } catch (err: any) {
@@ -121,9 +127,15 @@ export default function DesignationsPage() {
             Manage job designations, levels and grades
           </p>
         </div>
-        <Button variant="solid" icon={<PlusIcon size={16} />} onClick={openAdd}>
-          Add Designation
-        </Button>
+        {canManage && (
+          <Button
+            variant="solid"
+            icon={<PlusIcon size={16} />}
+            onClick={openAdd}
+          >
+            Add Designation
+          </Button>
+        )}
       </div>
 
       <div className="card">
@@ -150,30 +162,35 @@ export default function DesignationsPage() {
                       No designations found
                     </td>
                   </tr>
-                ) : items.map(d => (
-                  <tr key={d.id}>
-                    <td className="font-medium heading-text">{d.title}</td>
-                    <td>{d.level ?? '—'}</td>
-                    <td>{d.grade ?? '—'}</td>
-                    <td>
-                      <span className={`xp-badge ${d.isActive ? 'xp-badge-success' : 'xp-badge-danger'}`}>
-                        {d.isActive ? 'Active' : 'Inactive'}
-                      </span>
-                    </td>
-                    <td className="text-center">
-                      <div className="flex items-center justify-center gap-1">
-                        <button
-                          onClick={() => openEdit(d)}
-                          className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-primary dark:hover:bg-gray-700 transition-colors"
-                          title="Edit"
+                ) : (
+                  items.map((d) => (
+                    <tr key={d.id}>
+                      <td className="font-medium heading-text">{d.title}</td>
+                      <td>{d.level ?? "—"}</td>
+                      <td>{d.grade ?? "—"}</td>
+                      <td>
+                        <span
+                          className={`xp-badge ${d.isActive ? "xp-badge-success" : "xp-badge-danger"}`}
                         >
-                          <Pencil size={15} />
-                        </button>
-                        
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                          {d.isActive ? "Active" : "Inactive"}
+                        </span>
+                      </td>
+                      <td className="text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          {canManage && (
+                            <button
+                              onClick={() => openEdit(d)}
+                              className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-primary dark:hover:bg-gray-700 transition-colors"
+                              title="Edit"
+                            >
+                              <Pencil size={15} />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           )}
@@ -185,15 +202,19 @@ export default function DesignationsPage() {
         onClose={() => setDialogOpen(false)}
         onRequestClose={() => setDialogOpen(false)}
       >
-        <h5 className="h5 mb-4">{editing ? 'Edit Designation' : 'Add Designation'}</h5>
+        <h5 className="h5 mb-4">
+          {editing ? "Edit Designation" : "Add Designation"}
+        </h5>
 
         <div className="space-y-4">
           <div>
-            <label className="form-label">Title <span className="text-error">*</span></label>
+            <label className="form-label">
+              Title <span className="text-error">*</span>
+            </label>
             <Input
               placeholder="e.g. Software Engineer"
               value={form.title}
-              onChange={e => set('title', e.target.value)}
+              onChange={(e) => set("title", e.target.value)}
             />
           </div>
 
@@ -203,7 +224,7 @@ export default function DesignationsPage() {
               <Input
                 placeholder="e.g. Senior"
                 value={form.level}
-                onChange={e => set('level', e.target.value)}
+                onChange={(e) => set("level", e.target.value)}
               />
             </div>
             <div>
@@ -211,7 +232,7 @@ export default function DesignationsPage() {
               <Input
                 placeholder="e.g. G3"
                 value={form.grade}
-                onChange={e => set('grade', e.target.value)}
+                onChange={(e) => set("grade", e.target.value)}
               />
             </div>
           </div>
@@ -220,7 +241,7 @@ export default function DesignationsPage() {
             <span className="text-sm font-medium">Active</span>
             <Switcher
               checked={form.isActive}
-              onChange={val => set('isActive', val)}
+              onChange={(val) => set("isActive", val)}
             />
           </div>
         </div>
@@ -230,7 +251,7 @@ export default function DesignationsPage() {
             Cancel
           </Button>
           <Button variant="solid" loading={saving} onClick={handleSave}>
-            {editing ? 'Update' : 'Create'}
+            {editing ? "Update" : "Create"}
           </Button>
         </div>
       </Dialog>

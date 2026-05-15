@@ -8,6 +8,9 @@ import Input from '@/components/ui/Input';
 import Switcher from '@/components/ui/Switcher';
 import { showSuccess, showError } from '@/lib/toast';
 import { PlusIcon, Pencil, Trash2 } from 'lucide-react';
+import { useRequirePermission } from "@/hooks/useRequirePermission";
+import { usePermission } from "@/hooks/usePermission";
+import { Permissions } from "@/lib/permissions";
 
 interface TaxConfig {
   id: string;
@@ -42,6 +45,9 @@ const REGIME_COLORS: Record<string, string> = {
 };
 
 export default function TaxConfigPage() {
+  useRequirePermission(Permissions.MasterData.TaxConfig.View);
+  const canManage = usePermission(Permissions.MasterData.TaxConfig.Manage);
+
   const [items, setItems]           = useState<TaxConfig[]>([]);
   const [loading, setLoading]       = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -54,7 +60,7 @@ export default function TaxConfigPage() {
   const load = async () => {
     try {
       setLoading(true);
-      const res = await api.get<TaxConfig[]>('/TaxConfig');
+      const res = await api.get<TaxConfig[]>("/tax-configs");
       setItems(res.data);
     } catch (err: any) {
       showError('Load failed', err?.response?.data?.error ?? 'Could not load tax configurations.');
@@ -94,12 +100,12 @@ export default function TaxConfigPage() {
     setSaving(true);
     setError('');
     try {
-      await api.post('/TaxConfig/save', {
-        action:   editing ? 'UPDATE' : 'ADD',
-        id:       editing?.id ?? null,
-        name:     form.name.trim(),
-        taxYear:  parseInt(form.taxYear),
-        regime:   form.regime,
+      await api.post("/tax-configs/save", {
+        action: editing ? "UPDATE" : "ADD",
+        id: editing?.id ?? null,
+        name: form.name.trim(),
+        taxYear: parseInt(form.taxYear),
+        regime: form.regime,
         isActive: form.isActive,
       });
       setDialogOpen(false);
@@ -115,7 +121,7 @@ export default function TaxConfigPage() {
   const handleDelete = async (item: TaxConfig) => {
     if (!confirm(`Delete tax config "${item.name}"?`)) return;
     try {
-      await api.post('/TaxConfig/save', { action: 'DELETE', id: item.id });
+      await api.post("/tax-configs/save", { action: "DELETE", id: item.id });
       await load();
       showSuccess('Tax config deleted', item.name);
     } catch (err: any) {
@@ -130,12 +136,19 @@ export default function TaxConfigPage() {
         <div>
           <h3 className="h3">Tax Configuration</h3>
           <p className="text-gray-500 dark:text-gray-400 mt-1">
-            PAYE and other tax regime configurations by year. Tax slabs are managed within each config.
+            PAYE and other tax regime configurations by year. Tax slabs are
+            managed within each config.
           </p>
         </div>
-        <Button variant="solid" icon={<PlusIcon size={16} />} onClick={openAdd}>
-          Add Config
-        </Button>
+        {canManage && (
+          <Button
+            variant="solid"
+            icon={<PlusIcon size={16} />}
+            onClick={openAdd}
+          >
+            Add Config
+          </Button>
+        )}
       </div>
 
       {/* Table */}
@@ -164,37 +177,46 @@ export default function TaxConfigPage() {
                       No tax configurations found
                     </td>
                   </tr>
-                ) : items.map(item => (
-                  <tr key={item.id}>
-                    <td className="font-medium heading-text">{item.name}</td>
-                    <td className="font-semibold text-primary">{item.taxYear}</td>
-                    <td>
-                      <span className={`xp-badge ${REGIME_COLORS[item.regime] ?? 'xp-badge-neutral'}`}>
-                        {item.regime}
-                      </span>
-                    </td>
-                    <td>
-                      <span className={`xp-badge ${item.isActive ? 'xp-badge-success' : 'xp-badge-danger'}`}>
-                        {item.isActive ? 'Active' : 'Inactive'}
-                      </span>
-                    </td>
-                    <td className="text-gray-500 text-sm">
-                      {new Date(item.createdAt).toLocaleDateString()}
-                    </td>
-                    <td className="text-center">
-                      <div className="flex items-center justify-center gap-1">
-                        <button
-                          onClick={() => openEdit(item)}
-                          className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-primary dark:hover:bg-gray-700 transition-colors"
-                          title="Edit"
+                ) : (
+                  items.map((item) => (
+                    <tr key={item.id}>
+                      <td className="font-medium heading-text">{item.name}</td>
+                      <td className="font-semibold text-primary">
+                        {item.taxYear}
+                      </td>
+                      <td>
+                        <span
+                          className={`xp-badge ${REGIME_COLORS[item.regime] ?? "xp-badge-neutral"}`}
                         >
-                          <Pencil size={15} />
-                        </button>
-                        
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                          {item.regime}
+                        </span>
+                      </td>
+                      <td>
+                        <span
+                          className={`xp-badge ${item.isActive ? "xp-badge-success" : "xp-badge-danger"}`}
+                        >
+                          {item.isActive ? "Active" : "Inactive"}
+                        </span>
+                      </td>
+                      <td className="text-gray-500 text-sm">
+                        {new Date(item.createdAt).toLocaleDateString()}
+                      </td>
+                      <td className="text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          {canManage && (
+                            <button
+                              onClick={() => openEdit(item)}
+                              className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-primary dark:hover:bg-gray-700 transition-colors"
+                              title="Edit"
+                            >
+                              <Pencil size={15} />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           )}
@@ -207,27 +229,35 @@ export default function TaxConfigPage() {
         onClose={() => setDialogOpen(false)}
         onRequestClose={() => setDialogOpen(false)}
       >
-        <h5 className="h5 mb-4">{editing ? 'Edit Tax Config' : 'Add Tax Config'}</h5>
+        <h5 className="h5 mb-4">
+          {editing ? "Edit Tax Config" : "Add Tax Config"}
+        </h5>
 
         <div className="space-y-4">
           <div>
-            <label className="form-label">Name <span className="text-error">*</span></label>
+            <label className="form-label">
+              Name <span className="text-error">*</span>
+            </label>
             <Input
               placeholder="e.g. PAYE 2025/2026"
               value={form.name}
-              onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
             />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="form-label">Tax Year <span className="text-error">*</span></label>
+              <label className="form-label">
+                Tax Year <span className="text-error">*</span>
+              </label>
               <Input
                 type="number"
                 min="2000"
                 max="2100"
                 value={form.taxYear}
-                onChange={e => setForm(f => ({ ...f, taxYear: e.target.value }))}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, taxYear: e.target.value }))
+                }
               />
             </div>
             <div>
@@ -235,9 +265,15 @@ export default function TaxConfigPage() {
               <select
                 className="input w-full"
                 value={form.regime}
-                onChange={e => setForm(f => ({ ...f, regime: e.target.value }))}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, regime: e.target.value }))
+                }
               >
-                {REGIMES.map(r => <option key={r} value={r}>{r}</option>)}
+                {REGIMES.map((r) => (
+                  <option key={r} value={r}>
+                    {r}
+                  </option>
+                ))}
               </select>
             </div>
           </div>
@@ -246,7 +282,7 @@ export default function TaxConfigPage() {
             <span className="text-sm font-medium">Active</span>
             <Switcher
               checked={form.isActive}
-              onChange={val => setForm(f => ({ ...f, isActive: val }))}
+              onChange={(val) => setForm((f) => ({ ...f, isActive: val }))}
             />
           </div>
 
@@ -254,9 +290,11 @@ export default function TaxConfigPage() {
         </div>
 
         <div className="flex justify-end gap-2 mt-6">
-          <Button variant="plain" onClick={() => setDialogOpen(false)}>Cancel</Button>
+          <Button variant="plain" onClick={() => setDialogOpen(false)}>
+            Cancel
+          </Button>
           <Button variant="solid" loading={saving} onClick={handleSave}>
-            {editing ? 'Update' : 'Create'}
+            {editing ? "Update" : "Create"}
           </Button>
         </div>
       </Dialog>

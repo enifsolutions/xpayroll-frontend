@@ -8,6 +8,8 @@ import Input from '@/components/ui/Input';
 import Switcher from '@/components/ui/Switcher';
 import { showSuccess, showError } from '@/lib/toast';
 import { PlusIcon, Pencil, Trash2 } from 'lucide-react';
+import { usePermission } from "@/hooks/usePermission";
+import { Permissions } from "@/lib/permissions";
 
 interface DeductionType {
   id: string;
@@ -57,6 +59,7 @@ const CALC_OPTIONS = [
 ];
 
 export default function DeductionTypesPage() {
+  const canManage = usePermission(Permissions.MasterData.DeductionTypes.Manage);
   const [items, setItems]           = useState<DeductionType[]>([]);
   const [loading, setLoading]       = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -155,12 +158,19 @@ export default function DeductionTypesPage() {
         <div>
           <h3 className="h3">Deduction Types</h3>
           <p className="text-gray-500 dark:text-gray-400 mt-1">
-            Define voluntary, statutory, loan, and other deductions applied to employee payroll.
+            Define voluntary, statutory, loan, and other deductions applied to
+            employee payroll.
           </p>
         </div>
-        <Button variant="solid" icon={<PlusIcon size={16} />} onClick={openAdd}>
-          Add Deduction Type
-        </Button>
+        {canManage && (
+          <Button
+            variant="solid"
+            icon={<PlusIcon size={16} />}
+            onClick={openAdd}
+          >
+            Add Deduction Type
+          </Button>
+        )}
       </div>
 
       {/* Table */}
@@ -191,60 +201,80 @@ export default function DeductionTypesPage() {
                       No deduction types found
                     </td>
                   </tr>
-                ) : items.map(item => (
-                  <tr key={item.id}>
-                    <td className="font-medium heading-text">{item.name}</td>
-                    <td>
-                      <code className="text-xs bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">
-                        {item.code}
-                      </code>
-                    </td>
-                    <td>
-                      <span className={`xp-badge ${
-                        item.type === 'Statutory' ? 'xp-badge-warning' :
-                        item.type === 'Loan'      ? 'xp-badge-danger'  :
-                        item.type === 'Other'     ? 'xp-badge-neutral' :
-                        'xp-badge-info'
-                      }`}>
-                        {TYPE_OPTIONS.find(o => o.value === item.type)?.label ?? item.type}
-                      </span>
-                    </td>
-                    <td>{CALC_OPTIONS.find(o => o.value === item.calculationType)?.label ?? item.calculationType}</td>
-                    <td>
-                      {item.calculationType === 'FixedAmount'
-                        ? item.defaultAmount.toFixed(2)
-                        : `${item.defaultPercentage.toFixed(2)}%`}
-                    </td>
-                    <td>
-                      <span className={`xp-badge ${item.isStatutory ? 'xp-badge-warning' : 'xp-badge-neutral'}`}>
-                        {item.isStatutory ? 'Yes' : 'No'}
-                      </span>
-                    </td>
-                    <td>
-                      <span className={`xp-badge ${item.isActive ? 'xp-badge-success' : 'xp-badge-danger'}`}>
-                        {item.isActive ? 'Active' : 'Inactive'}
-                      </span>
-                    </td>
-                    <td className="text-center">
-                      <div className="flex items-center justify-center gap-1">
-                        <button
-                          onClick={() => openEdit(item)}
-                          className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-primary dark:hover:bg-gray-700 transition-colors"
-                          title="Edit"
+                ) : (
+                  items.map((item) => (
+                    <tr key={item.id}>
+                      <td className="font-medium heading-text">{item.name}</td>
+                      <td>
+                        <code className="text-xs bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">
+                          {item.code}
+                        </code>
+                      </td>
+                      <td>
+                        <span
+                          className={`xp-badge ${
+                            item.type === "Statutory"
+                              ? "xp-badge-warning"
+                              : item.type === "Loan"
+                                ? "xp-badge-danger"
+                                : item.type === "Other"
+                                  ? "xp-badge-neutral"
+                                  : "xp-badge-info"
+                          }`}
                         >
-                          <Pencil size={15} />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(item)}
-                          className="p-1.5 rounded-lg text-gray-500 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20 transition-colors"
-                          title="Delete"
+                          {TYPE_OPTIONS.find((o) => o.value === item.type)
+                            ?.label ?? item.type}
+                        </span>
+                      </td>
+                      <td>
+                        {CALC_OPTIONS.find(
+                          (o) => o.value === item.calculationType,
+                        )?.label ?? item.calculationType}
+                      </td>
+                      <td>
+                        {item.calculationType === "FixedAmount"
+                          ? item.defaultAmount.toFixed(2)
+                          : `${item.defaultPercentage.toFixed(2)}%`}
+                      </td>
+                      <td>
+                        <span
+                          className={`xp-badge ${item.isStatutory ? "xp-badge-warning" : "xp-badge-neutral"}`}
                         >
-                          <Trash2 size={15} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                          {item.isStatutory ? "Yes" : "No"}
+                        </span>
+                      </td>
+                      <td>
+                        <span
+                          className={`xp-badge ${item.isActive ? "xp-badge-success" : "xp-badge-danger"}`}
+                        >
+                          {item.isActive ? "Active" : "Inactive"}
+                        </span>
+                      </td>
+                      <td className="text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          {canManage && (
+                            <button
+                              onClick={() => openEdit(item)}
+                              className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-primary dark:hover:bg-gray-700 transition-colors"
+                              title="Edit"
+                            >
+                              <Pencil size={15} />
+                            </button>
+                          )}
+                          {canManage && (
+                            <button
+                              onClick={() => handleDelete(item)}
+                              className="p-1.5 rounded-lg text-gray-500 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20 transition-colors"
+                              title="Delete"
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           )}
@@ -257,25 +287,35 @@ export default function DeductionTypesPage() {
         onClose={() => setDialogOpen(false)}
         onRequestClose={() => setDialogOpen(false)}
       >
-        <h5 className="h5 mb-4">{editing ? 'Edit Deduction Type' : 'Add Deduction Type'}</h5>
+        <h5 className="h5 mb-4">
+          {editing ? "Edit Deduction Type" : "Add Deduction Type"}
+        </h5>
 
         <div className="space-y-4">
           {/* Name + Code */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="form-label">Name <span className="text-error">*</span></label>
+              <label className="form-label">
+                Name <span className="text-error">*</span>
+              </label>
               <Input
                 placeholder="e.g. EPF Employee"
                 value={form.name}
-                onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, name: e.target.value }))
+                }
               />
             </div>
             <div>
-              <label className="form-label">Code <span className="text-error">*</span></label>
+              <label className="form-label">
+                Code <span className="text-error">*</span>
+              </label>
               <Input
                 placeholder="e.g. EPF_EE"
                 value={form.code}
-                onChange={e => setForm(f => ({ ...f, code: e.target.value.toUpperCase() }))}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, code: e.target.value.toUpperCase() }))
+                }
               />
             </div>
           </div>
@@ -287,10 +327,14 @@ export default function DeductionTypesPage() {
               <select
                 className="input w-full"
                 value={form.type}
-                onChange={e => setForm(f => ({ ...f, type: e.target.value }))}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, type: e.target.value }))
+                }
               >
-                {TYPE_OPTIONS.map(o => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
+                {TYPE_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
                 ))}
               </select>
             </div>
@@ -299,10 +343,14 @@ export default function DeductionTypesPage() {
               <select
                 className="input w-full"
                 value={form.calculationType}
-                onChange={e => setForm(f => ({ ...f, calculationType: e.target.value }))}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, calculationType: e.target.value }))
+                }
               >
-                {CALC_OPTIONS.map(o => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
+                {CALC_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
                 ))}
               </select>
             </div>
@@ -318,8 +366,10 @@ export default function DeductionTypesPage() {
                 step="0.01"
                 placeholder="0.00"
                 value={form.defaultAmount}
-                onChange={e => setForm(f => ({ ...f, defaultAmount: e.target.value }))}
-                disabled={form.calculationType !== 'FixedAmount'}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, defaultAmount: e.target.value }))
+                }
+                disabled={form.calculationType !== "FixedAmount"}
               />
             </div>
             <div>
@@ -331,8 +381,10 @@ export default function DeductionTypesPage() {
                 step="0.01"
                 placeholder="0.00"
                 value={form.defaultPercentage}
-                onChange={e => setForm(f => ({ ...f, defaultPercentage: e.target.value }))}
-                disabled={form.calculationType === 'FixedAmount'}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, defaultPercentage: e.target.value }))
+                }
+                disabled={form.calculationType === "FixedAmount"}
               />
             </div>
           </div>
@@ -343,14 +395,14 @@ export default function DeductionTypesPage() {
               <span className="text-sm font-medium">Statutory</span>
               <Switcher
                 checked={form.isStatutory}
-                onChange={val => setForm(f => ({ ...f, isStatutory: val }))}
+                onChange={(val) => setForm((f) => ({ ...f, isStatutory: val }))}
               />
             </div>
             <div className="flex items-center gap-3">
               <span className="text-sm font-medium">Active</span>
               <Switcher
                 checked={form.isActive}
-                onChange={val => setForm(f => ({ ...f, isActive: val }))}
+                onChange={(val) => setForm((f) => ({ ...f, isActive: val }))}
               />
             </div>
           </div>
@@ -363,7 +415,7 @@ export default function DeductionTypesPage() {
             Cancel
           </Button>
           <Button variant="solid" loading={saving} onClick={handleSave}>
-            {editing ? 'Update' : 'Create'}
+            {editing ? "Update" : "Create"}
           </Button>
         </div>
       </Dialog>

@@ -10,6 +10,8 @@ import Switcher from '@/components/ui/Switcher'
 import ConfirmDialog from '@/components/ui/ConfirmDialog'
 import { showSuccess, showError } from '@/lib/toast'
 import api from '@/lib/axios'
+import { usePermission } from "@/hooks/usePermission";
+import { Permissions } from "@/lib/permissions";
 import {
   LoanRecord, ExternalLiability, DsrData,
   LoanForm, LiabilityForm,
@@ -117,6 +119,8 @@ function ProgressBar({ pct }: { pct: number }) {
 export default function LoansPage() {
   const { id: employeeId } = useParams<{ id: string }>()
   const initialized = useRef(false)
+  const canManage = usePermission(Permissions.Payroll.Loan.Manage);
+
 
   const [loans,        setLoans]        = useState<LoanRecord[]>([])
   const [liabilities,  setLiabilities]  = useState<ExternalLiability[]>([])
@@ -151,10 +155,10 @@ export default function LoansPage() {
   const load = async () => {
     try {
       const [lRes, elRes, dsrRes] = await Promise.all([
-        api.get(`loan-records/${employeeId}`),
-        api.get(`employee-external-liabilities/${employeeId}`),
-        api.get(`employee-external-liabilities/${employeeId}/dsr`),
-      ])
+        api.get(`loan-records?employeeId=${employeeId}`),
+        api.get(`employee-external-liabilities?employeeId=${employeeId}`),
+        api.get(`employee-external-liabilities/dsr?employeeId=${employeeId}`),
+      ]);
       setLoans(lRes.data)
       setLiabilities(elRes.data)
       setDsr(dsrRes.data)
@@ -323,7 +327,9 @@ export default function LoansPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h5 className="h5">Loans & Liabilities</h5>
-          <p className="text-sm text-gray-500 mt-0.5">Internal loans, external liabilities, and DSR analysis.</p>
+          <p className="text-sm text-gray-500 mt-0.5">
+            Internal loans, external liabilities, and DSR analysis.
+          </p>
         </div>
       </div>
 
@@ -333,7 +339,6 @@ export default function LoansPage() {
         </div>
       ) : (
         <div className="space-y-6">
-
           {/* DSR Gauge */}
           {dsr && <DsrGauge dsr={dsr} />}
 
@@ -341,16 +346,28 @@ export default function LoansPage() {
           <div>
             <div className="flex items-center justify-between mb-3">
               <div>
-                <h6 className="font-semibold text-gray-700 dark:text-gray-300">Company Loans</h6>
+                <h6 className="font-semibold text-gray-700 dark:text-gray-300">
+                  Company Loans
+                </h6>
                 {activeLoans.length > 0 && (
                   <p className="text-xs text-gray-400 mt-0.5">
-                    {activeLoans.length} active · {fmtMoney(activeLoans.reduce((s, l) => s + l.monthlyInstallment, 0))}/mo
+                    {activeLoans.length} active ·{" "}
+                    {fmtMoney(
+                      activeLoans.reduce((s, l) => s + l.monthlyInstallment, 0),
+                    )}
+                    /mo
                   </p>
                 )}
               </div>
-              <Button variant="solid" icon={<PlusIcon size={15} />} onClick={openAddLoan}>
-                Add Loan
-              </Button>
+              {canManage && (
+                <Button
+                  variant="solid"
+                  icon={<PlusIcon size={15} />}
+                  onClick={openAddLoan}
+                >
+                  Add Loan
+                </Button>
+              )}
             </div>
 
             {loans.length === 0 ? (
@@ -374,22 +391,66 @@ export default function LoansPage() {
                   {loans.map((l) => (
                     <tr key={l.id}>
                       <td>
-                        <span className="heading-text font-medium">{fmtMoney(l.principalAmount)}</span>
-                        <p className="text-xs text-gray-400">{fmt(l.startDate)}</p>
+                        <span className="heading-text font-medium">
+                          {fmtMoney(l.principalAmount)}
+                        </span>
+                        <p className="text-xs text-gray-400">
+                          {fmt(l.startDate)}
+                        </p>
                       </td>
-                      <td className="text-right font-medium">{fmtMoney(l.monthlyInstallment)}</td>
-                      <td className="text-sm">{l.paidInstallments} / {l.totalInstallments}</td>
                       <td className="text-right font-medium">
-                        <span className={l.outstandingBalance === 0 ? 'text-emerald-500' : 'heading-text'}>
-                          {l.outstandingBalance === 0 ? 'Cleared' : fmtMoney(l.outstandingBalance)}
+                        {fmtMoney(l.monthlyInstallment)}
+                      </td>
+                      <td className="text-sm">
+                        {l.paidInstallments} / {l.totalInstallments}
+                      </td>
+                      <td className="text-right font-medium">
+                        <span
+                          className={
+                            l.outstandingBalance === 0
+                              ? "text-emerald-500"
+                              : "heading-text"
+                          }
+                        >
+                          {l.outstandingBalance === 0
+                            ? "Cleared"
+                            : fmtMoney(l.outstandingBalance)}
                         </span>
                       </td>
-                      <td><ProgressBar pct={l.progressPct} /></td>
-                      <td><span className={`xp-badge ${LOAN_STATUS_BADGE[l.status] ?? 'xp-badge-neutral'}`}>{l.status}</span></td>
+                      <td>
+                        <ProgressBar pct={l.progressPct} />
+                      </td>
+                      <td>
+                        <span
+                          className={`xp-badge ${LOAN_STATUS_BADGE[l.status] ?? "xp-badge-neutral"}`}
+                        >
+                          {l.status}
+                        </span>
+                      </td>
                       <td>
                         <div className="flex justify-end gap-1">
-                          <button onClick={() => openEditLoan(l)} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 hover:text-primary transition-colors"><Pencil size={15} /></button>
-                          <button onClick={() => promptDelete(l.id, `Loan of ${fmtMoney(l.principalAmount)}`, 'loan')} className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-gray-500 hover:text-red-500 transition-colors"><Trash2 size={15} /></button>
+                          {canManage && (
+                            <button
+                              onClick={() => openEditLoan(l)}
+                              className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 hover:text-primary transition-colors"
+                            >
+                              <Pencil size={15} />
+                            </button>
+                          )}
+                          {canManage && (
+                            <button
+                              onClick={() =>
+                                promptDelete(
+                                  l.id,
+                                  `Loan of ${fmtMoney(l.principalAmount)}`,
+                                  "loan",
+                                )
+                              }
+                              className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-gray-500 hover:text-red-500 transition-colors"
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -403,16 +464,31 @@ export default function LoansPage() {
           <div>
             <div className="flex items-center justify-between mb-3">
               <div>
-                <h6 className="font-semibold text-gray-700 dark:text-gray-300">External Liabilities</h6>
+                <h6 className="font-semibold text-gray-700 dark:text-gray-300">
+                  External Liabilities
+                </h6>
                 {activeLiabilities.length > 0 && (
                   <p className="text-xs text-gray-400 mt-0.5">
-                    {activeLiabilities.length} active · {fmtMoney(activeLiabilities.reduce((s, l) => s + l.monthlyCommitment, 0))}/mo
+                    {activeLiabilities.length} active ·{" "}
+                    {fmtMoney(
+                      activeLiabilities.reduce(
+                        (s, l) => s + l.monthlyCommitment,
+                        0,
+                      ),
+                    )}
+                    /mo
                   </p>
                 )}
               </div>
-              <Button variant="solid" icon={<PlusIcon size={15} />} onClick={openAddLiab}>
-                Add Liability
-              </Button>
+              {canManage && (
+                <Button
+                  variant="solid"
+                  icon={<PlusIcon size={15} />}
+                  onClick={openAddLiab}
+                >
+                  Add Liability
+                </Button>
+              )}
             </div>
 
             {liabilities.length === 0 ? (
@@ -436,18 +512,63 @@ export default function LoansPage() {
                   {liabilities.map((l) => (
                     <tr key={l.id}>
                       <td>
-                        <span className="heading-text font-medium">{l.lenderName}</span>
-                        {l.notes && <p className="text-xs text-gray-400 truncate max-w-[140px]">{l.notes}</p>}
+                        <span className="heading-text font-medium">
+                          {l.lenderName}
+                        </span>
+                        {l.notes && (
+                          <p className="text-xs text-gray-400 truncate max-w-[140px]">
+                            {l.notes}
+                          </p>
+                        )}
                       </td>
-                      <td><span className={`xp-badge ${LIABILITY_TYPE_BADGE[l.liabilityType] ?? 'xp-badge-neutral'}`}>{l.liabilityType}</span></td>
-                      <td className="text-right font-medium">{fmtMoney(l.monthlyCommitment)}</td>
-                      <td className="text-right heading-text">{fmtMoney(l.outstandingBalance)}</td>
-                      <td className="text-sm text-gray-500">{fmt(l.startDate)}{l.endDate ? ` → ${fmt(l.endDate)}` : ' → Open'}</td>
-                      <td><span className={`xp-badge ${l.isActive ? 'xp-badge-success' : 'xp-badge-neutral'}`}>{l.isActive ? 'Active' : 'Inactive'}</span></td>
+                      <td>
+                        <span
+                          className={`xp-badge ${LIABILITY_TYPE_BADGE[l.liabilityType] ?? "xp-badge-neutral"}`}
+                        >
+                          {l.liabilityType}
+                        </span>
+                      </td>
+                      <td className="text-right font-medium">
+                        {fmtMoney(l.monthlyCommitment)}
+                      </td>
+                      <td className="text-right heading-text">
+                        {fmtMoney(l.outstandingBalance)}
+                      </td>
+                      <td className="text-sm text-gray-500">
+                        {fmt(l.startDate)}
+                        {l.endDate ? ` → ${fmt(l.endDate)}` : " → Open"}
+                      </td>
+                      <td>
+                        <span
+                          className={`xp-badge ${l.isActive ? "xp-badge-success" : "xp-badge-neutral"}`}
+                        >
+                          {l.isActive ? "Active" : "Inactive"}
+                        </span>
+                      </td>
                       <td>
                         <div className="flex justify-end gap-1">
-                          <button onClick={() => openEditLiab(l)} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 hover:text-primary transition-colors"><Pencil size={15} /></button>
-                          <button onClick={() => promptDelete(l.id, `${l.liabilityType} — ${l.lenderName}`, 'liability')} className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-gray-500 hover:text-red-500 transition-colors"><Trash2 size={15} /></button>
+                          {canManage && (
+                            <button
+                              onClick={() => openEditLiab(l)}
+                              className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 hover:text-primary transition-colors"
+                            >
+                              <Pencil size={15} />
+                            </button>
+                          )}
+                          {canManage && (
+                            <button
+                              onClick={() =>
+                                promptDelete(
+                                  l.id,
+                                  `${l.liabilityType} — ${l.lenderName}`,
+                                  "liability",
+                                )
+                              }
+                              className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-gray-500 hover:text-red-500 transition-colors"
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -460,32 +581,83 @@ export default function LoansPage() {
       )}
 
       {/* ── Loan Dialog ── */}
-      <Dialog isOpen={loanDialogOpen} onClose={() => setLoanDialogOpen(false)} onRequestClose={() => setLoanDialogOpen(false)}>
+      <Dialog
+        isOpen={loanDialogOpen}
+        onClose={() => setLoanDialogOpen(false)}
+        onRequestClose={() => setLoanDialogOpen(false)}
+      >
         <div className="p-6 w-full max-w-md">
-          <h5 className="h5 mb-4">{editingLoan ? 'Edit Loan' : 'Add Company Loan'}</h5>
+          <h5 className="h5 mb-4">
+            {editingLoan ? "Edit Loan" : "Add Company Loan"}
+          </h5>
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="form-label">Principal Amount <span className="text-red-500">*</span></label>
-                <Input type="number" step="0.01" placeholder="100000" value={loanForm.principalAmount}
-                  onChange={(e) => setLoanForm({ ...loanForm, principalAmount: e.target.value })} />
+                <label className="form-label">
+                  Principal Amount <span className="text-red-500">*</span>
+                </label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  placeholder="100000"
+                  value={loanForm.principalAmount}
+                  onChange={(e) =>
+                    setLoanForm({
+                      ...loanForm,
+                      principalAmount: e.target.value,
+                    })
+                  }
+                />
               </div>
               <div>
-                <label className="form-label">Monthly Installment <span className="text-red-500">*</span></label>
-                <Input type="number" step="0.01" placeholder="8333" value={loanForm.monthlyInstallment}
-                  onChange={(e) => setLoanForm({ ...loanForm, monthlyInstallment: e.target.value })} />
+                <label className="form-label">
+                  Monthly Installment <span className="text-red-500">*</span>
+                </label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  placeholder="8333"
+                  value={loanForm.monthlyInstallment}
+                  onChange={(e) =>
+                    setLoanForm({
+                      ...loanForm,
+                      monthlyInstallment: e.target.value,
+                    })
+                  }
+                />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="form-label">Total Installments <span className="text-red-500">*</span></label>
-                <Input type="number" min="1" placeholder="12" value={loanForm.totalInstallments}
-                  onChange={(e) => setLoanForm({ ...loanForm, totalInstallments: e.target.value })} />
+                <label className="form-label">
+                  Total Installments <span className="text-red-500">*</span>
+                </label>
+                <Input
+                  type="number"
+                  min="1"
+                  placeholder="12"
+                  value={loanForm.totalInstallments}
+                  onChange={(e) =>
+                    setLoanForm({
+                      ...loanForm,
+                      totalInstallments: e.target.value,
+                    })
+                  }
+                />
               </div>
               <div>
                 <label className="form-label">Paid Installments</label>
-                <Input type="number" min="0" value={loanForm.paidInstallments}
-                  onChange={(e) => setLoanForm({ ...loanForm, paidInstallments: e.target.value })} />
+                <Input
+                  type="number"
+                  min="0"
+                  value={loanForm.paidInstallments}
+                  onChange={(e) =>
+                    setLoanForm({
+                      ...loanForm,
+                      paidInstallments: e.target.value,
+                    })
+                  }
+                />
               </div>
             </div>
 
@@ -494,41 +666,76 @@ export default function LoansPage() {
               <div className="bg-gray-50 dark:bg-gray-800 rounded-lg px-4 py-3 space-y-1.5 text-sm">
                 <div className="flex justify-between">
                   <span className="text-gray-500">Total Repayment</span>
-                  <span className={`font-semibold ${totalRepayment > principal ? 'text-red-500' : 'heading-text'}`}>
+                  <span
+                    className={`font-semibold ${totalRepayment > principal ? "text-red-500" : "heading-text"}`}
+                  >
                     {fmtMoney(totalRepayment)}
-                    {totalRepayment > principal && ' ⚠'}
+                    {totalRepayment > principal && " ⚠"}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-500">Outstanding Balance</span>
-                  <span className="font-semibold text-primary">{fmtMoney(outstanding)}</span>
+                  <span className="font-semibold text-primary">
+                    {fmtMoney(outstanding)}
+                  </span>
                 </div>
               </div>
             )}
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="form-label">Start Date <span className="text-red-500">*</span></label>
-                <Input type="date" value={loanForm.startDate}
-                  onChange={(e) => setLoanForm({ ...loanForm, startDate: e.target.value })} />
+                <label className="form-label">
+                  Start Date <span className="text-red-500">*</span>
+                </label>
+                <Input
+                  type="date"
+                  value={loanForm.startDate}
+                  onChange={(e) =>
+                    setLoanForm({ ...loanForm, startDate: e.target.value })
+                  }
+                />
               </div>
               <div>
                 <label className="form-label">Status</label>
-                <select className="input w-full" value={loanForm.status}
-                  onChange={(e) => setLoanForm({ ...loanForm, status: e.target.value })}>
-                  {LOAN_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+                <select
+                  className="input w-full"
+                  value={loanForm.status}
+                  onChange={(e) =>
+                    setLoanForm({ ...loanForm, status: e.target.value })
+                  }
+                >
+                  {LOAN_STATUSES.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
                 </select>
               </div>
             </div>
             <div>
               <label className="form-label">Notes</label>
-              <Input placeholder="Optional" value={loanForm.notes}
-                onChange={(e) => setLoanForm({ ...loanForm, notes: e.target.value })} />
+              <Input
+                placeholder="Optional"
+                value={loanForm.notes}
+                onChange={(e) =>
+                  setLoanForm({ ...loanForm, notes: e.target.value })
+                }
+              />
             </div>
             <div className="flex justify-end gap-2 pt-2">
-              <Button variant="plain" onClick={() => setLoanDialogOpen(false)} disabled={loanSaving}>Cancel</Button>
-              <Button variant="solid" loading={loanSaving} onClick={handleLoanSave}>
-                {editingLoan ? 'Update' : 'Add Loan'}
+              <Button
+                variant="plain"
+                onClick={() => setLoanDialogOpen(false)}
+                disabled={loanSaving}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="solid"
+                loading={loanSaving}
+                onClick={handleLoanSave}
+              >
+                {editingLoan ? "Update" : "Add Loan"}
               </Button>
             </div>
           </div>
@@ -536,60 +743,140 @@ export default function LoansPage() {
       </Dialog>
 
       {/* ── External Liability Dialog ── */}
-      <Dialog isOpen={liabDialogOpen} onClose={() => setLiabDialogOpen(false)} onRequestClose={() => setLiabDialogOpen(false)}>
+      <Dialog
+        isOpen={liabDialogOpen}
+        onClose={() => setLiabDialogOpen(false)}
+        onRequestClose={() => setLiabDialogOpen(false)}
+      >
         <div className="p-6 w-full max-w-md">
-          <h5 className="h5 mb-4">{editingLiab ? 'Edit Liability' : 'Add External Liability'}</h5>
+          <h5 className="h5 mb-4">
+            {editingLiab ? "Edit Liability" : "Add External Liability"}
+          </h5>
           <div className="space-y-4">
             <div>
-              <label className="form-label">Liability Type <span className="text-red-500">*</span></label>
-              <select className="input w-full" value={liabForm.liabilityType}
-                onChange={(e) => setLiabForm({ ...liabForm, liabilityType: e.target.value })}>
-                {LIABILITY_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+              <label className="form-label">
+                Liability Type <span className="text-red-500">*</span>
+              </label>
+              <select
+                className="input w-full"
+                value={liabForm.liabilityType}
+                onChange={(e) =>
+                  setLiabForm({ ...liabForm, liabilityType: e.target.value })
+                }
+              >
+                {LIABILITY_TYPES.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
               </select>
             </div>
             <div>
-              <label className="form-label">Lender Name <span className="text-red-500">*</span></label>
-              <Input placeholder="e.g. Commercial Bank" value={liabForm.lenderName}
-                onChange={(e) => setLiabForm({ ...liabForm, lenderName: e.target.value })} />
+              <label className="form-label">
+                Lender Name <span className="text-red-500">*</span>
+              </label>
+              <Input
+                placeholder="e.g. Commercial Bank"
+                value={liabForm.lenderName}
+                onChange={(e) =>
+                  setLiabForm({ ...liabForm, lenderName: e.target.value })
+                }
+              />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="form-label">Monthly Commitment <span className="text-red-500">*</span></label>
-                <Input type="number" step="0.01" placeholder="15000" value={liabForm.monthlyCommitment}
-                  onChange={(e) => setLiabForm({ ...liabForm, monthlyCommitment: e.target.value })} />
+                <label className="form-label">
+                  Monthly Commitment <span className="text-red-500">*</span>
+                </label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  placeholder="15000"
+                  value={liabForm.monthlyCommitment}
+                  onChange={(e) =>
+                    setLiabForm({
+                      ...liabForm,
+                      monthlyCommitment: e.target.value,
+                    })
+                  }
+                />
               </div>
               <div>
                 <label className="form-label">Outstanding Balance</label>
-                <Input type="number" step="0.01" placeholder="0" value={liabForm.outstandingBalance}
-                  onChange={(e) => setLiabForm({ ...liabForm, outstandingBalance: e.target.value })} />
+                <Input
+                  type="number"
+                  step="0.01"
+                  placeholder="0"
+                  value={liabForm.outstandingBalance}
+                  onChange={(e) =>
+                    setLiabForm({
+                      ...liabForm,
+                      outstandingBalance: e.target.value,
+                    })
+                  }
+                />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="form-label">Start Date <span className="text-red-500">*</span></label>
-                <Input type="date" value={liabForm.startDate}
-                  onChange={(e) => setLiabForm({ ...liabForm, startDate: e.target.value })} />
+                <label className="form-label">
+                  Start Date <span className="text-red-500">*</span>
+                </label>
+                <Input
+                  type="date"
+                  value={liabForm.startDate}
+                  onChange={(e) =>
+                    setLiabForm({ ...liabForm, startDate: e.target.value })
+                  }
+                />
               </div>
               <div>
-                <label className="form-label">End Date <span className="text-gray-400 text-xs">(optional)</span></label>
-                <Input type="date" value={liabForm.endDate}
-                  onChange={(e) => setLiabForm({ ...liabForm, endDate: e.target.value })} />
+                <label className="form-label">
+                  End Date{" "}
+                  <span className="text-gray-400 text-xs">(optional)</span>
+                </label>
+                <Input
+                  type="date"
+                  value={liabForm.endDate}
+                  onChange={(e) =>
+                    setLiabForm({ ...liabForm, endDate: e.target.value })
+                  }
+                />
               </div>
             </div>
             <div className="flex items-center justify-between">
               <label className="form-label mb-0">Active</label>
-              <Switcher checked={liabForm.isActive}
-                onChange={(val: boolean) => setLiabForm({ ...liabForm, isActive: val })} />
+              <Switcher
+                checked={liabForm.isActive}
+                onChange={(val: boolean) =>
+                  setLiabForm({ ...liabForm, isActive: val })
+                }
+              />
             </div>
             <div>
               <label className="form-label">Notes</label>
-              <Input placeholder="Optional" value={liabForm.notes}
-                onChange={(e) => setLiabForm({ ...liabForm, notes: e.target.value })} />
+              <Input
+                placeholder="Optional"
+                value={liabForm.notes}
+                onChange={(e) =>
+                  setLiabForm({ ...liabForm, notes: e.target.value })
+                }
+              />
             </div>
             <div className="flex justify-end gap-2 pt-2">
-              <Button variant="plain" onClick={() => setLiabDialogOpen(false)} disabled={liabSaving}>Cancel</Button>
-              <Button variant="solid" loading={liabSaving} onClick={handleLiabSave}>
-                {editingLiab ? 'Update' : 'Add Liability'}
+              <Button
+                variant="plain"
+                onClick={() => setLiabDialogOpen(false)}
+                disabled={liabSaving}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="solid"
+                loading={liabSaving}
+                onClick={handleLiabSave}
+              >
+                {editingLiab ? "Update" : "Add Liability"}
               </Button>
             </div>
           </div>
@@ -601,13 +888,20 @@ export default function LoansPage() {
         open={confirmOpen}
         variant="danger"
         title="Remove Record"
-        message={deleteTarget ? `Are you sure you want to remove "${deleteTarget.label}"?` : ''}
+        message={
+          deleteTarget
+            ? `Are you sure you want to remove "${deleteTarget.label}"?`
+            : ""
+        }
         confirmLabel="Yes, Remove"
         cancelLabel="Keep It"
         loading={deleting}
         onConfirm={handleDelete}
-        onCancel={() => { setConfirmOpen(false); setDeleteTarget(null) }}
+        onCancel={() => {
+          setConfirmOpen(false);
+          setDeleteTarget(null);
+        }}
       />
     </>
-  )
+  );
 }

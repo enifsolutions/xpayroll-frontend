@@ -10,6 +10,8 @@ import Switcher from '@/components/ui/Switcher'
 import ConfirmDialog from '@/components/ui/ConfirmDialog'
 import { showSuccess, showError } from '@/lib/toast'
 import api from '@/lib/axios'
+import { usePermission } from "@/hooks/usePermission";
+import { Permissions } from "@/lib/permissions";
 import {
   EmployeeBenefit, BenefitTypeOption, BenefitForm, defaultForm,
 } from './benefits.types'
@@ -39,14 +41,15 @@ export default function BenefitsPage() {
   const [deleteTarget,  setDeleteTarget]  = useState<EmployeeBenefit | null>(null)
 
   // Selected benefit type details (for showing defaults in form)
+  const canManage = usePermission(Permissions.HR.Employee.Update);
   const selectedType = benefitTypes.find(b => b.id === form.benefitDefinitionId)
 
   const load = async () => {
     try {
       const [bRes, btRes] = await Promise.all([
-        api.get(`employee-benefits/${employeeId}`),
-        api.get('benefittype'),
-      ])
+        api.get(`employee-benefits?employeeId=${employeeId}`),
+        api.get("benefit-types"),
+      ]);
       setBenefits(bRes.data)
       setBenefitTypes(btRes.data)
     } catch {
@@ -147,11 +150,19 @@ export default function BenefitsPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h5 className="h5">Benefits</h5>
-          <p className="text-sm text-gray-500 mt-0.5">Manage benefit assignments for this employee.</p>
+          <p className="text-sm text-gray-500 mt-0.5">
+            Manage benefit assignments for this employee.
+          </p>
         </div>
-        <Button variant="solid" icon={<PlusIcon size={16} />} onClick={openAdd}>
-          Add Benefit
-        </Button>
+        {canManage && (
+          <Button
+            variant="solid"
+            icon={<PlusIcon size={16} />}
+            onClick={openAdd}
+          >
+            Add Benefit
+          </Button>
+        )}
       </div>
 
       {/* Table */}
@@ -161,7 +172,8 @@ export default function BenefitsPage() {
         </div>
       ) : benefits.length === 0 ? (
         <div className="text-center py-16 text-gray-400">
-          No benefits assigned. Click <strong>Add Benefit</strong> to get started.
+          No benefits assigned. Click <strong>Add Benefit</strong> to get
+          started.
         </div>
       ) : (
         <table className="table-default table-hover w-full">
@@ -181,44 +193,58 @@ export default function BenefitsPage() {
             {benefits.map((b) => (
               <tr key={b.id}>
                 <td>
-                  <span className="heading-text font-medium">{b.benefitName}</span>
-                  <span className="ml-2 text-xs text-gray-400">{b.benefitCode}</span>
+                  <span className="heading-text font-medium">
+                    {b.benefitName}
+                  </span>
+                  <span className="ml-2 text-xs text-gray-400">
+                    {b.benefitCode}
+                  </span>
                   {b.overrideAmount != null || b.overridePercentage != null ? (
-                    <span className="ml-2 xp-badge xp-badge-info text-xs">Override</span>
+                    <span className="ml-2 xp-badge xp-badge-info text-xs">
+                      Override
+                    </span>
                   ) : null}
                 </td>
                 <td>
-                  <span className="xp-badge xp-badge-neutral">{b.benefitType}</span>
+                  <span className="xp-badge xp-badge-neutral">
+                    {b.benefitType}
+                  </span>
                 </td>
                 <td className="text-gray-500 text-sm">{b.calculationType}</td>
                 <td className="text-right font-medium heading-text">
-                  {b.calculationType === 'FixedAmount'
+                  {b.calculationType === "FixedAmount"
                     ? `LKR ${fmtAmount(b.effectiveAmount)}`
                     : `${b.effectivePercentage}%`}
                 </td>
                 <td>{fmt(b.effectiveFrom)}</td>
                 <td>{fmt(b.effectiveTo)}</td>
                 <td>
-                  <span className={`xp-badge ${b.isActive ? 'xp-badge-success' : 'xp-badge-neutral'}`}>
-                    {b.isActive ? 'Active' : 'Inactive'}
+                  <span
+                    className={`xp-badge ${b.isActive ? "xp-badge-success" : "xp-badge-neutral"}`}
+                  >
+                    {b.isActive ? "Active" : "Inactive"}
                   </span>
                 </td>
                 <td>
                   <div className="flex justify-end gap-1">
-                    <button
-                      onClick={() => openEdit(b)}
-                      className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 hover:text-primary transition-colors"
-                      title="Edit"
-                    >
-                      <Pencil size={15} />
-                    </button>
-                    <button
-                      onClick={() => promptDelete(b)}
-                      className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-gray-500 hover:text-red-500 transition-colors"
-                      title="Remove"
-                    >
-                      <Trash2 size={15} />
-                    </button>
+                    {canManage && (
+                      <button
+                        onClick={() => openEdit(b)}
+                        className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 hover:text-primary transition-colors"
+                        title="Edit"
+                      >
+                        <Pencil size={15} />
+                      </button>
+                    )}
+                    {canManage && (
+                      <button
+                        onClick={() => promptDelete(b)}
+                        className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-gray-500 hover:text-red-500 transition-colors"
+                        title="Remove"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>
@@ -228,24 +254,35 @@ export default function BenefitsPage() {
       )}
 
       {/* Add / Edit Dialog */}
-      <Dialog isOpen={dialogOpen} onClose={closeDialog} onRequestClose={closeDialog}>
+      <Dialog
+        isOpen={dialogOpen}
+        onClose={closeDialog}
+        onRequestClose={closeDialog}
+      >
         <div className="p-6 w-full max-w-md">
-          <h5 className="h5 mb-4">{editing ? 'Edit Benefit' : 'Add Benefit'}</h5>
+          <h5 className="h5 mb-4">
+            {editing ? "Edit Benefit" : "Add Benefit"}
+          </h5>
 
           <div className="space-y-4">
-
             {/* Benefit type */}
             <div>
-              <label className="form-label">Benefit Type <span className="text-red-500">*</span></label>
+              <label className="form-label">
+                Benefit Type <span className="text-red-500">*</span>
+              </label>
               <select
                 className="input w-full"
                 value={form.benefitDefinitionId}
-                onChange={(e) => setForm({ ...form, benefitDefinitionId: e.target.value })}
+                onChange={(e) =>
+                  setForm({ ...form, benefitDefinitionId: e.target.value })
+                }
                 disabled={!!editing}
               >
                 <option value="">Select benefit type…</option>
                 {benefitTypes.map((bt) => (
-                  <option key={bt.id} value={bt.id}>{bt.name} ({bt.code})</option>
+                  <option key={bt.id} value={bt.id}>
+                    {bt.name} ({bt.code})
+                  </option>
                 ))}
               </select>
             </div>
@@ -256,46 +293,56 @@ export default function BenefitsPage() {
                 <div className="flex justify-between">
                   <span>Default</span>
                   <span className="font-medium text-gray-700 dark:text-gray-300">
-                    {selectedType.calculationType === 'FixedAmount'
+                    {selectedType.calculationType === "FixedAmount"
                       ? `LKR ${fmtAmount(selectedType.defaultAmount)}`
                       : `${selectedType.defaultPercentage}%`}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span>Calculation</span>
-                  <span className="font-medium text-gray-700 dark:text-gray-300">{selectedType.calculationType}</span>
+                  <span className="font-medium text-gray-700 dark:text-gray-300">
+                    {selectedType.calculationType}
+                  </span>
                 </div>
               </div>
             )}
 
             {/* Override fields */}
-            {selectedType?.calculationType === 'FixedAmount' && (
+            {selectedType?.calculationType === "FixedAmount" && (
               <div>
                 <label className="form-label">
                   Override Amount
-                  <span className="text-gray-400 text-xs ml-1">(leave blank to use default)</span>
+                  <span className="text-gray-400 text-xs ml-1">
+                    (leave blank to use default)
+                  </span>
                 </label>
                 <Input
                   type="number"
                   placeholder={selectedType.defaultAmount.toString()}
                   value={form.overrideAmount}
-                  onChange={(e) => setForm({ ...form, overrideAmount: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, overrideAmount: e.target.value })
+                  }
                 />
               </div>
             )}
 
-            {selectedType && selectedType.calculationType !== 'FixedAmount' && (
+            {selectedType && selectedType.calculationType !== "FixedAmount" && (
               <div>
                 <label className="form-label">
                   Override Percentage
-                  <span className="text-gray-400 text-xs ml-1">(leave blank to use default)</span>
+                  <span className="text-gray-400 text-xs ml-1">
+                    (leave blank to use default)
+                  </span>
                 </label>
                 <Input
                   type="number"
                   step="0.01"
                   placeholder={selectedType.defaultPercentage.toString()}
                   value={form.overridePercentage}
-                  onChange={(e) => setForm({ ...form, overridePercentage: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, overridePercentage: e.target.value })
+                  }
                 />
               </div>
             )}
@@ -303,11 +350,15 @@ export default function BenefitsPage() {
             {/* Dates */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="form-label">Effective From <span className="text-red-500">*</span></label>
+                <label className="form-label">
+                  Effective From <span className="text-red-500">*</span>
+                </label>
                 <Input
                   type="date"
                   value={form.effectiveFrom}
-                  onChange={(e) => setForm({ ...form, effectiveFrom: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, effectiveFrom: e.target.value })
+                  }
                 />
               </div>
               <div>
@@ -318,7 +369,9 @@ export default function BenefitsPage() {
                 <Input
                   type="date"
                   value={form.effectiveTo}
-                  onChange={(e) => setForm({ ...form, effectiveTo: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, effectiveTo: e.target.value })
+                  }
                 />
               </div>
             </div>
@@ -329,7 +382,9 @@ export default function BenefitsPage() {
                 <label className="form-label mb-0">Active</label>
                 <Switcher
                   checked={form.isActive}
-                  onChange={(val: boolean) => setForm({ ...form, isActive: val })}
+                  onChange={(val: boolean) =>
+                    setForm({ ...form, isActive: val })
+                  }
                 />
               </div>
             )}
@@ -337,9 +392,11 @@ export default function BenefitsPage() {
             {error && <p className="text-error text-sm">{error}</p>}
 
             <div className="flex justify-end gap-2 pt-2">
-              <Button variant="plain" onClick={closeDialog} disabled={saving}>Cancel</Button>
+              <Button variant="plain" onClick={closeDialog} disabled={saving}>
+                Cancel
+              </Button>
               <Button variant="solid" loading={saving} onClick={handleSave}>
-                {editing ? 'Update' : 'Add Benefit'}
+                {editing ? "Update" : "Add Benefit"}
               </Button>
             </div>
           </div>
@@ -351,13 +408,20 @@ export default function BenefitsPage() {
         open={confirmOpen}
         variant="danger"
         title="Remove Benefit"
-        message={deleteTarget ? `Are you sure you want to remove "${deleteTarget.benefitName}"? This action cannot be undone.` : ''}
+        message={
+          deleteTarget
+            ? `Are you sure you want to remove "${deleteTarget.benefitName}"? This action cannot be undone.`
+            : ""
+        }
         confirmLabel="Yes, Remove"
         cancelLabel="Keep It"
         loading={deleting}
         onConfirm={handleDelete}
-        onCancel={() => { setConfirmOpen(false); setDeleteTarget(null) }}
+        onCancel={() => {
+          setConfirmOpen(false);
+          setDeleteTarget(null);
+        }}
       />
     </>
-  )
+  );
 }

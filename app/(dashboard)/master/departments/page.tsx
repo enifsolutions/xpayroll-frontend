@@ -8,6 +8,9 @@ import Input from '@/components/ui/Input';
 import Switcher from '@/components/ui/Switcher';
 import { showSuccess, showError } from '@/lib/toast';
 import { PlusIcon, Pencil, Trash2 } from 'lucide-react';
+import { useRequirePermission } from "@/hooks/useRequirePermission";
+import { usePermission } from "@/hooks/usePermission";
+import { Permissions } from "@/lib/permissions";
 
 interface Branch {
   id: number;
@@ -44,6 +47,9 @@ const EMPTY: DeptForm = {
 };
 
 export default function DepartmentsPage() {
+  useRequirePermission(Permissions.MasterData.Departments.View);
+  const canManage = usePermission(Permissions.MasterData.Departments.Manage);
+
   const [items, setItems]         = useState<Department[]>([]);
   const [branches, setBranches]   = useState<Branch[]>([]);
   const [loading, setLoading]     = useState(true);
@@ -58,8 +64,8 @@ export default function DepartmentsPage() {
     try {
       setLoading(true);
       const [depts, brs] = await Promise.all([
-        api.get<Department[]>('/department'),
-        api.get<Branch[]>('/branches'),
+        api.get<Department[]>("/departments"),
+        api.get<Branch[]>("/branches"),
       ]);
       setItems(depts.data);
       setBranches(brs.data.filter(b => b.isActive));
@@ -106,8 +112,8 @@ export default function DepartmentsPage() {
     setSaving(true);
     setError('');
     try {
-      await api.post('/department/save', {
-        action: editing ? 'UPDATE' : 'ADD',
+      await api.post("/departments/save", {
+        action: editing ? "UPDATE" : "ADD",
         id: editing?.id ?? null,
         branchId: form.allBranches ? null : form.branchId,
         name: form.name.trim(),
@@ -129,7 +135,7 @@ export default function DepartmentsPage() {
   const handleDelete = async (d: Department) => {
     if (!confirm(`Delete "${d.name}"?`)) return;
     try {
-      await api.post('/department/save', { action: 'DELETE', id: d.id });
+      await api.post("/departments/save", { action: "DELETE", id: d.id });
       await load();
       showSuccess('Department deleted', d.name);
     } catch (err: any) {
@@ -150,9 +156,15 @@ export default function DepartmentsPage() {
             Manage company departments
           </p>
         </div>
-        <Button variant="solid" icon={<PlusIcon size={16} />} onClick={openAdd}>
-          Add Department
-        </Button>
+        {canManage && (
+          <Button
+            variant="solid"
+            icon={<PlusIcon size={16} />}
+            onClick={openAdd}
+          >
+            Add Department
+          </Button>
+        )}
       </div>
 
       {/* Table */}
@@ -181,36 +193,46 @@ export default function DepartmentsPage() {
                       No departments found
                     </td>
                   </tr>
-                ) : items.map(d => (
-                  <tr key={d.id}>
-                    <td className="font-medium heading-text">{d.name}</td>
-                    <td>
-                      <code className="text-xs bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">
-                        {d.code}
-                      </code>
-                    </td>
-                    <td>{d.branchName ?? <span className="badge badge-info">All Branches</span>}</td>
-                    <td className="text-sm text-gray-500 max-w-xs truncate">
-                      {d.description || '—'}
-                    </td>
-                    <td>
-                      <span className={`xp-badge ${d.isActive ? 'xp-badge-success' : 'xp-badge-danger'}`}>
-                        {d.isActive ? 'Active' : 'Inactive'}
-                      </span>
-                    </td>
-                    <td className="text-center">
-                      <div className="flex items-center justify-center gap-1">
-                        <button
-                          onClick={() => openEdit(d)}
-                          className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-primary dark:hover:bg-gray-700 transition-colors"
-                          title="Edit"
+                ) : (
+                  items.map((d) => (
+                    <tr key={d.id}>
+                      <td className="font-medium heading-text">{d.name}</td>
+                      <td>
+                        <code className="text-xs bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">
+                          {d.code}
+                        </code>
+                      </td>
+                      <td>
+                        {d.branchName ?? (
+                          <span className="badge badge-info">All Branches</span>
+                        )}
+                      </td>
+                      <td className="text-sm text-gray-500 max-w-xs truncate">
+                        {d.description || "—"}
+                      </td>
+                      <td>
+                        <span
+                          className={`xp-badge ${d.isActive ? "xp-badge-success" : "xp-badge-danger"}`}
                         >
-                          <Pencil size={15} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                          {d.isActive ? "Active" : "Inactive"}
+                        </span>
+                      </td>
+                      <td className="text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          {canManage && (
+                            <button
+                              onClick={() => openEdit(d)}
+                              className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-primary dark:hover:bg-gray-700 transition-colors"
+                              title="Edit"
+                            >
+                              <Pencil size={15} />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           )}
@@ -223,35 +245,44 @@ export default function DepartmentsPage() {
         onClose={() => setDialogOpen(false)}
         onRequestClose={() => setDialogOpen(false)}
       >
-        <h5 className="h5 mb-4">{editing ? 'Edit Department' : 'Add Department'}</h5>
+        <h5 className="h5 mb-4">
+          {editing ? "Edit Department" : "Add Department"}
+        </h5>
 
         <div className="space-y-4">
           {/* All Branches toggle */}
           <div className="flex items-center gap-3">
-        <span className="text-sm font-medium">All Branches</span>
-        <Switcher
-            checked={form.allBranches}
-            onChange={val => {
-            if (!editing) setForm(f => ({ ...f, allBranches: val, branchId: '' }));
-            }}
-        />
-        {editing && (
-            <span className="text-xs text-gray-400">Cannot change when editing</span>
-        )}
-        </div>
+            <span className="text-sm font-medium">All Branches</span>
+            <Switcher
+              checked={form.allBranches}
+              onChange={(val) => {
+                if (!editing)
+                  setForm((f) => ({ ...f, allBranches: val, branchId: "" }));
+              }}
+            />
+            {editing && (
+              <span className="text-xs text-gray-400">
+                Cannot change when editing
+              </span>
+            )}
+          </div>
 
           {/* Branch dropdown — hidden when All Branches */}
           {!form.allBranches && (
             <div>
-              <label className="form-label">Branch <span className="text-error">*</span></label>
+              <label className="form-label">
+                Branch <span className="text-error">*</span>
+              </label>
               <select
                 className="input w-full"
                 value={form.branchId}
-                onChange={e => set('branchId', e.target.value)}
+                onChange={(e) => set("branchId", e.target.value)}
               >
                 <option value="">Select branch…</option>
-                {branches.map(b => (
-                  <option key={b.id} value={b.id}>{b.name}</option>
+                {branches.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name}
+                  </option>
                 ))}
               </select>
             </div>
@@ -260,19 +291,23 @@ export default function DepartmentsPage() {
           {/* Name + Code */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="form-label">Name <span className="text-error">*</span></label>
+              <label className="form-label">
+                Name <span className="text-error">*</span>
+              </label>
               <Input
                 placeholder="e.g. Finance"
                 value={form.name}
-                onChange={e => set('name', e.target.value)}
+                onChange={(e) => set("name", e.target.value)}
               />
             </div>
             <div>
-              <label className="form-label">Code <span className="text-error">*</span></label>
+              <label className="form-label">
+                Code <span className="text-error">*</span>
+              </label>
               <Input
                 placeholder="e.g. FIN"
                 value={form.code}
-                onChange={e => set('code', e.target.value.toUpperCase())}
+                onChange={(e) => set("code", e.target.value.toUpperCase())}
               />
             </div>
           </div>
@@ -283,7 +318,7 @@ export default function DepartmentsPage() {
             <Input
               placeholder="Optional description…"
               value={form.description}
-              onChange={e => set('description', e.target.value)}
+              onChange={(e) => set("description", e.target.value)}
             />
           </div>
 
@@ -292,7 +327,7 @@ export default function DepartmentsPage() {
             <span className="text-sm font-medium">Active</span>
             <Switcher
               checked={form.isActive}
-              onChange={val => set('isActive', val)}
+              onChange={(val) => set("isActive", val)}
             />
           </div>
 
@@ -304,7 +339,7 @@ export default function DepartmentsPage() {
             Cancel
           </Button>
           <Button variant="solid" loading={saving} onClick={handleSave}>
-            {editing ? 'Update' : 'Create'}
+            {editing ? "Update" : "Create"}
           </Button>
         </div>
       </Dialog>

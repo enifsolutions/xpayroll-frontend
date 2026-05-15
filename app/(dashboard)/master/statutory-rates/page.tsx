@@ -8,6 +8,9 @@ import Input from '@/components/ui/Input';
 import Switcher from '@/components/ui/Switcher';
 import { showSuccess, showError } from '@/lib/toast';
 import { PlusIcon, Pencil, Trash2 } from 'lucide-react';
+import { useRequirePermission } from "@/hooks/useRequirePermission";
+import { usePermission } from "@/hooks/usePermission";
+import { Permissions } from "@/lib/permissions";
 
 interface StatutoryRate {
   id: string;
@@ -48,6 +51,9 @@ const MONTHS = [
 const SCHEMES = ['EPF', 'ETF', 'PAYE', 'APIT', 'SocialSecurity', 'Other'];
 
 export default function StatutoryRatesPage() {
+  useRequirePermission(Permissions.MasterData.StatutoryRates.View);
+  const canManage = usePermission(Permissions.MasterData.StatutoryRates.Manage);
+
   const [items, setItems]             = useState<StatutoryRate[]>([]);
   const [loading, setLoading]         = useState(true);
   const [dialogOpen, setDialogOpen]   = useState(false);
@@ -61,7 +67,7 @@ export default function StatutoryRatesPage() {
   const load = async () => {
     try {
       setLoading(true);
-      const res = await api.get<StatutoryRate[]>('/StatutoryRate');
+      const res = await api.get<StatutoryRate[]>("/statutory-rates");
       setItems(res.data);
     } catch (err: any) {
       showError('Load failed', err?.response?.data?.error ?? 'Could not load statutory rates.');
@@ -104,16 +110,18 @@ export default function StatutoryRatesPage() {
     setSaving(true);
     setError('');
     try {
-      await api.post('/StatutoryRate/save', {
-        action:         editing ? 'UPDATE' : 'ADD',
-        id:             editing?.id ?? null,
-        scheme:         form.scheme,
-        effectiveYear:  parseInt(form.effectiveYear),
+      await api.post("/statutory-rates/save", {
+        action: editing ? "UPDATE" : "ADD",
+        id: editing?.id ?? null,
+        scheme: form.scheme,
+        effectiveYear: parseInt(form.effectiveYear),
         effectiveMonth: parseInt(form.effectiveMonth) || 1,
-        employeeRate:   parseFloat(form.employeeRate) || 0,
-        employerRate:   parseFloat(form.employerRate) || 0,
-        maxWageCeiling: form.maxWageCeiling ? parseFloat(form.maxWageCeiling) : null,
-        isActive:       form.isActive,
+        employeeRate: parseFloat(form.employeeRate) || 0,
+        employerRate: parseFloat(form.employerRate) || 0,
+        maxWageCeiling: form.maxWageCeiling
+          ? parseFloat(form.maxWageCeiling)
+          : null,
+        isActive: form.isActive,
       });
       setDialogOpen(false);
       await load();
@@ -128,7 +136,10 @@ export default function StatutoryRatesPage() {
   const handleDelete = async (item: StatutoryRate) => {
     if (!confirm(`Delete "${item.scheme}" rate for ${item.effectiveYear}?`)) return;
     try {
-      await api.post('/StatutoryRate/save', { action: 'DELETE', id: item.id });
+      await api.post("/statutory-rates/save", {
+        action: "DELETE",
+        id: item.id,
+      });
       await load();
       showSuccess('Rate deleted', `${item.scheme} ${item.effectiveYear}`);
     } catch (err: any) {
@@ -146,21 +157,32 @@ export default function StatutoryRatesPage() {
         <div>
           <h3 className="h3">Statutory Rates</h3>
           <p className="text-gray-500 dark:text-gray-400 mt-1">
-            EPF, ETF, PAYE and other statutory contribution rates by year and scheme.
+            EPF, ETF, PAYE and other statutory contribution rates by year and
+            scheme.
           </p>
         </div>
         <div className="flex items-center gap-3">
           <select
             className="input"
             value={schemeFilter}
-            onChange={e => setSchemeFilter(e.target.value)}
+            onChange={(e) => setSchemeFilter(e.target.value)}
           >
             <option value="">All Schemes</option>
-            {schemes.map(s => <option key={s} value={s}>{s}</option>)}
+            {schemes.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
           </select>
-          <Button variant="solid" icon={<PlusIcon size={16} />} onClick={openAdd}>
-            Add Rate
-          </Button>
+          {canManage && (
+            <Button
+              variant="solid"
+              icon={<PlusIcon size={16} />}
+              onClick={openAdd}
+            >
+              Add Rate
+            </Button>
+          )}
         </div>
       </div>
 
@@ -192,35 +214,58 @@ export default function StatutoryRatesPage() {
                       No statutory rates found
                     </td>
                   </tr>
-                ) : filtered.map(item => (
-                  <tr key={item.id}>
-                    <td><span className="font-semibold text-primary">{item.scheme}</span></td>
-                    <td className="font-medium heading-text">{item.effectiveYear}</td>
-                    <td className="text-gray-500">{MONTHS[item.effectiveMonth - 1]}</td>
-                    <td><code className="text-xs bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">{item.employeeRate}%</code></td>
-                    <td><code className="text-xs bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">{item.employerRate}%</code></td>
-                    <td className="text-gray-500">
-                      {item.maxWageCeiling != null ? item.maxWageCeiling.toLocaleString() : '—'}
-                    </td>
-                    <td>
-                      <span className={`xp-badge ${item.isActive ? 'xp-badge-success' : 'xp-badge-danger'}`}>
-                        {item.isActive ? 'Active' : 'Inactive'}
-                      </span>
-                    </td>
-                    <td className="text-center">
-                      <div className="flex items-center justify-center gap-1">
-                        <button
-                          onClick={() => openEdit(item)}
-                          className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-primary dark:hover:bg-gray-700 transition-colors"
-                          title="Edit"
+                ) : (
+                  filtered.map((item) => (
+                    <tr key={item.id}>
+                      <td>
+                        <span className="font-semibold text-primary">
+                          {item.scheme}
+                        </span>
+                      </td>
+                      <td className="font-medium heading-text">
+                        {item.effectiveYear}
+                      </td>
+                      <td className="text-gray-500">
+                        {MONTHS[item.effectiveMonth - 1]}
+                      </td>
+                      <td>
+                        <code className="text-xs bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">
+                          {item.employeeRate}%
+                        </code>
+                      </td>
+                      <td>
+                        <code className="text-xs bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">
+                          {item.employerRate}%
+                        </code>
+                      </td>
+                      <td className="text-gray-500">
+                        {item.maxWageCeiling != null
+                          ? item.maxWageCeiling.toLocaleString()
+                          : "—"}
+                      </td>
+                      <td>
+                        <span
+                          className={`xp-badge ${item.isActive ? "xp-badge-success" : "xp-badge-danger"}`}
                         >
-                          <Pencil size={15} />
-                        </button>
-                        
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                          {item.isActive ? "Active" : "Inactive"}
+                        </span>
+                      </td>
+                      <td className="text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          {canManage && (
+                            <button
+                              onClick={() => openEdit(item)}
+                              className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-primary dark:hover:bg-gray-700 transition-colors"
+                              title="Edit"
+                            >
+                              <Pencil size={15} />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           )}
@@ -233,28 +278,42 @@ export default function StatutoryRatesPage() {
         onClose={() => setDialogOpen(false)}
         onRequestClose={() => setDialogOpen(false)}
       >
-        <h5 className="h5 mb-4">{editing ? 'Edit Statutory Rate' : 'Add Statutory Rate'}</h5>
+        <h5 className="h5 mb-4">
+          {editing ? "Edit Statutory Rate" : "Add Statutory Rate"}
+        </h5>
 
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="form-label">Scheme <span className="text-error">*</span></label>
+              <label className="form-label">
+                Scheme <span className="text-error">*</span>
+              </label>
               <select
                 className="input w-full"
                 value={form.scheme}
-                onChange={e => setForm(f => ({ ...f, scheme: e.target.value }))}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, scheme: e.target.value }))
+                }
               >
-                {SCHEMES.map(s => <option key={s} value={s}>{s}</option>)}
+                {SCHEMES.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
               </select>
             </div>
             <div>
-              <label className="form-label">Effective Year <span className="text-error">*</span></label>
+              <label className="form-label">
+                Effective Year <span className="text-error">*</span>
+              </label>
               <Input
                 type="number"
                 min="2000"
                 max="2100"
                 value={form.effectiveYear}
-                onChange={e => setForm(f => ({ ...f, effectiveYear: e.target.value }))}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, effectiveYear: e.target.value }))
+                }
               />
             </div>
           </div>
@@ -264,9 +323,15 @@ export default function StatutoryRatesPage() {
             <select
               className="input w-full"
               value={form.effectiveMonth}
-              onChange={e => setForm(f => ({ ...f, effectiveMonth: e.target.value }))}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, effectiveMonth: e.target.value }))
+              }
             >
-              {MONTHS.map((m, i) => <option key={i + 1} value={i + 1}>{m}</option>)}
+              {MONTHS.map((m, i) => (
+                <option key={i + 1} value={i + 1}>
+                  {m}
+                </option>
+              ))}
             </select>
           </div>
 
@@ -278,7 +343,9 @@ export default function StatutoryRatesPage() {
                 min="0"
                 step="0.01"
                 value={form.employeeRate}
-                onChange={e => setForm(f => ({ ...f, employeeRate: e.target.value }))}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, employeeRate: e.target.value }))
+                }
               />
             </div>
             <div>
@@ -288,19 +355,26 @@ export default function StatutoryRatesPage() {
                 min="0"
                 step="0.01"
                 value={form.employerRate}
-                onChange={e => setForm(f => ({ ...f, employerRate: e.target.value }))}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, employerRate: e.target.value }))
+                }
               />
             </div>
           </div>
 
           <div>
-            <label className="form-label">Max Wage Ceiling <span className="text-xs text-gray-400">(optional)</span></label>
+            <label className="form-label">
+              Max Wage Ceiling{" "}
+              <span className="text-xs text-gray-400">(optional)</span>
+            </label>
             <Input
               type="number"
               min="0"
               placeholder="Leave blank for no ceiling"
               value={form.maxWageCeiling}
-              onChange={e => setForm(f => ({ ...f, maxWageCeiling: e.target.value }))}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, maxWageCeiling: e.target.value }))
+              }
             />
           </div>
 
@@ -308,7 +382,7 @@ export default function StatutoryRatesPage() {
             <span className="text-sm font-medium">Active</span>
             <Switcher
               checked={form.isActive}
-              onChange={val => setForm(f => ({ ...f, isActive: val }))}
+              onChange={(val) => setForm((f) => ({ ...f, isActive: val }))}
             />
           </div>
 
@@ -316,9 +390,11 @@ export default function StatutoryRatesPage() {
         </div>
 
         <div className="flex justify-end gap-2 mt-6">
-          <Button variant="plain" onClick={() => setDialogOpen(false)}>Cancel</Button>
+          <Button variant="plain" onClick={() => setDialogOpen(false)}>
+            Cancel
+          </Button>
           <Button variant="solid" loading={saving} onClick={handleSave}>
-            {editing ? 'Update' : 'Add Rate'}
+            {editing ? "Update" : "Add Rate"}
           </Button>
         </div>
       </Dialog>

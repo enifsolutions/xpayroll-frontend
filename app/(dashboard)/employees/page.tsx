@@ -101,10 +101,10 @@ export default function EmployeesPage() {
     try {
       setLoading(true);
       const [empRes, brRes, deptRes, desigRes] = await Promise.all([
-        api.get<Employee[]>('/employees'),
-        api.get<Branch[]>('/branches'),
-        api.get<Department[]>('/department'),
-        api.get<Designation[]>('/designation'),
+        api.get<Employee[]>("/employees"),
+        api.get<Branch[]>("/branches"),
+        api.get<Department[]>("/departments"),
+        api.get<Designation[]>("/designations"),
       ]);
       setItems(empRes.data);
       setBranches(brRes.data.filter((b: any) => b.isActive).map((b: any) => ({ ...b, id: String(b.id) })));
