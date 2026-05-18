@@ -13,6 +13,7 @@ import {
   Minus,
   Settings,
   LayoutDashboard,
+  Shield,
 } from "lucide-react";
 
 export interface NavItem {
@@ -152,6 +153,13 @@ const navigationConfig: NavItem[] = [
         path: "/settings/company",
         icon: Building2,
         permissionKey: "Settings.Company.View",
+      },
+      {
+        key: "roles",
+        label: "Roles & Permissions",
+        path: "/settings/roles",
+        icon: Shield,
+        permissionKey: "Settings.Roles.View",
       },
     ],
   },
