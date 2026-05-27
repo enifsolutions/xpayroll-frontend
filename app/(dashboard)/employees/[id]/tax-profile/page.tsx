@@ -1,5 +1,5 @@
 'use client'
-
+import { useRequirePermission } from '@/hooks/useRequirePermission';
 import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { PlusIcon, Pencil, Trash2, ShieldCheck } from 'lucide-react'
@@ -22,6 +22,7 @@ const CURRENT_YEAR = new Date().getFullYear()
 const fmt = (n: number) => n.toLocaleString('en-LK', { minimumFractionDigits: 2 })
 
 export default function TaxProfilePage() {
+  useRequirePermission('HR.Employee.View');
   const { id: employeeId } = useParams<{ id: string }>()
   const initialized = useRef(false)
   const canManage = usePermission(Permissions.HR.Employee.Update);

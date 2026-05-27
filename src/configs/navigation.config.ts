@@ -155,6 +155,13 @@ const navigationConfig: NavItem[] = [
         permissionKey: "Settings.Company.View",
       },
       {
+        key: "users",
+        label: "User Accounts",
+        path: "/settings/users",
+        icon: Users,
+        permissionKey: "Settings.Users.View",
+      },
+      {
         key: "roles",
         label: "Roles & Permissions",
         path: "/settings/roles",

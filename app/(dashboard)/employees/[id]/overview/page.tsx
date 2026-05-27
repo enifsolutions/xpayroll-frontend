@@ -1,5 +1,5 @@
 'use client'
-
+import { useRequirePermission } from '@/hooks/useRequirePermission';
 import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { useRouter } from 'next/navigation'
@@ -125,6 +125,7 @@ function StatCard({ label, value, sub, color = 'primary' }: {
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 export default function OverviewPage() {
+  useRequirePermission('HR.Employee.View');
   const { id: employeeId } = useParams<{ id: string }>()
   const router = useRouter()
   const initialized = useRef(false)

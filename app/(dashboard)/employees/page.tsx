@@ -1,5 +1,5 @@
 'use client';
-
+import { useRequirePermission } from '@/hooks/useRequirePermission';
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { PlusIcon, Trash2, X, Pencil, ExternalLink } from 'lucide-react';
@@ -58,6 +58,7 @@ function WizardModal({ open, onClose, children }: {
 type EditTab = 'details' | 'contract';
 
 export default function EmployeesPage() {
+  useRequirePermission('HR.Employee.View');
   const router = useRouter();
   const initialized                         = useRef(false);
   const [items, setItems]                   = useState<Employee[]>([]);

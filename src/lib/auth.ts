@@ -12,14 +12,15 @@ interface TokenPair {
 }
 
 export interface LoginResponse {
-  userId:      number       // comes as number from JSON — we stringify it
-  email:       string
-  firstName:   string | null
-  lastName:    string | null
-  role:        string       // "Role" in C# record
-  tokens:      TokenPair    // nested TokenPair object
-  permHash:    string
-  permissions: string[]
+  userId: number;
+  email: string;
+  firstName: string | null;
+  lastName: string | null;
+  role: string;
+  tokens: TokenPair;
+  permHash: string;
+  permissions: string[];
+  isTempPassword: boolean;
 }
 
 // -------------------------------------------------------

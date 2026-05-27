@@ -1,5 +1,5 @@
 'use client'
-
+import { useRequirePermission } from '@/hooks/useRequirePermission';
 import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { PlusIcon, Pencil, Trash2 } from 'lucide-react'
@@ -34,6 +34,7 @@ function BalanceBar({ used, entitled, carried }: { used: number; entitled: numbe
 }
 
 export default function LeaveBalancesPage() {
+  useRequirePermission('HR.Employee.View');
   const { id: employeeId } = useParams<{ id: string }>()
   const initialized = useRef(false)
   const canManage = usePermission(Permissions.HR.Leave.Manage);

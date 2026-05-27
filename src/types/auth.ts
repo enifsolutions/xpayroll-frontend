@@ -4,17 +4,18 @@ export type LoginRequest = {
 }
 
 export type AuthResponse = {
-  userId:      number;
-  email:       string;
-  firstName:   string;
-  lastName:    string;
-  role:        string;
+  userId: number;
+  email: string;
+  firstName: string;
+  lastName: string;
+  role: string;
   tokens: {
-    accessToken:           string;
-    refreshToken:          string;
-    accessTokenExpiresAt:  string;
+    accessToken: string;
+    refreshToken: string;
+    accessTokenExpiresAt: string;
     refreshTokenExpiresAt: string;
   };
-  permHash:    string;
+  permHash: string;
   permissions: string[];
-}
+  isTempPassword: boolean;
+};

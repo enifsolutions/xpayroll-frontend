@@ -1,5 +1,5 @@
 'use client'
-
+import { useRequirePermission } from '@/hooks/useRequirePermission';
 import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { PlusIcon, Pencil, Trash2 } from 'lucide-react'
@@ -23,6 +23,7 @@ const fmtAmount = (n: number) =>
   n.toLocaleString('en-LK', { minimumFractionDigits: 2 })
 
 export default function BenefitsPage() {
+  useRequirePermission('HR.Employee.View');
   const { id: employeeId } = useParams<{ id: string }>()
   const initialized = useRef(false)
 

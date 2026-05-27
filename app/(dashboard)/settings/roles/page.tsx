@@ -1,5 +1,5 @@
 "use client";
-
+import { useRequirePermission } from '@/hooks/useRequirePermission';
 import { useState, useRef, useEffect } from "react";
 import { Shield, Users, Key, ClipboardList, PlusIcon } from "lucide-react";
 import Button from "@/components/ui/Button";
@@ -17,6 +17,7 @@ const TABS = [
 ];
 
 export default function RolesManagementPage() {
+  useRequirePermission('Settings.Roles.View');
   const [activeTab, setActiveTab] = useState("roles");
   const [roles, setRoles] = useState<Role[]>([]);
   const [permissions, setPermissions] = useState<Permission[]>([]);

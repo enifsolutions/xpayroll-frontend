@@ -1,5 +1,5 @@
 'use client'
-
+import { useRequirePermission } from '@/hooks/useRequirePermission';
 import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { PlusIcon, Pencil, Trash2 } from 'lucide-react'
@@ -21,6 +21,7 @@ import {
 } from './shift-assignments.types'
 
 export default function ShiftAssignmentsPage() {
+  useRequirePermission('HR.Employee.View');
   const { id: employeeId } = useParams<{ id: string }>()
 
   const initialized = useRef(false)

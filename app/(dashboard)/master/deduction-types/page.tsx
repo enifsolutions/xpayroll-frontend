@@ -1,5 +1,5 @@
 'use client';
-
+import { useRequirePermission } from '@/hooks/useRequirePermission';
 import { useEffect, useState, useRef } from 'react';
 import api from '@/lib/axios';
 import Button from '@/components/ui/Button';
@@ -59,6 +59,7 @@ const CALC_OPTIONS = [
 ];
 
 export default function DeductionTypesPage() {
+  useRequirePermission('MasterData.DeductionTypes.View');
   const canManage = usePermission(Permissions.MasterData.DeductionTypes.Manage);
   const [items, setItems]           = useState<DeductionType[]>([]);
   const [loading, setLoading]       = useState(true);
