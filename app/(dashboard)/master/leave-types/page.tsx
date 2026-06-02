@@ -8,9 +8,10 @@ import Input from '@/components/ui/Input';
 import Switcher from '@/components/ui/Switcher';
 import { showSuccess, showError } from '@/lib/toast';
 import { PlusIcon, Pencil, Trash2 } from 'lucide-react';
-import { useRequirePermission } from '@/hooks/useRequirePermission'
-import { usePermission } from '@/hooks/usePermission'
-import { Permissions } from '@/lib/permissions'
+import { useRequirePermission } from "@/hooks/useRequirePermission";
+import { usePermission } from "@/hooks/usePermission";
+import { Permissions } from "@/lib/permissions";
+
 
 interface LeaveType {
   id: number;
@@ -24,6 +25,7 @@ interface LeaveType {
   requiresApproval: boolean;
   minNoticeDays: number;
   genderRestriction: string | null;
+  isCoveringEmployee: boolean;
   isActive: boolean;
 }
 
@@ -38,20 +40,22 @@ interface LeaveTypeForm {
   requiresApproval: boolean;
   minNoticeDays: string;
   genderRestriction: string;
+  isCoveringEmployee: boolean;
   isActive: boolean;
 }
 
 const EMPTY: LeaveTypeForm = {
-  name: '',
-  code: '',
-  accrualType: 'Annual',
-  daysPerYear: '',
+  name: "",
+  code: "",
+  accrualType: "Annual",
+  daysPerYear: "",
   isPaid: true,
   carryForward: false,
-  maxCarryDays: '0',
+  maxCarryDays: "0",
   requiresApproval: true,
-  minNoticeDays: '0',
-  genderRestriction: '-',
+  minNoticeDays: "0",
+  genderRestriction: "",
+  isCoveringEmployee: false,
   isActive: true,
 };
 
@@ -62,25 +66,28 @@ const ACCRUAL_OPTIONS = [
 ];
 
 export default function LeaveTypesPage() {
-  useRequirePermission(Permissions.MasterData.DeductionTypes.View)
-  const canManage = usePermission(Permissions.MasterData.DeductionTypes.Manage)
+  useRequirePermission(Permissions.MasterData.DeductionTypes.View);
+  const canManage = usePermission(Permissions.MasterData.DeductionTypes.Manage);
 
-  const [items, setItems]           = useState<LeaveType[]>([]);
-  const [loading, setLoading]       = useState(true);
+  const [items, setItems] = useState<LeaveType[]>([]);
+  const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editing, setEditing]       = useState<LeaveType | null>(null);
-  const [form, setForm]             = useState<LeaveTypeForm>(EMPTY);
-  const [saving, setSaving]         = useState(false);
-  const [error, setError]           = useState('');
-  const initialized                 = useRef(false);
+  const [editing, setEditing] = useState<LeaveType | null>(null);
+  const [form, setForm] = useState<LeaveTypeForm>(EMPTY);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const initialized = useRef(false);
 
   const load = async () => {
     try {
       setLoading(true);
-      const res = await api.get<LeaveType[]>('/leavetype');
+      const res = await api.get<LeaveType[]>("/leave-types");
       setItems(res.data);
     } catch (err: any) {
-      showError('Load failed', err?.response?.data?.error ?? 'Could not load leave types.');
+      showError(
+        "Load failed",
+        err?.response?.data?.error ?? "Could not load leave types.",
+      );
     } finally {
       setLoading(false);
     }
@@ -95,7 +102,7 @@ export default function LeaveTypesPage() {
   const openAdd = () => {
     setEditing(null);
     setForm({ ...EMPTY });
-    setError('');
+    setError("");
     setDialogOpen(true);
   };
 
@@ -111,23 +118,24 @@ export default function LeaveTypesPage() {
       maxCarryDays: String(item.maxCarryDays),
       requiresApproval: item.requiresApproval,
       minNoticeDays: String(item.minNoticeDays),
-      genderRestriction: item.genderRestriction ?? '',
+      genderRestriction: item.genderRestriction ?? "",
+      isCoveringEmployee: item.isCoveringEmployee,
       isActive: item.isActive,
     });
-    setError('');
+    setError("");
     setDialogOpen(true);
   };
 
   const handleSave = async () => {
     if (!form.name.trim() || !form.code.trim()) {
-      setError('Name and Code are required.');
+      setError("Name and Code are required.");
       return;
     }
     setSaving(true);
-    setError('');
+    setError("");
     try {
-      await api.post('/leavetype/save', {
-        action: editing ? 'UPDATE' : 'ADD',
+      await api.post("/leave-types/save", {
+        action: editing ? "UPDATE" : "ADD",
         id: editing?.id ?? null,
         name: form.name.trim(),
         code: form.code.trim().toUpperCase(),
@@ -139,14 +147,21 @@ export default function LeaveTypesPage() {
         requiresApproval: form.requiresApproval,
         minNoticeDays: parseInt(form.minNoticeDays) || 0,
         genderRestriction: form.genderRestriction || null,
+        isCoveringEmployee: form.isCoveringEmployee,
         isActive: form.isActive,
         userId: null,
       });
       setDialogOpen(false);
       await load();
-      showSuccess(editing ? 'Leave type updated' : 'Leave type created', form.name);
+      showSuccess(
+        editing ? "Leave type updated" : "Leave type created",
+        form.name,
+      );
     } catch (err: any) {
-      showError('Failed to save', err?.response?.data?.error ?? 'Could not save leave type.');
+      showError(
+        "Failed to save",
+        err?.response?.data?.error ?? "Could not save leave type.",
+      );
     } finally {
       setSaving(false);
     }
@@ -155,17 +170,19 @@ export default function LeaveTypesPage() {
   const handleDelete = async (item: LeaveType) => {
     if (!confirm(`Delete "${item.name}"?`)) return;
     try {
-      await api.post('/leavetype/save', { action: 'DELETE', id: item.id });
+      await api.post("/leave-types/save", { action: "DELETE", id: item.id });
       await load();
-      showSuccess('Leave type deleted', item.name);
+      showSuccess("Leave type deleted", item.name);
     } catch (err: any) {
-      showError('Delete failed', err?.response?.data?.error ?? 'Could not delete leave type.');
+      showError(
+        "Delete failed",
+        err?.response?.data?.error ?? "Could not delete leave type.",
+      );
     }
   };
 
   return (
     <div>
-      {/* Page header */}
       <div className="flex items-center justify-between mb-6">
         <div>
           <h3 className="h3">Leave Types</h3>
@@ -174,13 +191,16 @@ export default function LeaveTypesPage() {
           </p>
         </div>
         {canManage && (
-          <Button variant="solid" icon={<PlusIcon size={16} />} onClick={openAdd}>
+          <Button
+            variant="solid"
+            icon={<PlusIcon size={16} />}
+            onClick={openAdd}
+          >
             Add Leave Type
           </Button>
         )}
       </div>
 
-      {/* Table */}
       <div className="card">
         <div className="card-body">
           {loading ? (
@@ -198,8 +218,7 @@ export default function LeaveTypesPage() {
                   <th>Paid</th>
                   <th>Carry Forward</th>
                   <th>Approval</th>
-                  <th>Min Notice</th>
-                  <th>Gender</th>
+                  <th>Covering Emp.</th>
                   <th>Status</th>
                   <th className="w-24 text-center">Actions</th>
                 </tr>
@@ -207,100 +226,125 @@ export default function LeaveTypesPage() {
               <tbody>
                 {items.length === 0 ? (
                   <tr>
-                    <td colSpan={11} className="text-center py-8 text-gray-400">
+                    <td colSpan={10} className="text-center py-8 text-gray-400">
                       No leave types found
                     </td>
                   </tr>
-                ) : items.map(item => (
-                  <tr key={item.id}>
-                    <td className="font-medium heading-text">{item.name}</td>
-                    <td>
-                      <code className="text-xs bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">
-                        {item.code}
-                      </code>
-                    </td>
-                    <td>{ACCRUAL_OPTIONS.find(o => o.value === item.accrualType)?.label ?? item.accrualType}</td>
-                    <td>{item.daysPerYear}</td>
-                    <td>
-                      <span className={`xp-badge ${item.isPaid ? 'xp-badge-success' : 'xp-badge-neutral'}`}>
-                        {item.isPaid ? 'Paid' : 'Unpaid'}
-                      </span>
-                    </td>
-                    <td>
-                      {item.carryForward
-                        ? <span className="xp-badge xp-badge-info">Up to {item.maxCarryDays}d</span>
-                        : <span className="xp-badge xp-badge-neutral">No</span>}
-                    </td>
-                    <td>
-                      <span className={`xp-badge ${item.requiresApproval ? 'xp-badge-warning' : 'xp-badge-neutral'}`}>
-                        {item.requiresApproval ? 'Required' : 'Auto'}
-                      </span>
-                    </td>
-                    <td>{item.minNoticeDays > 0 ? `${item.minNoticeDays}d` : '—'}</td>
-                    <td>
-                      {item.genderRestriction
-                        ? <span className="xp-badge xp-badge-info">{item.genderRestriction}</span>
-                        : <span className="text-gray-400">—</span>}
-                    </td>
-                    <td>
-                      <span className={`xp-badge ${item.isActive ? 'xp-badge-success' : 'xp-badge-danger'}`}>
-                        {item.isActive ? 'Active' : 'Inactive'}
-                      </span>
-                    </td>
-                    <td className="text-center">
-                      <div className="flex items-center justify-center gap-1">
-                        {canManage && (
-                          <button
-                            onClick={() => openEdit(item)}
-                            className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-primary dark:hover:bg-gray-700 transition-colors"
-                            title="Edit"
-                          >
-                            <Pencil size={15} />
-                          </button>
+                ) : (
+                  items.map((item) => (
+                    <tr key={item.id}>
+                      <td className="font-medium heading-text">{item.name}</td>
+                      <td>
+                        <code className="text-xs bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">
+                          {item.code}
+                        </code>
+                      </td>
+                      <td>
+                        {ACCRUAL_OPTIONS.find(
+                          (o) => o.value === item.accrualType,
+                        )?.label ?? item.accrualType}
+                      </td>
+                      <td>{item.daysPerYear}</td>
+                      <td>
+                        <span
+                          className={`xp-badge ${item.isPaid ? "xp-badge-success" : "xp-badge-neutral"}`}
+                        >
+                          {item.isPaid ? "Paid" : "Unpaid"}
+                        </span>
+                      </td>
+                      <td>
+                        {item.carryForward ? (
+                          <span className="xp-badge xp-badge-info">
+                            Up to {item.maxCarryDays}d
+                          </span>
+                        ) : (
+                          <span className="xp-badge xp-badge-neutral">No</span>
                         )}
-                        {canManage && (
-                          <button
-                            onClick={() => handleDelete(item)}
-                            className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-error dark:hover:bg-gray-700 transition-colors"
-                            title="Delete"
-                          >
-                            <Trash2 size={15} />
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td>
+                        <span
+                          className={`xp-badge ${item.requiresApproval ? "xp-badge-warning" : "xp-badge-neutral"}`}
+                        >
+                          {item.requiresApproval ? "Required" : "Auto"}
+                        </span>
+                      </td>
+                      <td>
+                        <span
+                          className={`xp-badge ${item.isCoveringEmployee ? "xp-badge-info" : "xp-badge-neutral"}`}
+                        >
+                          {item.isCoveringEmployee ? "Required" : "No"}
+                        </span>
+                      </td>
+                      <td>
+                        <span
+                          className={`xp-badge ${item.isActive ? "xp-badge-success" : "xp-badge-danger"}`}
+                        >
+                          {item.isActive ? "Active" : "Inactive"}
+                        </span>
+                      </td>
+                      <td className="text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          {canManage && (
+                            <button
+                              onClick={() => openEdit(item)}
+                              className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-primary dark:hover:bg-gray-700 transition-colors"
+                              title="Edit"
+                            >
+                              <Pencil size={15} />
+                            </button>
+                          )}
+                          {canManage && (
+                            <button
+                              onClick={() => handleDelete(item)}
+                              className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-error dark:hover:bg-gray-700 transition-colors"
+                              title="Delete"
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           )}
         </div>
       </div>
 
-      {/* Add/Edit Dialog */}
       <Dialog
         isOpen={dialogOpen}
         onClose={() => setDialogOpen(false)}
         onRequestClose={() => setDialogOpen(false)}
       >
-        <h5 className="h5 mb-4">{editing ? 'Edit Leave Type' : 'Add Leave Type'}</h5>
-
+        <h5 className="h5 mb-4">
+          {editing ? "Edit Leave Type" : "Add Leave Type"}
+        </h5>
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="form-label">Name <span className="text-error">*</span></label>
+              <label className="form-label">
+                Name <span className="text-error">*</span>
+              </label>
               <Input
                 placeholder="e.g. Annual Leave"
                 value={form.name}
-                onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, name: e.target.value }))
+                }
               />
             </div>
             <div>
-              <label className="form-label">Code <span className="text-error">*</span></label>
+              <label className="form-label">
+                Code <span className="text-error">*</span>
+              </label>
               <Input
                 placeholder="e.g. AL"
                 value={form.code}
-                onChange={e => setForm(f => ({ ...f, code: e.target.value.toUpperCase() }))}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, code: e.target.value.toUpperCase() }))
+                }
               />
             </div>
           </div>
@@ -311,10 +355,14 @@ export default function LeaveTypesPage() {
               <select
                 className="input w-full"
                 value={form.accrualType}
-                onChange={e => setForm(f => ({ ...f, accrualType: e.target.value }))}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, accrualType: e.target.value }))
+                }
               >
-                {ACCRUAL_OPTIONS.map(o => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
+                {ACCRUAL_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
                 ))}
               </select>
             </div>
@@ -324,7 +372,9 @@ export default function LeaveTypesPage() {
                 type="number"
                 placeholder="e.g. 14"
                 value={form.daysPerYear}
-                onChange={e => setForm(f => ({ ...f, daysPerYear: e.target.value }))}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, daysPerYear: e.target.value }))
+                }
               />
             </div>
           </div>
@@ -336,7 +386,9 @@ export default function LeaveTypesPage() {
                 type="number"
                 placeholder="0"
                 value={form.minNoticeDays}
-                onChange={e => setForm(f => ({ ...f, minNoticeDays: e.target.value }))}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, minNoticeDays: e.target.value }))
+                }
               />
             </div>
             <div>
@@ -345,7 +397,9 @@ export default function LeaveTypesPage() {
                 type="number"
                 placeholder="0"
                 value={form.maxCarryDays}
-                onChange={e => setForm(f => ({ ...f, maxCarryDays: e.target.value }))}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, maxCarryDays: e.target.value }))
+                }
                 disabled={!form.carryForward}
               />
             </div>
@@ -356,7 +410,9 @@ export default function LeaveTypesPage() {
             <select
               className="input w-full"
               value={form.genderRestriction}
-              onChange={e => setForm(f => ({ ...f, genderRestriction: e.target.value }))}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, genderRestriction: e.target.value }))
+              }
             >
               <option value="">No Restriction</option>
               <option value="Male">Male</option>
@@ -368,19 +424,46 @@ export default function LeaveTypesPage() {
           <div className="grid grid-cols-2 gap-3">
             <div className="flex items-center gap-3">
               <span className="text-sm font-medium">Paid Leave</span>
-              <Switcher checked={form.isPaid} onChange={val => setForm(f => ({ ...f, isPaid: val }))} />
+              <Switcher
+                checked={form.isPaid}
+                onChange={(val) => setForm((f) => ({ ...f, isPaid: val }))}
+              />
             </div>
             <div className="flex items-center gap-3">
               <span className="text-sm font-medium">Carry Forward</span>
-              <Switcher checked={form.carryForward} onChange={val => setForm(f => ({ ...f, carryForward: val }))} />
+              <Switcher
+                checked={form.carryForward}
+                onChange={(val) =>
+                  setForm((f) => ({ ...f, carryForward: val }))
+                }
+              />
             </div>
             <div className="flex items-center gap-3">
               <span className="text-sm font-medium">Requires Approval</span>
-              <Switcher checked={form.requiresApproval} onChange={val => setForm(f => ({ ...f, requiresApproval: val }))} />
+              <Switcher
+                checked={form.requiresApproval}
+                onChange={(val) =>
+                  setForm((f) => ({ ...f, requiresApproval: val }))
+                }
+              />
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-medium">
+                Covering Employee Required
+              </span>
+              <Switcher
+                checked={form.isCoveringEmployee}
+                onChange={(val) =>
+                  setForm((f) => ({ ...f, isCoveringEmployee: val }))
+                }
+              />
             </div>
             <div className="flex items-center gap-3">
               <span className="text-sm font-medium">Active</span>
-              <Switcher checked={form.isActive} onChange={val => setForm(f => ({ ...f, isActive: val }))} />
+              <Switcher
+                checked={form.isActive}
+                onChange={(val) => setForm((f) => ({ ...f, isActive: val }))}
+              />
             </div>
           </div>
 
@@ -388,9 +471,11 @@ export default function LeaveTypesPage() {
         </div>
 
         <div className="flex justify-end gap-2 mt-6">
-          <Button variant="plain" onClick={() => setDialogOpen(false)}>Cancel</Button>
+          <Button variant="plain" onClick={() => setDialogOpen(false)}>
+            Cancel
+          </Button>
           <Button variant="solid" loading={saving} onClick={handleSave}>
-            {editing ? 'Update' : 'Create'}
+            {editing ? "Update" : "Create"}
           </Button>
         </div>
       </Dialog>

@@ -19,8 +19,8 @@
       }
     ],
     "paths": {
-  "@/*": ["./src/*"]
-}
+      "@/*": ["./src/*"]
+    }
   },
   "include": [
     "next-env.d.ts",
@@ -28,7 +28,8 @@
     "**/*.tsx",
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
-    "**/*.mts"
+    "**/*.mts",
+    "app/(dashboard)/my-leave/page.tsx.bak"
   ],
   "exclude": ["node_modules"]
 }

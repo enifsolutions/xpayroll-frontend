@@ -14,7 +14,10 @@ import {
   Settings,
   LayoutDashboard,
   Shield,
+  ClipboardList,
+  UserCheck,
 } from "lucide-react";
+
 
 export interface NavItem {
   key: string;
@@ -66,6 +69,13 @@ const navigationConfig: NavItem[] = [
         path: "/master/shifts",
         icon: Clock,
         permissionKey: "MasterData.Shifts.View",
+      },
+      {
+        key: "leave-types",
+        label: "Leave Types",
+        path: "/master/leave-types",
+        icon: Clock,
+        permissionKey: "MasterData.LeaveTypes.View",
       },
       {
         key: "statutory-rates",
@@ -142,6 +152,35 @@ const navigationConfig: NavItem[] = [
     ],
   },
   {
+    key: "transactions",
+    label: "Transactions",
+    path: "/transactions",
+    icon: ClipboardList,
+    children: [
+      {
+        key: "leave-requests",
+        label: "Leave Requests",
+        path: "/transactions/leave-requests",
+        icon: UserCheck,
+        permissionKey: "Leave.Request.View",
+      },
+      {
+        key: "my-leave",
+        label: "Leave Applications",
+        path: "/my-leave",
+        icon: Calendar,
+        permissionKey: "Leave.Request.Apply",
+      },
+      {
+        key: "attendance-logs",
+        label: "Attendance Logs",
+        path: "/transactions/attendance-logs",
+        icon: Clock,
+        permissionKey: "Attendance.Log.View",
+      },
+    ],
+  },
+  {
     key: "settings",
     label: "Settings",
     path: "/settings",
@@ -173,3 +212,4 @@ const navigationConfig: NavItem[] = [
 ];
 
 export default navigationConfig;
+// ← This file needs manual edit — see instructions below
