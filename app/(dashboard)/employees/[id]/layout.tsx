@@ -26,6 +26,7 @@ const TABS = [
   { label: 'Leave Balances',    href: 'leave-balances' },
   { label: 'Tax Profile',       href: 'tax-profile' },
   { label: 'Loans',             href: 'loans' },
+  { label: 'Biometric',         href: 'biometric' },
 ]
 
 const STATUS_BADGE: Record<string, string> = {

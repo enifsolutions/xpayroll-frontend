@@ -16,6 +16,7 @@ import {
   Shield,
   ClipboardList,
   UserCheck,
+  Fingerprint,
 } from "lucide-react";
 
 
@@ -104,6 +105,13 @@ const navigationConfig: NavItem[] = [
         path: "/master/devices",
         icon: Cpu,
         permissionKey: "MasterData.Devices.View",
+      },
+      {
+        key: "biometric-bindings",
+        label: "Biometric Bindings",
+        path: "/master/biometric-bindings",
+        icon: Fingerprint,
+        permissionKey: "Biometric.Binding.View",
       },
       {
         key: "public-holidays",

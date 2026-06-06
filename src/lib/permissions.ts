@@ -107,4 +107,17 @@ export const Permissions = {
       Delete: "Attendance.Log.Delete",
     },
   },
+  Biometric: {
+    Binding: {
+      View: "Biometric.Binding.View",
+      Manage: "Biometric.Binding.Manage",
+    },
+    Device: {
+      View: "Biometric.Device.View",
+      Manage: "Biometric.Device.Manage",
+    },
+    Sync: {
+      View: "Biometric.Sync.View",
+    },
+  },
 } as const;
