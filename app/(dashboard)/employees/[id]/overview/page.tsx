@@ -9,35 +9,48 @@ import {
   Building2, Layers, BadgeCheck, Banknote,
 } from 'lucide-react'
 import api from '@/lib/axios'
+import ProfileCompletion from "@/components/employees/ProfileCompletion";
+import {
+  EmployeeDependent,
+  EmployeeTransport,
+  EmployeeDocument,
+  EmployeeQualification,
+} from "@/types/employee-extended.types";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
 interface Employee {
-  id: string
-  employeeCode: string
-  firstName: string
-  lastName: string
-  middleName: string | null
-  email: string | null
-  personalEmail: string | null
-  phoneNumber: string | null
-  nationalIdNumber: string | null
-  bankAccountNumber: string | null
-  bankName: string | null
-  bankBranchCode: string | null
-  dateOfBirth: string | null
-  gender: string | null
-  nationality: string | null
-  address: string | null
-  branchName: string | null
-  departmentName: string | null
-  designationName: string | null
-  joinDate: string
-  terminationDate: string | null
-  employmentType: string
-  status: string
-  basicSalary: number
-  notes: string | null
+  id: string;
+  employeeCode: string;
+  firstName: string;
+  lastName: string;
+  middleName: string | null;
+  email: string | null;
+  personalEmail: string | null;
+  phoneNumber: string | null;
+  nationalIdNumber: string | null;
+  bankAccountNumber: string | null;
+  bankName: string | null;
+  bankBranchCode: string | null;
+  bankBranchName: string | null;
+  bankAccountHolderName: string | null;
+  bankAccountType: string | null;
+  tinNumber: string | null;
+  crew: string | null;
+  groupName: string | null;
+  dateOfBirth: string | null;
+  gender: string | null;
+  nationality: string | null;
+  address: string | null;
+  branchName: string | null;
+  departmentName: string | null;
+  designationName: string | null;
+  joinDate: string;
+  terminationDate: string | null;
+  employmentType: string;
+  status: string;
+  basicSalary: number;
+  notes: string | null;
 }
 
 interface Contract {
@@ -136,6 +149,13 @@ export default function OverviewPage() {
   const [leaveBalances,  setLeaveBalances]  = useState<LeaveBalance[]>([])
   const [loading,        setLoading]        = useState(true)
 
+  const [dependents, setDependents] = useState<EmployeeDependent[]>([]);
+  const [transport, setTransport] = useState<EmployeeTransport | null>(null);
+  const [documents, setDocuments] = useState<EmployeeDocument[]>([]);
+  const [qualifications, setQualifications] = useState<EmployeeQualification[]>(
+    [],
+  );
+
   useEffect(() => {
     if (initialized.current) return
     initialized.current = true
@@ -144,27 +164,54 @@ export default function OverviewPage() {
 
   const loadAll = async () => {
     try {
-      const [empRes, contractRes, shiftRes, leaveRes] =
-        await Promise.allSettled([
-          api.get<Employee>(`/employees/${employeeId}`),
-          api.get<Contract[]>(
-            `/employees/contracts?employeeId=${employeeId}&isActive=true`,
-          ),
-          api.get<ShiftAssignment[]>(
-            `shift-assignments?employeeId=${employeeId}`,
-          ),
-          api.get<LeaveBalance[]>(
-            `employee-leave-balances/${employeeId}?year=${CURRENT_YEAR}`,
-          ),
-        ]);
+      const [
+        empRes,
+        contractRes,
+        shiftRes,
+        leaveRes,
+        depRes,
+        transRes,
+        docRes,
+        qualRes,
+      ] = await Promise.allSettled([
+        api.get<Employee>(`/employees/${employeeId}`),
+        api.get<Contract[]>(
+          `/employees/contracts?employeeId=${employeeId}&isActive=true`,
+        ),
+        api.get<ShiftAssignment[]>(
+          `shift-assignments?employeeId=${employeeId}`,
+        ),
+        api.get<LeaveBalance[]>(
+          `employee-leave-balances/${employeeId}?year=${CURRENT_YEAR}`,
+        ),
+        api.get<EmployeeDependent[]>(`employee-dependents/${employeeId}`),
+        api.get<EmployeeTransport>(`employee-transport/${employeeId}`),
+        api.get<EmployeeDocument[]>(`employee-documents/${employeeId}`),
+        api.get<EmployeeQualification[]>(
+          `employee-qualifications/${employeeId}`,
+        ),
+      ]);
 
-      if (empRes.status === 'fulfilled') setEmployee(empRes.value.data)
-      if (contractRes.status === 'fulfilled') setContract(contractRes.value.data?.[0] ?? null)
-      if (shiftRes.status === 'fulfilled') {
-        const active = shiftRes.value.data.find((s) => s.isActive) ?? null
-        setActiveShift(active)
-      }
-      if (leaveRes.status === 'fulfilled') setLeaveBalances(leaveRes.value.data)
+        if (depRes.status === "fulfilled")
+          setDependents(depRes.value.data ?? []);
+        if (transRes.status === "fulfilled")
+          setTransport(transRes.value.data ?? null);
+        if (docRes.status === "fulfilled")
+          setDocuments(docRes.value.data ?? []);
+        if (qualRes.status === "fulfilled")
+          setQualifications(qualRes.value.data ?? []);
+
+        if (empRes.status === "fulfilled") setEmployee(empRes.value.data);
+        if (contractRes.status === "fulfilled")
+          setContract(contractRes.value.data?.[0] ?? null);
+        if (shiftRes.status === "fulfilled") {
+          const active = shiftRes.value.data.find((s) => s.isActive) ?? null;
+          setActiveShift(active);
+        }
+        if (leaveRes.status === "fulfilled")
+          setLeaveBalances(leaveRes.value.data);
+
+        
     } finally {
       setLoading(false)
     }
@@ -195,7 +242,13 @@ export default function OverviewPage() {
 
   return (
     <div className="space-y-5">
-
+      <ProfileCompletion
+        employee={employee as any}
+        dependents={dependents}
+        transport={transport}
+        documents={documents}
+        qualifications={qualifications}
+      />
       {/* ── Quick Stats ── */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <StatCard
@@ -213,53 +266,95 @@ export default function OverviewPage() {
         <StatCard
           label="Leave Remaining"
           value={totalLeaveRemaining}
-          sub={`${CURRENT_YEAR} — ${leaveBalances.length} type${leaveBalances.length !== 1 ? 's' : ''}`}
-          color={totalLeaveRemaining < 3 ? 'red' : 'yellow'}
+          sub={`${CURRENT_YEAR} — ${leaveBalances.length} type${leaveBalances.length !== 1 ? "s" : ""}`}
+          color={totalLeaveRemaining < 3 ? "red" : "yellow"}
         />
         <StatCard
           label="Active Shift"
-          value={activeShift?.shiftCode ?? '—'}
-          sub={activeShift?.shiftName ?? 'No shift assigned'}
+          value={activeShift?.shiftCode ?? "—"}
+          sub={activeShift?.shiftName ?? "No shift assigned"}
           color="primary"
         />
       </div>
 
       {/* ── Main grid ── */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-
         {/* Personal Information */}
         <SectionCard icon={<User size={17} />} title="Personal Information">
-          <InfoRow label="Full Name"     value={`${employee.firstName}${employee.middleName ? ' ' + employee.middleName : ''} ${employee.lastName}`} />
+          <InfoRow
+            label="Full Name"
+            value={`${employee.firstName}${employee.middleName ? " " + employee.middleName : ""} ${employee.lastName}`}
+          />
           <InfoRow label="Date of Birth" value={fmt(employee.dateOfBirth)} />
-          <InfoRow label="Gender"        value={employee.gender} />
-          <InfoRow label="Nationality"   value={employee.nationality} />
-          <InfoRow label="National ID"   value={employee.nationalIdNumber} />
-          <InfoRow label="Address"       value={employee.address} />
+          <InfoRow label="Gender" value={employee.gender} />
+          <InfoRow label="Nationality" value={employee.nationality} />
+          <InfoRow label="National ID" value={employee.nationalIdNumber} />
+          <InfoRow label="Address" value={employee.address} />
         </SectionCard>
 
         {/* Contact */}
         <SectionCard icon={<Mail size={17} />} title="Contact">
-          <InfoRow label="Work Email"     value={employee.email
-            ? <a href={`mailto:${employee.email}`} className="text-primary hover:underline">{employee.email}</a>
-            : null} />
-          <InfoRow label="Personal Email" value={employee.personalEmail
-            ? <a href={`mailto:${employee.personalEmail}`} className="text-primary hover:underline">{employee.personalEmail}</a>
-            : null} />
-          <InfoRow label="Phone"          value={employee.phoneNumber
-            ? <a href={`tel:${employee.phoneNumber}`} className="text-primary hover:underline">{employee.phoneNumber}</a>
-            : null} />
+          <InfoRow
+            label="Work Email"
+            value={
+              employee.email ? (
+                <a
+                  href={`mailto:${employee.email}`}
+                  className="text-primary hover:underline"
+                >
+                  {employee.email}
+                </a>
+              ) : null
+            }
+          />
+          <InfoRow
+            label="Personal Email"
+            value={
+              employee.personalEmail ? (
+                <a
+                  href={`mailto:${employee.personalEmail}`}
+                  className="text-primary hover:underline"
+                >
+                  {employee.personalEmail}
+                </a>
+              ) : null
+            }
+          />
+          <InfoRow
+            label="Phone"
+            value={
+              employee.phoneNumber ? (
+                <a
+                  href={`tel:${employee.phoneNumber}`}
+                  className="text-primary hover:underline"
+                >
+                  {employee.phoneNumber}
+                </a>
+              ) : null
+            }
+          />
         </SectionCard>
 
         {/* Employment */}
         <SectionCard icon={<Briefcase size={17} />} title="Employment">
-          <InfoRow label="Employee Code"    value={<code className="text-xs bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">{employee.employeeCode}</code>} />
-          <InfoRow label="Branch"           value={employee.branchName} />
-          <InfoRow label="Department"       value={employee.departmentName} />
-          <InfoRow label="Designation"      value={employee.designationName} />
-          <InfoRow label="Employment Type"  value={employee.employmentType} />
-          <InfoRow label="Join Date"        value={fmt(employee.joinDate)} />
+          <InfoRow
+            label="Employee Code"
+            value={
+              <code className="text-xs bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">
+                {employee.employeeCode}
+              </code>
+            }
+          />
+          <InfoRow label="Branch" value={employee.branchName} />
+          <InfoRow label="Department" value={employee.departmentName} />
+          <InfoRow label="Designation" value={employee.designationName} />
+          <InfoRow label="Employment Type" value={employee.employmentType} />
+          <InfoRow label="Join Date" value={fmt(employee.joinDate)} />
           {employee.terminationDate && (
-            <InfoRow label="Termination Date" value={fmt(employee.terminationDate)} />
+            <InfoRow
+              label="Termination Date"
+              value={fmt(employee.terminationDate)}
+            />
           )}
         </SectionCard>
 
@@ -267,13 +362,19 @@ export default function OverviewPage() {
         <SectionCard icon={<CreditCard size={17} />} title="Active Contract">
           {contract ? (
             <>
-              <InfoRow label="Contract Type"  value={contract.contractType} />
-              <InfoRow label="Payroll Basis"  value={contract.payrollBasis} />
-              <InfoRow label="Basic Salary"   value={fmtMoney(contract.basicSalary)} />
-              <InfoRow label="Allowances"     value={fmtMoney(contract.allowances)} />
-              <InfoRow label="Currency"       value={contract.currency} />
-              <InfoRow label="Start Date"     value={fmt(contract.startDate)} />
-              <InfoRow label="End Date"       value={fmt(contract.endDate)} />
+              <InfoRow label="Contract Type" value={contract.contractType} />
+              <InfoRow label="Payroll Basis" value={contract.payrollBasis} />
+              <InfoRow
+                label="Basic Salary"
+                value={fmtMoney(contract.basicSalary)}
+              />
+              <InfoRow
+                label="Allowances"
+                value={fmtMoney(contract.allowances)}
+              />
+              <InfoRow label="Currency" value={contract.currency} />
+              <InfoRow label="Start Date" value={fmt(contract.startDate)} />
+              <InfoRow label="End Date" value={fmt(contract.endDate)} />
             </>
           ) : (
             <p className="text-sm text-gray-400 py-2">No active contract.</p>
@@ -282,29 +383,55 @@ export default function OverviewPage() {
 
         {/* Bank Details */}
         <SectionCard icon={<Banknote size={17} />} title="Bank Details">
-          <InfoRow label="Bank Name"       value={employee.bankName} />
-          <InfoRow label="Account Number"  value={employee.bankAccountNumber} />
-          <InfoRow label="Branch Code"     value={employee.bankBranchCode} />
+          <InfoRow
+            label="Account Holder"
+            value={employee.bankAccountHolderName}
+          />
+          <InfoRow label="Account Number" value={employee.bankAccountNumber} />
+          <InfoRow label="Account Type" value={employee.bankAccountType} />
+          <InfoRow label="Bank Name" value={employee.bankName} />
+          <InfoRow label="Branch Name" value={employee.bankBranchName} />
+          <InfoRow label="Branch Code" value={employee.bankBranchCode} />
+          {employee.tinNumber && (
+            <InfoRow label="TIN Number" value={employee.tinNumber} />
+          )}
+          {(employee.crew || employee.groupName) && (
+            <>
+              {employee.crew && <InfoRow label="Crew" value={employee.crew} />}
+              {employee.groupName && (
+                <InfoRow label="Group" value={employee.groupName} />
+              )}
+            </>
+          )}
         </SectionCard>
 
         {/* Leave Balances */}
-        <SectionCard icon={<Calendar size={17} />} title={`Leave Balances (${CURRENT_YEAR})`}>
+        <SectionCard
+          icon={<Calendar size={17} />}
+          title={`Leave Balances (${CURRENT_YEAR})`}
+        >
           {leaveBalances.length === 0 ? (
-            <p className="text-sm text-gray-400 py-2">No leave balances for {CURRENT_YEAR}.</p>
+            <p className="text-sm text-gray-400 py-2">
+              No leave balances for {CURRENT_YEAR}.
+            </p>
           ) : (
             <div className="space-y-2">
               {leaveBalances.map((lb, i) => (
                 <div key={i} className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600 dark:text-gray-400">{lb.leaveTypeName}</span>
+                  <span className="text-sm text-gray-600 dark:text-gray-400">
+                    {lb.leaveTypeName}
+                  </span>
                   <div className="flex items-center gap-3">
                     <div className="flex items-center gap-1 text-xs text-gray-400">
                       <span>{lb.used} used</span>
                       <span>/</span>
                       <span>{lb.entitled} entitled</span>
                     </div>
-                    <span className={`text-sm font-semibold min-w-[36px] text-right ${
-                      lb.remaining <= 0 ? 'text-red-500' : 'text-primary'
-                    }`}>
+                    <span
+                      className={`text-sm font-semibold min-w-[36px] text-right ${
+                        lb.remaining <= 0 ? "text-red-500" : "text-primary"
+                      }`}
+                    >
                       {lb.remaining}d
                     </span>
                   </div>
@@ -313,17 +440,19 @@ export default function OverviewPage() {
             </div>
           )}
         </SectionCard>
-
       </div>
 
       {/* Notes */}
       {employee.notes && (
         <div className="border border-gray-200 dark:border-gray-700 rounded-xl p-5">
-          <h6 className="font-semibold text-gray-700 dark:text-gray-300 mb-2">Notes</h6>
-          <p className="text-sm text-gray-500 whitespace-pre-line">{employee.notes}</p>
+          <h6 className="font-semibold text-gray-700 dark:text-gray-300 mb-2">
+            Notes
+          </h6>
+          <p className="text-sm text-gray-500 whitespace-pre-line">
+            {employee.notes}
+          </p>
         </div>
       )}
-
     </div>
-  )
+  );
 }

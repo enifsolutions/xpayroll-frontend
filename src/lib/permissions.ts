@@ -72,6 +72,22 @@ export const Permissions = {
       Approve: "HR.Leave.Approve",
       Manage: "HR.Leave.Manage",
     },
+    Dependents: {
+      View: "HR.Dependents.View",
+      Manage: "HR.Dependents.Manage",
+    },
+    Transport: {
+      View: "HR.Transport.View",
+      Manage: "HR.Transport.Manage",
+    },
+    Documents: {
+      View: "HR.Documents.View",
+      Manage: "HR.Documents.Manage",
+    },
+    Qualifications: {
+      View: "HR.Qualifications.View",
+      Manage: "HR.Qualifications.Manage",
+    },
   },
   Payroll: {
     PayrollRun: {
@@ -97,6 +113,18 @@ export const Permissions = {
     Company: {
       View: "Settings.Company.View",
       Manage: "Settings.Company.Manage",
+    },
+    Crews: {
+      View: "Settings.Crews.View",
+      Manage: "Settings.Crews.Manage",
+    },
+    Groups: {
+      View: "Settings.Groups.View",
+      Manage: "Settings.Groups.Manage",
+    },
+    BankBranches: {
+      View: "Settings.BankBranches.View",
+      Manage: "Settings.BankBranches.Manage",
     },
   },
   Attendance: {

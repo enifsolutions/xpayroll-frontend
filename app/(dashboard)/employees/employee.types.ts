@@ -1,37 +1,46 @@
 export interface Employee {
-  id: string
-  employeeCode: string
-  firstName: string
-  lastName: string
-  middleName: string | null
-  email: string | null
-  personalEmail: string | null
-  phoneNumber: string | null
-  nationalIdNumber: string | null
-  bankAccountNumber: string | null
-  bankName: string | null
-  bankBranchCode: string | null
-  dateOfBirth: string | null
-  gender: string | null
-  nationality: string | null
-  address: string | null
-  profilePictureUrl: string | null
-  branchId: string | null
-  departmentId: string | null
-  designationId: string | null
-  managerId: string | null
-  joinDate: string
-  terminationDate: string | null
-  employmentType: string
-  status: string
-  basicSalary: number
-  notes: string | null
-  branchName: string | null
-  departmentName: string | null
-  designationName: string | null
-  managerName: string | null
-  createdAt: string
-  updatedAt: string | null
+  id: string;
+  employeeCode: string;
+  firstName: string;
+  lastName: string;
+  middleName: string | null;
+  email: string | null;
+  personalEmail: string | null;
+  phoneNumber: string | null;
+  nationalIdNumber: string | null;
+  tinNumber?: string | null;
+  bankAccountNumber: string | null;
+  bankAccountHolderName?: string | null;
+  bankAccountType?: string | null;
+  bankBranchId?: string | null;
+  bankBranchBankName?: string | null;
+  bankBranchName?: string | null;
+  bankBranchCode?: string | null;
+  crewId?: string | null;
+  crewName?: string | null;
+  groupId?: string | null;
+  groupName?: string | null;
+  dateOfBirth: string | null;
+  gender: string | null;
+  nationality: string | null;
+  address: string | null;
+  profilePictureUrl: string | null;
+  branchId: string | null;
+  departmentId: string | null;
+  designationId: string | null;
+  managerId: string | null;
+  joinDate: string;
+  terminationDate: string | null;
+  employmentType: string;
+  status: string;
+  basicSalary: number;
+  notes: string | null;
+  branchName: string | null;
+  departmentName: string | null;
+  designationName: string | null;
+  managerName: string | null;
+  createdAt: string;
+  updatedAt: string | null;
 }
 
 export interface EmployeeContract {
@@ -79,32 +88,64 @@ export interface Designation {
   isActive: boolean
 }
 
+export interface CrewOption {
+  id: string;
+  name: string;
+  code: string;
+  departmentName?: string | null;
+  leadName?: string | null;
+  isActive: boolean;
+}
+
+export interface GroupOption {
+  id: string;
+  name: string;
+  code: string;
+  departmentName?: string | null;
+  leadName?: string | null;
+  isActive: boolean;
+}
+
+export interface BankBranchOption {
+  id: string;
+  bankName: string;
+  branchName: string;
+  branchCode?: string | null;
+  city?: string | null;
+  swiftCode?: string | null;
+  isActive: boolean;
+}
+
 // ── Form types ────────────────────────────────────────────────────────────────
 export interface EmployeeForm {
-  employeeCode: string
-  firstName: string
-  lastName: string
-  middleName: string
-  email: string
-  personalEmail: string
-  phoneNumber: string
-  nationalIdNumber: string
-  bankAccountNumber: string
-  bankName: string
-  bankBranchCode: string
-  dateOfBirth: string
-  gender: string
-  nationality: string
-  address: string
-  branchId: string
-  departmentId: string
-  designationId: string
-  managerId: string
-  joinDate: string
-  terminationDate: string
-  employmentType: string
-  status: string
-  notes: string
+  employeeCode: string;
+  firstName: string;
+  lastName: string;
+  middleName: string;
+  email: string;
+  personalEmail: string;
+  phoneNumber: string;
+  nationalIdNumber: string;
+  tinNumber: string;
+  bankAccountNumber: string;
+  bankAccountHolderName: string;
+  bankAccountType: string;
+  bankBranchId: string;
+  dateOfBirth: string;
+  gender: string;
+  nationality: string;
+  address: string;
+  branchId: string;
+  departmentId: string;
+  designationId: string;
+  managerId: string;
+  joinDate: string;
+  terminationDate: string;
+  employmentType: string;
+  status: string;
+  notes: string;
+  crewId: string;
+  groupId: string;
 }
 
 export interface ContractForm {
@@ -131,14 +172,35 @@ export const CONTRACT_TYPES = ['Permanent', 'Fixed-Term', 'Probation', 'Part-Tim
 export const CURRENCIES = ['LKR', 'USD', 'EUR', 'GBP']
 
 export const EMPTY_EMPLOYEE: EmployeeForm = {
-  employeeCode: '', firstName: '', lastName: '', middleName: '',
-  email: '', personalEmail: '', phoneNumber: '',
-  nationalIdNumber: '', bankAccountNumber: '', bankName: '', bankBranchCode: '',
-  dateOfBirth: '', gender: '', nationality: '', address: '',
-  branchId: '', departmentId: '', designationId: '', managerId: '',
-  joinDate: new Date().toISOString().split('T')[0],
-  terminationDate: '', employmentType: 'FullTime', status: 'Active', notes: '',
-}
+  employeeCode: "",
+  firstName: "",
+  lastName: "",
+  middleName: "",
+  email: "",
+  personalEmail: "",
+  phoneNumber: "",
+  nationalIdNumber: "",
+  tinNumber: "",
+  bankAccountNumber: "",
+  bankAccountHolderName: "",
+  bankAccountType: "",
+  bankBranchId: "",
+  dateOfBirth: "",
+  gender: "",
+  nationality: "",
+  address: "",
+  branchId: "",
+  departmentId: "",
+  designationId: "",
+  managerId: "",
+  joinDate: new Date().toISOString().split("T")[0],
+  terminationDate: "",
+  employmentType: "FullTime",
+  status: "Active",
+  notes: "",
+  crewId: "",
+  groupId: "",
+};
 
 export const EMPTY_CONTRACT: ContractForm = {
   contractType: 'Permanent', payrollBasis: 'Fixed',

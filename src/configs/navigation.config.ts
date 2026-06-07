@@ -17,6 +17,7 @@ import {
   ClipboardList,
   UserCheck,
   Fingerprint,
+  DollarSign,
 } from "lucide-react";
 
 
@@ -151,6 +152,13 @@ const navigationConfig: NavItem[] = [
     icon: CreditCard,
     children: [
       {
+        key: "payroll-runs",
+        label: "Payroll Runs",
+        path: "/transactions/payroll-runs",
+        icon: DollarSign,
+        permissionKey: "Payroll.PayrollRun.View",
+      },
+      {
         key: "loans",
         label: "Loans",
         path: "/payroll/loans",
@@ -214,6 +222,27 @@ const navigationConfig: NavItem[] = [
         path: "/settings/roles",
         icon: Shield,
         permissionKey: "Settings.Roles.View",
+      },
+      {
+        key: "crews",
+        label: "Crews",
+        path: "/settings/crews",
+        icon: Users,
+        permissionKey: "Settings.Crews.View",
+      },
+      {
+        key: "groups",
+        label: "Groups",
+        path: "/settings/groups",
+        icon: GitBranch,
+        permissionKey: "Settings.Groups.View",
+      },
+      {
+        key: "bank-branches",
+        label: "Bank Branches",
+        path: "/settings/bank-branches",
+        icon: CreditCard,
+        permissionKey: "Settings.BankBranches.View",
       },
     ],
   },

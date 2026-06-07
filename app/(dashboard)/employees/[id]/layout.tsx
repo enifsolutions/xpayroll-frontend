@@ -27,6 +27,10 @@ const TABS = [
   { label: 'Tax Profile',       href: 'tax-profile' },
   { label: 'Loans',             href: 'loans' },
   { label: 'Biometric',         href: 'biometric' },
+  { label: 'Dependents',        href: 'dependents' },
+  { label: 'Transport',         href: 'transport' },
+  { label: 'Qualifications',    href: 'qualifications' },
+  { label: 'Documents',         href: 'documents' },
 ]
 
 const STATUS_BADGE: Record<string, string> = {
@@ -69,8 +73,6 @@ export default function EmployeeProfileLayout({ children }: { children: React.Re
         <div className="card-body py-5">
           {employee ? (
             <div className="flex items-center gap-4">
-
-              {/* Photo upload component handles avatar + camera + crop */}
               <div className="relative">
                 <EmployeePhotoUpload
                   employeeId={id}
@@ -79,15 +81,12 @@ export default function EmployeeProfileLayout({ children }: { children: React.Re
                     setEmployee((prev) => prev ? { ...prev, profilePictureUrl: url } : prev)
                   }
                 />
-                {/* Initials fallback rendered inside the component slot */}
                 {!employee.profilePictureUrl && (
                   <div className="absolute inset-0 rounded-full flex items-center justify-center pointer-events-none">
                     <span className="text-primary font-semibold text-lg select-none">{initials}</span>
                   </div>
                 )}
               </div>
-
-              {/* Info */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <h5 className="h5 mb-0">{employee.firstName} {employee.lastName}</h5>

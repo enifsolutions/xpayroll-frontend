@@ -7,7 +7,7 @@
       dark:bg-gray-700 
       rounded-xl 
       w-full 
-      py-2 px-3
+      h-10 py-2 px-3
       focus:outline-none 
       focus:ring-1 
       focus-within:ring-1
@@ -70,3 +70,10 @@
     @apply absolute top-2/4 transform -translate-y-2/4 ltr:right-2.5 rtl:left-2.5 flex;
   }
 }
+  textarea.input {
+    @apply h-auto;
+  }
+
+  textarea.input {
+    @apply h-auto;
+  }

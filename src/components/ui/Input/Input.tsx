@@ -79,7 +79,7 @@ const Input = (props: InputProps) => {
     }
 
     const inputDefaultClass = 'input'
-    const inputSizeClass = `input-${inputSize} ${CONTROL_SIZES[inputSize].h}`
+    const inputSizeClass = `input-${inputSize}`;
     const inputFocusClass = `focus:ring-primary focus-within:ring-primary focus-within:border-primary focus:border-primary`
     const inputWrapperClass = classNames(
         'input-wrapper',
