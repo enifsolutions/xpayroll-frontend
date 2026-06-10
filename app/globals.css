@@ -5,6 +5,10 @@
 @import '../src/assets/styles/others/index.css';
 @import '../src/assets/styles/vendors/index.css';
 
+
+html {
+  font-size: 14px;
+}
 :root {
   --sidebar-width: 240px;
 }

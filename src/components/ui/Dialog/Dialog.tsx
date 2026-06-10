@@ -102,6 +102,7 @@ const Dialog = (props: DialogProps) => {
                 animate={{
                     transform: isOpen ? 'scale(1)' : 'scale(0.9)',
                 }}
+                style={{ maxHeight: '90vh', overflowY: 'auto' }}
             >
                 {closable && renderCloseButton}
                 {children}

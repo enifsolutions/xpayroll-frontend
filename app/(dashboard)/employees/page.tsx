@@ -918,6 +918,7 @@ export default function EmployeesPage() {
               <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full" />
             </div>
           ) : (
+            <div className="overflow-x-auto">
             <table className="table-default table-hover w-full">
               <thead>
                 <tr>
@@ -1002,6 +1003,7 @@ export default function EmployeesPage() {
                 )}
               </tbody>
             </table>
+            </div>
           )}
         </div>
       </div>

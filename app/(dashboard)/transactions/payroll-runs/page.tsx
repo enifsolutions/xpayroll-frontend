@@ -12,6 +12,7 @@ import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import Dialog from "@/components/ui/Dialog";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
+import PayslipExportMenu from "@/components/payroll/PayslipExportMenu";
 
 function fmt(n: number) {
   return n.toLocaleString("en-LK", {
@@ -254,6 +255,70 @@ export default function PayrollRunsPage() {
                           : "—"}
                       </td>
                       <td>
+                        <div className="flex gap-1 items-center">
+                          {(run.status === "Completed" ||
+                            run.status === "Approved") && (
+                            <button
+                              className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500"
+                              title="View Payslips"
+                              onClick={() =>
+                                router.push(
+                                  `/transactions/payroll-runs/${run.id}`,
+                                )
+                              }
+                            >
+                              <Eye size={15} />
+                            </button>
+                          )}
+                          {canProcess && run.status === "Draft" && (
+                            <button
+                              className="p-1.5 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 text-blue-500"
+                              title="Process"
+                              onClick={() => openConfirm(run, "PROCESS")}
+                            >
+                              <Play size={15} />
+                            </button>
+                          )}
+                          {canApprove && run.status === "Completed" && (
+                            <button
+                              className="p-1.5 rounded-lg hover:bg-green-50 dark:hover:bg-green-900/20 text-green-500"
+                              title="Approve"
+                              onClick={() => openConfirm(run, "APPROVE")}
+                            >
+                              <CheckCircle size={15} />
+                            </button>
+                          )}
+                          {run.status === "Draft" && (
+                            <button
+                              className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-red-400"
+                              title="Cancel"
+                              onClick={() => openConfirm(run, "CANCEL")}
+                            >
+                              <XCircle size={15} />
+                            </button>
+                          )}
+                          {canVoid && run.status === "Approved" && (
+                            <button
+                              className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-red-400"
+                              title="Void"
+                              onClick={() => openConfirm(run, "VOID")}
+                            >
+                              <XCircle size={15} />
+                            </button>
+                          )}
+
+                          {/* ✅ Export menu — only when there are payslips to export */}
+                          {(run.status === "Completed" ||
+                            run.status === "Approved") && (
+                            <PayslipExportMenu
+                              payrollRunId={run.id}
+                              periodLabel={run.periodLabel}
+                              mode="run"
+                            />
+                          )}
+                        </div>
+                      </td>
+                      {/* <td>
                         <div className="flex gap-1">
                           {(run.status === "Completed" ||
                             run.status === "Approved") && (
@@ -306,7 +371,7 @@ export default function PayrollRunsPage() {
                             </button>
                           )}
                         </div>
-                      </td>
+                      </td> */}
                     </tr>
                   ))
                 )}

@@ -48,8 +48,9 @@ export default function LoginPage() {
       } else {
         router.push("/dashboard");
       }
-    } catch {
-      setError("Invalid email or password.");
+    } catch (err) {
+      console.error('LOGIN ERROR:', err);
+      setError(err instanceof Error ? err.message : String(err));
     } finally {
       setLoading(false);
     }

@@ -25,6 +25,13 @@ export async function PATCH(req: NextRequest, ctx: RouteContext) {
   return forwardRequest(req, path, 'PATCH')
 }
 
+const BINARY_TYPES = [
+  'application/pdf',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/octet-stream',
+  'text/csv',
+]
+
 async function forwardRequest(req: NextRequest, pathSegments: string[], method: string) {
   const joined  = pathSegments.join('/')
   const search  = req.nextUrl.search
@@ -35,7 +42,6 @@ async function forwardRequest(req: NextRequest, pathSegments: string[], method: 
   const contentType = req.headers.get('content-type') ?? ''
   const isMultipart = contentType.includes('multipart/form-data')
 
-  // Build forward headers — always pass auth, only set Content-Type for JSON
   const headers: Record<string, string> = {}
   const authHeader = req.headers.get('authorization')
   if (authHeader) headers['Authorization'] = authHeader
@@ -45,21 +51,29 @@ async function forwardRequest(req: NextRequest, pathSegments: string[], method: 
   if (method === 'GET' || method === 'DELETE') {
     body = undefined
   } else if (isMultipart) {
-    // Forward raw bytes + original Content-Type header (preserves boundary)
     body = await req.blob()
-    headers['Content-Type'] = contentType   // includes boundary parameter
+    headers['Content-Type'] = contentType
   } else {
-    // JSON — existing behaviour
     body = await req.text()
     headers['Content-Type'] = 'application/json'
   }
 
   try {
     const response = await fetch(url, { method, headers, body })
+    const responseContentType = response.headers.get('content-type') ?? 'application/json'
+
+    const isBinary = BINARY_TYPES.some(t => responseContentType.includes(t))
+
+    if (isBinary) {
+      const buffer = await response.arrayBuffer()
+      return new NextResponse(buffer, {
+        status: response.status,
+        headers: { 'Content-Type': responseContentType },
+      })
+    }
+
     const data = await response.text()
     console.log(`[proxy] ${response.status}: ${data.slice(0, 300)}`)
-
-    const responseContentType = response.headers.get('content-type') ?? 'application/json'
     return new NextResponse(data, {
       status: response.status,
       headers: { 'Content-Type': responseContentType },

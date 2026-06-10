@@ -148,4 +148,13 @@ export const Permissions = {
       View: "Biometric.Sync.View",
     },
   },
+  PayslipExport: {
+    ExportPdf: "Payroll.PayslipExport.ExportPdf",
+    ExportBulkPdf: "Payroll.PayslipExport.ExportBulkPdf",
+    ExportExcel: "Payroll.PayslipExport.ExportExcel",
+    ExportCsv: "Payroll.PayslipExport.ExportCsv",
+    ExportBankLetter: "Payroll.PayslipExport.ExportBankLetter",
+    EmailPayslip: "Payroll.PayslipExport.EmailPayslip",
+    BulkEmail: "Payroll.PayslipExport.BulkEmail",
+  },
 } as const;
