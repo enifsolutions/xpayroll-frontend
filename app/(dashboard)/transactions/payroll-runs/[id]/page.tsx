@@ -1,12 +1,15 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, TrendingUp, TrendingDown, X } from "lucide-react";
+import { ArrowLeft, TrendingUp, TrendingDown, X, Printer } from "lucide-react";
 import { useRequirePermission } from "@/hooks/useRequirePermission";
+import { usePermission } from "@/hooks/usePermission";
+import { useAuthStore } from "@/store/authStore";
 import { payrollService } from "@/components/payroll/payrollService";
 import { Payslip, PayslipLineItem, PayrollRun } from "@/types/payroll.types";
 import { showError } from "@/lib/toast";
 import Button from "@/components/ui/Button";
+import api from "@/lib/axios";
 
 function fmt(n: number) {
   return n.toLocaleString("en-LK", {
@@ -36,9 +39,14 @@ const statusBadge = (status: string) => {
 
 export default function PayslipListPage() {
   useRequirePermission("Payroll.Payslip.ViewAll");
+
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const initialized = useRef(false);
+
+  
+  const canPrint = usePermission("Payroll.PayslipExport.ExportPdf");
+  const userId = useAuthStore((s) => s.user?.userId ?? "");
 
   const [run, setRun] = useState<PayrollRun | null>(null);
   const [payslips, setPayslips] = useState<Payslip[]>([]);
@@ -47,6 +55,7 @@ export default function PayslipListPage() {
   const [selected, setSelected] = useState<Payslip | null>(null);
   const [lineItems, setLineItems] = useState<PayslipLineItem[]>([]);
   const [liLoading, setLiLoading] = useState(false);
+  const [printing, setPrinting] = useState(false);
 
   useEffect(() => {
     if (initialized.current) return;
@@ -80,6 +89,34 @@ export default function PayslipListPage() {
   const deductions = lineItems.filter(
     (li) => li.category !== "Earning" && li.category !== "Benefit",
   );
+
+  const handleDownloadPdf = async () => {
+    if (!selected) return;
+    setPrinting(true);
+    try {
+      const res = await api.get(
+        `payslip-export/pdf/${id}/${selected.id}?printedBy=${userId}`,
+        { responseType: "blob" },
+      );
+      const url = URL.createObjectURL(res.data);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Payslip_${selected.employeeCode}_${run?.periodLabel}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e: any) {
+      if (e?.response?.status === 403) {
+        showError(
+          "Reprint Not Allowed",
+          "This payslip has already been printed. Reprint permission is required.",
+        );
+      } else {
+        showError("Error", "Failed to generate payslip PDF");
+      }
+    } finally {
+      setPrinting(false);
+    }
+  };
 
   return (
     <div>
@@ -285,54 +322,76 @@ export default function PayslipListPage() {
                     <div className="flex items-center gap-2 mb-2">
                       <TrendingUp size={14} className="text-green-500" />
                       <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                        Earnings
+                        Earnings & Benefits
                       </span>
                     </div>
                     <div className="space-y-1">
-                      {earnings.map((li) => (
-                        <div
-                          key={String(li.id)}
-                          className="flex justify-between py-1.5 border-b border-gray-100 dark:border-gray-800"
-                        >
-                          <span
-                            className={`text-sm ${CATEGORY_COLORS[li.category]}`}
+                      {earnings.length === 0 ? (
+                        <p className="text-sm text-gray-400">—</p>
+                      ) : (
+                        earnings.map((li) => (
+                          <div
+                            key={String(li.id)}
+                            className="flex justify-between py-1.5 border-b border-gray-100 dark:border-gray-800"
                           >
-                            {li.label}
-                          </span>
-                          <span className="text-sm font-mono">
-                            LKR {fmt(li.amount)}
-                          </span>
-                        </div>
-                      ))}
+                            <span
+                              className={`text-sm ${CATEGORY_COLORS[li.category]}`}
+                            >
+                              {li.label}
+                              <span className="ml-1 text-xs text-gray-400">
+                                ({li.category})
+                              </span>
+                            </span>
+                            <span className="text-sm font-mono">
+                              LKR {fmt(li.amount)}
+                            </span>
+                          </div>
+                        ))
+                      )}
                     </div>
                   </div>
 
-                  {/* Deductions */}
-                  <div>
-                    <div className="flex items-center gap-2 mb-2">
-                      <TrendingDown size={14} className="text-red-400" />
-                      <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                        Deductions
-                      </span>
-                    </div>
-                    <div className="space-y-1">
-                      {deductions.map((li) => (
-                        <div
-                          key={String(li.id)}
-                          className="flex justify-between py-1.5 border-b border-gray-100 dark:border-gray-800"
-                        >
-                          <span
-                            className={`text-sm ${CATEGORY_COLORS[li.category]}`}
-                          >
-                            {li.label}
-                          </span>
-                          <span className="text-sm font-mono text-red-500">
-                            - LKR {fmt(li.amount)}
+                  {/* Deductions — grouped by category */}
+                  {(["Statutory", "Deduction", "Loan"] as const).map((cat) => {
+                    const items = deductions.filter(
+                      (li) => li.category === cat,
+                    );
+                    if (!items.length) return null;
+                    return (
+                      <div key={cat}>
+                        <div className="flex items-center gap-2 mb-2">
+                          <TrendingDown
+                            size={14}
+                            className={CATEGORY_COLORS[cat]}
+                          />
+                          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                            {cat === "Statutory"
+                              ? "Statutory Deductions"
+                              : cat === "Loan"
+                                ? "Loan Repayments"
+                                : "Other Deductions"}
                           </span>
                         </div>
-                      ))}
-                    </div>
-                  </div>
+                        <div className="space-y-1">
+                          {items.map((li) => (
+                            <div
+                              key={String(li.id)}
+                              className="flex justify-between py-1.5 border-b border-gray-100 dark:border-gray-800"
+                            >
+                              <span
+                                className={`text-sm ${CATEGORY_COLORS[li.category]}`}
+                              >
+                                {li.label}
+                              </span>
+                              <span className="text-sm font-mono text-red-500">
+                                - LKR {fmt(li.amount)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
 
                   {/* Attendance Snapshot */}
                   {selected.attendanceSnapshot && (
@@ -402,10 +461,22 @@ export default function PayslipListPage() {
             </div>
 
             {/* Drawer Footer */}
-            <div className="px-5 py-4 border-t border-gray-200 dark:border-gray-700">
+            <div className="px-5 py-4 border-t border-gray-200 dark:border-gray-700 flex gap-2">
+              {canPrint && (
+                <Button
+                  variant="solid"
+                  color="primary"
+                  icon={<Printer size={15} />}
+                  loading={printing}
+                  className="flex-1"
+                  onClick={handleDownloadPdf}
+                >
+                  Download PDF
+                </Button>
+              )}
               <Button
                 variant="plain"
-                className="w-full"
+                className="flex-1"
                 onClick={() => setSelected(null)}
               >
                 Close
