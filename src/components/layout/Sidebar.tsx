@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { logout as clearTokens } from '@/lib/auth';
 import { SIDE_NAV_WIDTH, HEADER_HEIGHT } from '@/constants/theme.constant';
-import { useState } from 'react';
+import { useState, useEffect } from "react";
 import { useFilteredNavigation } from "@/hooks/useFilteredNavigation";
 import { useAuthStore } from "@/store/authStore";
 
@@ -27,15 +27,17 @@ export function Sidebar() {
   const navItems = useFilteredNavigation();
   const { clearAuth } = useAuthStore();
 
-  const isMasterActive = path.startsWith('/master');
-  const [openGroups, setOpenGroups] = useState<string[]>(
-    isMasterActive ? ['Master Data'] : []
-  );
+  const [openGroups, setOpenGroups] = useState<string[]>([]);
+
+  useEffect(() => {
+    const active = navItems.find((item) =>
+      item.children?.some((c) => path.startsWith(c.path)),
+    );
+    if (active) setOpenGroups([active.label]);
+  }, [path]);
 
   const toggleGroup = (label: string) => {
-    setOpenGroups((prev) =>
-      prev.includes(label) ? prev.filter((g) => g !== label) : [...prev, label]
-    );
+    setOpenGroups((prev) => (prev.includes(label) ? [] : [label]));
   };
 
   const handleSignOut = () => {

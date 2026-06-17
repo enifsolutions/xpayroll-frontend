@@ -35,7 +35,10 @@ const BINARY_TYPES = [
 async function forwardRequest(req: NextRequest, pathSegments: string[], method: string) {
   const joined  = pathSegments.join('/')
   const search  = req.nextUrl.search
-  const url     = `${API_TARGET}/api/${joined}${search}`
+  // tax-reports use assessment year with hyphen in URL (e.g. 2026-2027)
+  // convert back to slash for the backend (e.g. 2026/2027)
+  const resolvedPath = joined.replace(/^tax-reports\/([0-9]{4})-([0-9]{4})\//, 'tax-reports/$1%2F$2/')
+  const url     = `${API_TARGET}/api/${resolvedPath}${search}`
 
   console.log(`[proxy] ${method} ${url}`)
 

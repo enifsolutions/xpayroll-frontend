@@ -18,6 +18,8 @@ import {
   UserCheck,
   Fingerprint,
   DollarSign,
+  BarChart2,
+  Receipt,
 } from "lucide-react";
 
 
@@ -193,6 +195,28 @@ const navigationConfig: NavItem[] = [
         path: "/transactions/attendance-logs",
         icon: Clock,
         permissionKey: "Attendance.Log.View",
+      },
+    ],
+  },
+  {
+    key: "reports",
+    label: "Reports",
+    path: "/reports",
+    icon: BarChart2,
+    children: [
+      {
+        key: "payroll-reports",
+        label: "Payroll",
+        path: "/transactions/reports",
+        icon: DollarSign,
+        permissionKey: "Payroll.Reports.View",
+      },
+      {
+        key: "tax-reports",
+        label: "Tax (APIT)",
+        path: "/reports/tax",
+        icon: Receipt,
+        permissionKey: "Tax.Reports.View",
       },
     ],
   },
