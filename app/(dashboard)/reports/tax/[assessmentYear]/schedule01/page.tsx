@@ -12,7 +12,7 @@ const fmt = (n: number) => new Intl.NumberFormat('en-LK', { minimumFractionDigit
 const fmtDate = (d: string | null) => d ? new Date(d).toLocaleDateString('en-LK', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
 
 export default function Schedule01Page() {
-  useRequirePermission('Tax.Reports.View');
+  usePermission('Tax.Reports.View');
   const { assessmentYear } = useParams<{ assessmentYear: string }>();
   const year    = decodeURIComponent(assessmentYear);
   const router  = useRouter();

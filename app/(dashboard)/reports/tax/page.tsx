@@ -58,7 +58,7 @@ const REPORTS = [
 ];
 
 export default function TaxReportsHubPage() {
-  useRequirePermission('Tax.Reports.View');
+  usePermission('Tax.Reports.View');
 
   const router     = useRouter();
   const userId     = useAuthStore((s) => s.user?.userId ?? '1');

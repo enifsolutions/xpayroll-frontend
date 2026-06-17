@@ -13,7 +13,7 @@ const fmtDate = (d: string | null) => d ? new Date(d).toLocaleDateString('en-LK'
 const reasonLabel = (r: string) => r === 'LT' ? 'Below Threshold' : r === 'EX' ? 'Exempt Income' : r || 'Below Threshold';
 
 export default function Schedule03Page() {
-  useRequirePermission('Tax.Reports.View');
+  usePermission('Tax.Reports.View');
   const { assessmentYear } = useParams<{ assessmentYear: string }>();
   const year = assessmentYear.replace(/-/g, '/');
   const router = useRouter();
