@@ -1,0 +1,57 @@
+:root {
+  --xp-bg:         #f4f5f7;
+  --xp-surface:    #ffffff;
+  --xp-surface-hi: #f3f4f6;
+  --xp-border:     #e5e7eb;
+  --xp-border-dim: #d1d5db;
+  --xp-text-1:     #111827;
+  --xp-text-2:     #6b7280;
+  --xp-text-3:     #9ca3af;
+  --xp-primary-bg: #eff6ff;
+  --xp-primary-fg: #1d4ed8;
+}
+.dark {
+  --xp-bg:         #051424;
+  --xp-surface:    #0d1c2d;
+  --xp-surface-hi: #122131;
+  --xp-border:     #273647;
+  --xp-border-dim: #434655;
+  --xp-text-1:     #d4e4fa;
+  --xp-text-2:     #8d90a0;
+  --xp-text-3:     #434655;
+  --xp-primary-bg: rgba(37,99,235,0.12);
+  --xp-primary-fg: #b4c5ff;
+}
+
+/* Override Ecme primary in dark mode */
+.dark {
+  --primary:       #2563eb;
+  --primary-deep:  #1d4ed8;
+  --primary-mild:  #3b82f6;
+  --primary-subtle: rgba(37,99,235,0.15);
+}
+
+/* Fix Ecme neutral color in dark mode — button text must stay white */
+.dark {
+  --neutral: #ffffff;
+}
+
+/* Direct fix for solid primary button */
+.dark .bg-primary {
+  background-color: #2563eb !important;
+}
+.dark .bg-primary:hover,
+.dark .hover\:bg-primary-mild:hover {
+  background-color: #1d4ed8 !important;
+}
+.dark .text-neutral {
+  color: #ffffff !important;
+}
+
+/* Force white text on primary buttons */
+.dark button.bg-primary,
+.dark button.bg-primary span,
+.dark button.bg-primary svg {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
+}

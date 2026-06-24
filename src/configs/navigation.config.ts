@@ -192,18 +192,18 @@ const navigationConfig: NavItem[] = [
         permissionKey: "Leave.Request.View",
       },
       {
-        key: "my-leave",
-        label: "Leave Applications",
-        path: "/my-leave",
-        icon: Calendar,
-        permissionKey: "Leave.Request.Apply",
-      },
-      {
         key: "attendance-logs",
         label: "Attendance Logs",
         path: "/transactions/attendance-logs",
         icon: Clock,
         permissionKey: "Attendance.Log.View",
+      },
+      {
+        key: "my-leave",
+        label: "Approve Adjustments",
+        path: "/transactions/attendance-adjustments",
+        icon: Calendar,
+        permissionKey: "Leave.Request.Apply",
       },
     ],
   },
@@ -216,7 +216,7 @@ const navigationConfig: NavItem[] = [
       {
         key: "reports-payroll",
         label: "Payroll",
-        path: "/reports/payroll",
+        path: "#",
         icon: DollarSign,
         children: [
           {
@@ -266,7 +266,7 @@ const navigationConfig: NavItem[] = [
       {
         key: "reports-hr",
         label: "HR",
-        path: "/reports/hr",
+        path: "#",
         icon: Users,
         children: [
           {

@@ -11,6 +11,12 @@ import {
   FileEdit,
   ClipboardList,
   Lock,
+  Clock,
+  UserX,
+  AlertTriangle,
+  Timer,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import { useRequirePermission } from "@/hooks/useRequirePermission";
@@ -49,11 +55,38 @@ const STATUSES = [
   "NoPay",
 ];
 
+const PAGE_SIZE = 10;
+
 interface EmployeeOption {
   id: string;
   employeeCode: string;
   firstName: string;
   lastName: string;
+}
+
+const AVATAR_COLORS = [
+  "bg-blue-500",
+  "bg-violet-500",
+  "bg-emerald-500",
+  "bg-orange-500",
+  "bg-pink-500",
+  "bg-teal-500",
+  "bg-indigo-500",
+  "bg-rose-500",
+];
+
+function avatarColor(name: string) {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++)
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+}
+
+function initials(name: string) {
+  const parts = name.trim().split(" ");
+  return parts.length >= 2
+    ? `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase()
+    : name.slice(0, 2).toUpperCase();
 }
 
 const emptyForm = (): AttendanceLogForm => ({
@@ -72,6 +105,17 @@ const emptyForm = (): AttendanceLogForm => ({
   adjustmentReason: "",
   notes: "",
 });
+
+// Pagination helper
+function buildPages(current: number, total: number): (number | "…")[] {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const pages: (number | "…")[] = [1];
+  if (current > 3) pages.push("…");
+  for (let i = Math.max(2, current - 1); i <= Math.min(total - 1, current + 1); i++) pages.push(i);
+  if (current < total - 2) pages.push("…");
+  pages.push(total);
+  return pages;
+}
 
 export default function AttendanceLogsPage() {
   useRequirePermission("Attendance.Log.View");
@@ -100,11 +144,9 @@ export default function AttendanceLogsPage() {
   const [empSearch, setEmpSearch] = useState("");
   const [empLoading, setEmpLoading] = useState(false);
 
-  // Shift info for auto-calculation
   const [shiftStart, setShiftStart] = useState<string | null>(null);
   const [graceMinutes, setGraceMinutes] = useState<number>(0);
 
-  // Generation
   const [genLogs, setGenLogs] = useState<AttendanceGenerationLog[]>([]);
   const [genLoading, setGenLoading] = useState(false);
   const [genRunning, setGenRunning] = useState(false);
@@ -132,6 +174,9 @@ export default function AttendanceLogsPage() {
   const [adjError, setAdjError] = useState("");
   const [pendingCount, setPendingCount] = useState(0);
 
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+
   const today = new Date().toISOString().split("T")[0];
   const firstOfMonth = new Date(
     new Date().getFullYear(),
@@ -149,7 +194,25 @@ export default function AttendanceLogsPage() {
     status: "",
   });
 
-  // ── Auto-calculation ──────────────────────────────────────────────────────
+  // ── KPI derived stats ───────────────────────────────────────────────────
+  const kpiPresent = items.filter((i) => i.status === "Present").length;
+  const kpiAbsent = items.filter((i) => i.status === "Absent").length;
+  const kpiLate = items.filter((i) => i.status === "Late").length;
+  const kpiAvgHours =
+    items.length > 0
+      ? (
+          items.reduce((s, i) => s + Number(i.hoursWorked), 0) / items.length
+        ).toFixed(1)
+      : "0.0";
+
+  // ── Pagination ─────────────────────────────────────────────────────────
+  const totalPages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
+  const paginated = items.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE,
+  );
+
+  // ── Auto-calculation ──────────────────────────────────────────────────
   const recalculate = (
     checkIn: string,
     checkOut: string,
@@ -184,7 +247,6 @@ export default function AttendanceLogsPage() {
     const workedMins = Math.max(0, totalMins - breakM);
     const workedHours = workedMins / 60;
     const otHours = Math.max(0, workedHours - 8);
-
     let lateMins = 0;
     let isLate = false;
     if (currentShiftStart) {
@@ -196,14 +258,12 @@ export default function AttendanceLogsPage() {
       lateMins = Math.max(0, Math.floor(diffMins - currentGrace));
       isLate = lateMins > 0;
     }
-
     setForm((f) => ({
       ...f,
       hoursWorked: workedHours.toFixed(2),
       overtimeHours: otHours.toFixed(2),
       lateMinutes: String(lateMins),
       isLate,
-      // Auto-set status based on late detection
       status:
         f.status === "ToBeRegularized"
           ? isLate
@@ -213,9 +273,10 @@ export default function AttendanceLogsPage() {
     }));
   };
 
-  // ── Data loaders ──────────────────────────────────────────────────────────
+  // ── Data loaders ──────────────────────────────────────────────────────
   const load = async (f: AttendanceLogFilters = filters) => {
     setLoading(true);
+    setCurrentPage(1);
     try {
       const params: Record<string, string> = {};
       if (f.employeeId) params.employeeId = f.employeeId;
@@ -288,14 +349,12 @@ export default function AttendanceLogsPage() {
         setGraceMinutes(0);
         return { start: null, grace: 0 };
       }
-
       const [shiftRes, policyRes] = await Promise.all([
         api.get(`/shift?id=${active.shiftId}`),
         active.attendancePolicyId
           ? api.get(`/attendance-policies?id=${active.attendancePolicyId}`)
           : Promise.resolve(null),
       ]);
-
       const shift = Array.isArray(shiftRes.data)
         ? shiftRes.data[0]
         : shiftRes.data;
@@ -304,7 +363,6 @@ export default function AttendanceLogsPage() {
           ? policyRes.data[0]
           : policyRes.data
         : null;
-
       const start = shift?.expectedStart ?? null;
       const grace = policy?.lateGraceMinutes ?? 0;
       setShiftStart(start);
@@ -335,7 +393,7 @@ export default function AttendanceLogsPage() {
     if (canRequestAdj || canApprove) loadPendingCount();
   }, []);
 
-  // ── Dialog open ───────────────────────────────────────────────────────────
+  // ── Dialog open ───────────────────────────────────────────────────────
   const openAdd = () => {
     setShiftStart(null);
     setGraceMinutes(0);
@@ -351,10 +409,7 @@ export default function AttendanceLogsPage() {
     setEditing(item);
     setEmpSearch("");
     setError("");
-
     const { start, grace } = await loadEmployeeShift(item.employeeId);
-
-    // Extract local time only (HH:MM) from UTC timestamp
     const checkIn = item.checkIn
       ? new Date(item.checkIn).toLocaleTimeString("en-GB", {
           hour: "2-digit",
@@ -367,12 +422,10 @@ export default function AttendanceLogsPage() {
           minute: "2-digit",
         })
       : "";
-
     let hoursWorked = String(item.hoursWorked);
     let overtimeHours = String(item.overtimeHours);
     let lateMinutes = String(item.lateMinutes);
     let isLate = item.isLate;
-
     if (checkIn && checkOut && item.workDate) {
       const inTime = new Date(`${item.workDate}T${checkIn}`).getTime();
       const outTime = new Date(`${item.workDate}T${checkOut}`).getTime();
@@ -395,7 +448,6 @@ export default function AttendanceLogsPage() {
         }
       }
     }
-
     setForm({
       employeeId: item.employeeId,
       shiftId: item.shiftId ?? "",
@@ -412,7 +464,6 @@ export default function AttendanceLogsPage() {
       adjustmentReason: item.adjustmentReason ?? "",
       notes: item.notes ?? "",
     });
-
     setDialogOpen(true);
     if (employees.length === 0) loadEmployees();
   };
@@ -494,7 +545,7 @@ export default function AttendanceLogsPage() {
 
   const selectedEmployee = employees.find((e) => e.id === form.employeeId);
 
-  // ── Save ──────────────────────────────────────────────────────────────────
+  // ── Save ──────────────────────────────────────────────────────────────
   const handleSave = async () => {
     if (!form.employeeId) {
       setError("Please select an employee.");
@@ -504,7 +555,6 @@ export default function AttendanceLogsPage() {
       setError("Work date is required.");
       return;
     }
-
     setSaving(true);
     try {
       await api.post("/attendance-logs/save", {
@@ -616,7 +666,7 @@ export default function AttendanceLogsPage() {
     }
   };
 
-  // ── Badges ────────────────────────────────────────────────────────────────
+  // ── Badges ────────────────────────────────────────────────────────────
   const statusBadge = (status: string) => {
     const map: Record<string, string> = {
       Present: "xp-badge xp-badge-success",
@@ -667,13 +717,13 @@ export default function AttendanceLogsPage() {
       (new Date().getTime() - new Date(workDate).getTime()) /
         (1000 * 60 * 60 * 24),
     );
-    return days > 3; // ideally fetch from app_settings, but 3 is the default
+    return days > 3;
   };
 
-  // ── Render ────────────────────────────────────────────────────────────────
+  // ── Render ────────────────────────────────────────────────────────────
   return (
     <div>
-      {/* Header */}
+      {/* Page Header */}
       <div className="flex justify-between items-start mb-6">
         <div>
           <h3 className="text-lg font-semibold">Attendance Logs</h3>
@@ -692,7 +742,7 @@ export default function AttendanceLogsPage() {
             >
               {canApprove ? "Pending Approvals" : "My Requests"}
               {pendingCount > 0 && (
-                <span className="ml-1.5 bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5 leading-none">
+                <span className="ml-1.5 inline-flex items-center justify-center min-w-[18px] h-[18px] bg-red-500 dark:bg-red-500 text-white text-[11px] font-semibold rounded-full px-1 leading-none ring-1 ring-white/20">
                   {pendingCount}
                 </span>
               )}
@@ -720,25 +770,118 @@ export default function AttendanceLogsPage() {
         </div>
       </div>
 
+      {/* KPI Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        {/* Total Present */}
+        <div className="card">
+          <div className="card-body flex items-center gap-4">
+            <div className="flex-shrink-0 w-11 h-11 rounded-xl bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
+              <Clock
+                size={20}
+                className="text-emerald-600 dark:text-emerald-400"
+              />
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 font-medium">Total Present</p>
+              <p className="text-2xl font-bold text-gray-800 dark:text-gray-100 leading-tight">
+                {loading ? (
+                  <span className="text-base text-gray-400">—</span>
+                ) : (
+                  kpiPresent
+                )}
+              </p>
+            </div>
+          </div>
+        </div>
+        {/* Total Absent */}
+        <div className="card">
+          <div className="card-body flex items-center gap-4">
+            <div className="flex-shrink-0 w-11 h-11 rounded-xl bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+              <UserX size={20} className="text-red-500 dark:text-red-400" />
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 font-medium">Total Absent</p>
+              <p className="text-2xl font-bold text-gray-800 dark:text-gray-100 leading-tight">
+                {loading ? (
+                  <span className="text-base text-gray-400">—</span>
+                ) : (
+                  kpiAbsent
+                )}
+              </p>
+            </div>
+          </div>
+        </div>
+        {/* Late Arrivals */}
+        <div className="card">
+          <div className="card-body flex items-center gap-4">
+            <div className="flex-shrink-0 w-11 h-11 rounded-xl bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center">
+              <AlertTriangle
+                size={20}
+                className="text-orange-500 dark:text-orange-400"
+              />
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 font-medium">Late Arrivals</p>
+              <p className="text-2xl font-bold text-gray-800 dark:text-gray-100 leading-tight">
+                {loading ? (
+                  <span className="text-base text-gray-400">—</span>
+                ) : (
+                  kpiLate
+                )}
+              </p>
+            </div>
+          </div>
+        </div>
+        {/* Avg Work Hours */}
+        <div className="card">
+          <div className="card-body flex items-center gap-4">
+            <div className="flex-shrink-0 w-11 h-11 rounded-xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+              <Timer size={20} className="text-blue-500 dark:text-blue-400" />
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 font-medium">
+                Avg Work Hours
+              </p>
+              <p className="text-2xl font-bold text-gray-800 dark:text-gray-100 leading-tight">
+                {loading ? (
+                  <span className="text-base text-gray-400">—</span>
+                ) : (
+                  `${kpiAvgHours}h`
+                )}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Filters */}
       <div className="card mb-4">
         <div className="card-body">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="relative">
-              <Input
-                placeholder="Search employee..."
-                value={filters.empSearch ?? ""}
-                onChange={(e) => {
-                  setFilters((f) => ({
-                    ...f,
-                    empSearch: e.target.value,
-                    employeeId: "",
-                  }));
-                  if (employees.length === 0) loadEmployees();
-                }}
-              />
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
+            {/* Employee search */}
+            <div className="md:col-span-2 relative">
+              <label className="form-label">Employee</label>
+              <div className="relative">
+                <Search
+                  size={14}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+                />
+                <input
+                  className="input input-md w-full pl-8"
+                  placeholder="Search by name or code..."
+                  value={filters.empSearch ?? ""}
+                  onChange={(e) => {
+                    setFilters((f) => ({
+                      ...f,
+                      empSearch: e.target.value,
+                      employeeId: "",
+                    }));
+                    if (employees.length === 0) loadEmployees();
+                  }}
+                />
+              </div>
               {filters.employeeId && (
-                <div className="text-xs text-primary mt-0.5">
+                <div className="text-xs text-primary mt-0.5 font-medium">
                   ✓{" "}
                   {
                     employees.find((e) => e.id === filters.employeeId)
@@ -748,23 +891,20 @@ export default function AttendanceLogsPage() {
                 </div>
               )}
               {(filters.empSearch ?? "") && !filters.employeeId && (
-                <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                <div className="absolute z-20 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-48 overflow-y-auto">
                   {empLoading ? (
                     <div className="p-3 text-sm text-gray-400">Loading...</div>
                   ) : employees
-                      .filter((e) =>
-                        (filters.empSearch ?? "") === ""
-                          ? false
-                          : e.employeeCode
-                              .toLowerCase()
-                              .includes(
-                                (filters.empSearch ?? "").toLowerCase(),
-                              ) ||
-                            `${e.firstName} ${e.lastName}`
-                              .toLowerCase()
-                              .includes(
-                                (filters.empSearch ?? "").toLowerCase(),
-                              ),
+                      .filter(
+                        (e) =>
+                          e.employeeCode
+                            .toLowerCase()
+                            .includes(
+                              (filters.empSearch ?? "").toLowerCase(),
+                            ) ||
+                          `${e.firstName} ${e.lastName}`
+                            .toLowerCase()
+                            .includes((filters.empSearch ?? "").toLowerCase()),
                       )
                       .slice(0, 10).length === 0 ? (
                     <div className="p-3 text-sm text-gray-400">
@@ -799,7 +939,7 @@ export default function AttendanceLogsPage() {
                           <span className="font-medium">
                             {e.firstName} {e.lastName}
                           </span>
-                          <span className="text-gray-400 ml-2">
+                          <span className="text-gray-400 ml-2 text-xs">
                             {e.employeeCode}
                           </span>
                         </button>
@@ -808,41 +948,58 @@ export default function AttendanceLogsPage() {
                 </div>
               )}
             </div>
-            <Input
-              type="date"
-              value={filters.dateFrom}
-              onChange={(e) =>
-                setFilters((f) => ({ ...f, dateFrom: e.target.value }))
-              }
-            />
-            <Input
-              type="date"
-              value={filters.dateTo}
-              onChange={(e) =>
-                setFilters((f) => ({ ...f, dateTo: e.target.value }))
-              }
-            />
-            <div className="flex gap-2">
-              <select
-                className="input input-md w-full"
-                value={filters.status}
+
+            {/* Date From */}
+            <div>
+              <label className="form-label">From</label>
+              <Input
+                type="date"
+                value={filters.dateFrom}
                 onChange={(e) =>
-                  setFilters((f) => ({ ...f, status: e.target.value }))
+                  setFilters((f) => ({ ...f, dateFrom: e.target.value }))
                 }
-              >
-                <option value="">All statuses</option>
-                {STATUSES.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
-              <Button
-                variant="solid"
-                color="primary"
-                icon={<Search size={15} />}
-                onClick={() => load(filters)}
               />
+            </div>
+
+            {/* Date To */}
+            <div>
+              <label className="form-label">To</label>
+              <Input
+                type="date"
+                value={filters.dateTo}
+                onChange={(e) =>
+                  setFilters((f) => ({ ...f, dateTo: e.target.value }))
+                }
+              />
+            </div>
+
+            {/* Status + Search btn */}
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <label className="form-label">Status</label>
+                <select
+                  className="input input-md w-full"
+                  value={filters.status}
+                  onChange={(e) =>
+                    setFilters((f) => ({ ...f, status: e.target.value }))
+                  }
+                >
+                  <option value="">All statuses</option>
+                  {STATUSES.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex items-end">
+                <Button
+                  variant="solid"
+                  color="primary"
+                  icon={<Search size={15} />}
+                  onClick={() => load(filters)}
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -859,7 +1016,6 @@ export default function AttendanceLogsPage() {
           const onLeave = items.filter((i) => i.status === "OnLeave").length;
           const holiday = items.filter((i) => i.status === "Holiday").length;
           const weekOff = items.filter((i) => i.status === "WeekOff").length;
-
           const toReg = items.filter(
             (i) => i.status === "ToBeRegularized",
           ).length;
@@ -897,14 +1053,12 @@ export default function AttendanceLogsPage() {
                     </p>
                   </div>
                 </div>
-
-                {/* Attendance status counts */}
                 <div className="grid grid-cols-4 md:grid-cols-9 gap-3 mb-4">
                   {[
                     {
                       label: "Present",
                       value: present,
-                      cls: "text-green-600 dark:text-green-400",
+                      cls: "text-emerald-600 dark:text-emerald-400",
                     },
                     { label: "Absent", value: absent, cls: "text-red-500" },
                     { label: "Late", value: late, cls: "text-orange-500" },
@@ -934,9 +1088,7 @@ export default function AttendanceLogsPage() {
                     </div>
                   ))}
                 </div>
-
-                {/* Time totals */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                   {[
                     {
                       label: "Working Hours",
@@ -969,14 +1121,10 @@ export default function AttendanceLogsPage() {
                   ].map(({ label, value, cls }) => (
                     <div
                       key={label}
-                      className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3 flex items-center gap-3"
+                      className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3"
                     >
-                      <div>
-                        <div className={`text-lg font-bold ${cls}`}>
-                          {value}
-                        </div>
-                        <div className="text-xs text-gray-400">{label}</div>
-                      </div>
+                      <div className={`text-lg font-bold ${cls}`}>{value}</div>
+                      <div className="text-xs text-gray-400">{label}</div>
                     </div>
                   ))}
                 </div>
@@ -993,118 +1141,193 @@ export default function AttendanceLogsPage() {
               <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent" />
             </div>
           ) : (
-            <table className="table-default table-hover w-full">
-              <thead>
-                <tr>
-                  <th>Employee</th>
-                  <th>Date</th>
-                  <th>Check In</th>
-                  <th>Check Out</th>
-                  <th>Hours</th>
-                  <th>Status</th>
-                  <th>Source</th>
-                  <th>Adjusted</th>
-                  {(canEdit || canDelete) && <th>Actions</th>}
-                </tr>
-              </thead>
-              <tbody>
-                {items.length === 0 ? (
+            <>
+              <table className="table-default table-hover w-full">
+                <thead>
                   <tr>
-                    <td colSpan={9} className="text-center py-10 text-gray-400">
-                      No attendance logs found for the selected filters.
-                    </td>
+                    <th>Employee</th>
+                    <th>Date</th>
+                    <th>Check In</th>
+                    <th>Check Out</th>
+                    <th>Hours</th>
+                    <th>Status</th>
+                    <th>Source</th>
+                    <th>Adjusted</th>
+                    {(canEdit || canDelete) && <th>Actions</th>}
                   </tr>
-                ) : (
-                  items.map((item) => (
-                    <tr key={item.id}>
-                      <td>
-                        <div className="font-medium">{item.employeeName}</div>
-                        <div className="text-xs text-gray-400">
-                          {item.employeeCode}
-                        </div>
+                </thead>
+                <tbody>
+                  {paginated.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={9}
+                        className="text-center py-12 text-gray-400"
+                      >
+                        No attendance logs found for the selected filters.
                       </td>
-                      <td>{item.workDate}</td>
-                      <td>{fmtTime(item.checkIn)}</td>
-                      <td>{fmtTime(item.checkOut)}</td>
-                      <td>
-                        <div>{item.hoursWorked}h</div>
-                        {item.overtimeHours > 0 && (
-                          <div className="text-xs text-orange-500">
-                            +{item.overtimeHours}h OT
-                          </div>
-                        )}
-                      </td>
-                      <td>
-                        <span className={statusBadge(item.status)}>
-                          {item.status}
-                        </span>
-                        {item.isLate && item.lateMinutes > 0 && (
-                          <div className="text-xs text-orange-500 mt-0.5">
-                            {item.lateMinutes}m late
-                          </div>
-                        )}
-                      </td>
-                      <td className="text-sm text-gray-500">{item.source}</td>
-                      <td>
-                        {item.isAdjusted ? (
-                          <span className="xp-badge xp-badge-warning">Yes</span>
-                        ) : (
-                          <span className="xp-badge xp-badge-neutral">No</span>
-                        )}
-                      </td>
-                      {(canEdit || canDelete) && (
-                        <td>
-                          <div className="flex gap-1">
-                            {canEdit &&
-                              item.status === "ToBeRegularized" &&
-                              (isFrozen(item.workDate) ? (
-                                <button
-                                  className="p-1.5 rounded-lg text-gray-300 cursor-not-allowed"
-                                  title="Record is frozen — adjustment window has passed"
-                                  disabled
-                                >
-                                  <Lock size={15} />
-                                </button>
-                              ) : (
-                                <button
-                                  className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500"
-                                  onClick={() => openEdit(item)}
-                                  title="Edit"
-                                >
-                                  <Pencil size={15} />
-                                </button>
-                              ))}
-                            {canRequestAdj &&
-                              item.status !== "ToBeRegularized" && (
-                                <button
-                                  className="p-1.5 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 text-blue-500"
-                                  onClick={() => openAdjustmentRequest(item)}
-                                  title="Request Adjustment"
-                                >
-                                  <FileEdit size={15} />
-                                </button>
-                              )}
-                            {/* {canDelete && (
-                              <button
-                                className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-red-400"
-                                onClick={() => setConfirmDelete(item)}
-                                disabled={deleting === item.id}
-                              >
-                                {deleting === item.id ? (
-                                  <div className="animate-spin h-[15px] w-[15px] rounded-full border-2 border-red-400 border-t-transparent" />
-                                ) : (
-                                  <Trash2 size={15} />
-                                )}
-                              </button>
-                            )} */}
-                          </div>
-                        </td>
-                      )}
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                  ) : (
+                    paginated.map((item) => {
+                      const name = item.employeeName ?? "";
+                      const color = avatarColor(name);
+                      const ini = initials(name);
+                      return (
+                        <tr key={item.id}>
+                          <td>
+                            <div className="flex items-center gap-2.5">
+                              <div
+                                className={`flex-shrink-0 w-8 h-8 rounded-full ${color} flex items-center justify-center text-white text-xs font-semibold`}
+                              >
+                                {ini}
+                              </div>
+                              <div>
+                                <div className="font-medium text-sm">
+                                  {item.employeeName}
+                                </div>
+                                <div className="text-xs text-gray-400">
+                                  {item.employeeCode}
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="text-sm tabular-nums">
+                            {item.workDate}
+                          </td>
+                          <td className="text-sm tabular-nums">
+                            {fmtTime(item.checkIn)}
+                          </td>
+                          <td className="text-sm tabular-nums">
+                            {fmtTime(item.checkOut)}
+                          </td>
+                          <td>
+                            <div className="text-sm font-medium tabular-nums">
+                              {item.hoursWorked}h
+                            </div>
+                            {item.overtimeHours > 0 && (
+                              <div className="text-xs text-orange-500 tabular-nums">
+                                +{item.overtimeHours}h OT
+                              </div>
+                            )}
+                          </td>
+                          <td>
+                            <span className={statusBadge(item.status)}>
+                              {item.status}
+                            </span>
+                            {item.isLate && item.lateMinutes > 0 && (
+                              <div className="text-xs text-orange-500 mt-0.5 tabular-nums">
+                                {item.lateMinutes}m late
+                              </div>
+                            )}
+                          </td>
+                          <td className="text-sm text-gray-500">
+                            {item.source}
+                          </td>
+                          <td>
+                            {item.isAdjusted ? (
+                              <span className="xp-badge xp-badge-warning">
+                                Yes
+                              </span>
+                            ) : (
+                              <span className="xp-badge xp-badge-neutral">
+                                No
+                              </span>
+                            )}
+                          </td>
+                          {(canEdit || canDelete) && (
+                            <td>
+                              <div className="flex gap-1">
+                                {canEdit &&
+                                  item.status === "ToBeRegularized" &&
+                                  (isFrozen(item.workDate) ? (
+                                    <button
+                                      className="p-1.5 rounded-lg text-gray-300 cursor-not-allowed"
+                                      title="Record is frozen — adjustment window has passed"
+                                      disabled
+                                    >
+                                      <Lock size={15} />
+                                    </button>
+                                  ) : (
+                                    <button
+                                      className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500"
+                                      onClick={() => openEdit(item)}
+                                      title="Edit"
+                                    >
+                                      <Pencil size={15} />
+                                    </button>
+                                  ))}
+                                {canRequestAdj &&
+                                  item.status !== "ToBeRegularized" && (
+                                    <button
+                                      className="p-1.5 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 text-blue-500"
+                                      onClick={() =>
+                                        openAdjustmentRequest(item)
+                                      }
+                                      title="Request Adjustment"
+                                    >
+                                      <FileEdit size={15} />
+                                    </button>
+                                  )}
+                              </div>
+                            </td>
+                          )}
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+
+              {/* Pagination footer */}
+              {items.length > 0 && (
+                <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 dark:border-gray-700">
+                  <p className="text-sm text-gray-500">
+                    Showing {(currentPage - 1) * PAGE_SIZE + 1}–
+                    {Math.min(currentPage * PAGE_SIZE, items.length)} of{" "}
+                    {items.length} records
+                  </p>
+                  <div className="flex items-center gap-1">
+                    <button
+                      className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed"
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                    >
+                      <ChevronLeft size={16} />
+                    </button>
+                    {buildPages(currentPage, totalPages).map((p, i) =>
+                      p === "…" ? (
+                        <span
+                          key={`ell-${i}`}
+                          className="px-2 text-gray-400 text-sm"
+                        >
+                          …
+                        </span>
+                      ) : (
+                        <button
+                          key={p}
+                          onClick={() => setCurrentPage(p as number)}
+                          className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors ${
+                            currentPage === p
+                              ? "bg-primary text-white"
+                              : "hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300"
+                          }`}
+                        >
+                          {p}
+                        </button>
+                      ),
+                    )}
+                    <button
+                      className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed"
+                      onClick={() =>
+                        setCurrentPage((p) => Math.min(totalPages, p + 1))
+                      }
+                      disabled={currentPage === totalPages}
+                    >
+                      <ChevronRight size={16} />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>
@@ -1118,9 +1341,7 @@ export default function AttendanceLogsPage() {
         <h5 className="mb-4 font-semibold">
           {editing ? "Edit Attendance Log" : "Add Attendance Log"}
         </h5>
-
         <div className="grid grid-cols-2 gap-4">
-          {/* Employee */}
           <div className="col-span-2">
             <label className="form-label">
               Employee <span className="text-red-500">*</span>
@@ -1188,7 +1409,6 @@ export default function AttendanceLogsPage() {
             )}
           </div>
 
-          {/* Work Date */}
           <div>
             <label className="form-label">
               Work Date <span className="text-red-500">*</span>
@@ -1203,7 +1423,6 @@ export default function AttendanceLogsPage() {
             />
           </div>
 
-          {/* Status */}
           <div>
             <label className="form-label">
               Status <span className="text-red-500">*</span>
@@ -1223,7 +1442,6 @@ export default function AttendanceLogsPage() {
             </select>
           </div>
 
-          {/* Check In */}
           <div>
             <label className="form-label">Check In</label>
             <Input
@@ -1242,7 +1460,6 @@ export default function AttendanceLogsPage() {
             />
           </div>
 
-          {/* Check Out */}
           <div>
             <label className="form-label">Check Out</label>
             <Input
@@ -1261,7 +1478,6 @@ export default function AttendanceLogsPage() {
             />
           </div>
 
-          {/* Source — locked */}
           <div>
             <label className="form-label">Source</label>
             <select
@@ -1277,7 +1493,6 @@ export default function AttendanceLogsPage() {
             </select>
           </div>
 
-          {/* Break Minutes — editable, triggers recalc */}
           <div>
             <label className="form-label">Break Minutes</label>
             <Input
@@ -1297,7 +1512,6 @@ export default function AttendanceLogsPage() {
             />
           </div>
 
-          {/* Hours Worked — read only */}
           <div>
             <label className="form-label">Hours Worked</label>
             <div className="input input-md bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 cursor-not-allowed">
@@ -1305,7 +1519,6 @@ export default function AttendanceLogsPage() {
             </div>
           </div>
 
-          {/* Overtime Hours — read only */}
           <div>
             <label className="form-label">Overtime Hours</label>
             <div className="input input-md bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 cursor-not-allowed">
@@ -1313,7 +1526,6 @@ export default function AttendanceLogsPage() {
             </div>
           </div>
 
-          {/* Late Minutes — read only */}
           <div>
             <label className="form-label">Late Minutes</label>
             <div className="input input-md bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 cursor-not-allowed">
@@ -1321,7 +1533,6 @@ export default function AttendanceLogsPage() {
             </div>
           </div>
 
-          {/* Late status badge */}
           <div className="flex items-center gap-3 pt-5">
             <span
               className={
@@ -1386,7 +1597,6 @@ export default function AttendanceLogsPage() {
           Automatically creates attendance records for all active employees
           based on biometric data, leave records, and shift schedules.
         </p>
-
         <div className="flex gap-3 items-end mb-6">
           <div className="flex-1">
             <label className="form-label">Date to Generate</label>
@@ -1409,7 +1619,6 @@ export default function AttendanceLogsPage() {
             </Button>
           )}
         </div>
-
         <div>
           <div className="flex justify-between items-center mb-3">
             <h6 className="font-medium text-sm">Recent Runs</h6>
@@ -1463,7 +1672,6 @@ export default function AttendanceLogsPage() {
             </div>
           )}
         </div>
-
         <div className="flex justify-end mt-6">
           <Button variant="plain" onClick={() => setGenDialogOpen(false)}>
             Close
@@ -1514,7 +1722,6 @@ export default function AttendanceLogsPage() {
         <p className="text-sm text-gray-400 mb-4">
           {adjTarget?.employeeName} · {adjTarget?.workDate}
         </p>
-
         <div className="grid grid-cols-2 gap-4 mb-4">
           <div>
             <label className="form-label">New Check In</label>
@@ -1566,7 +1773,6 @@ export default function AttendanceLogsPage() {
             />
           </div>
         </div>
-
         <div className="mb-4">
           <label className="form-label">
             Reason <span className="text-red-500">*</span>
@@ -1579,9 +1785,7 @@ export default function AttendanceLogsPage() {
             placeholder="Explain why this adjustment is needed..."
           />
         </div>
-
         {adjError && <p className="text-red-500 text-sm mb-3">{adjError}</p>}
-
         <div className="flex justify-end gap-2">
           <Button variant="plain" onClick={() => setAdjDialogOpen(false)}>
             Cancel

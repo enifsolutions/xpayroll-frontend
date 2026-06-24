@@ -1,45 +1,97 @@
-'use client';
+"use client";
 
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { LogOut, ChevronDown } from "lucide-react";
-import { logout as clearTokens } from '@/lib/auth';
-import { SIDE_NAV_WIDTH, HEADER_HEIGHT } from '@/constants/theme.constant';
-import { useState, useEffect } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { LogOut, ChevronDown, Minus, AlignJustify } from "lucide-react";
+import { logout as clearTokens } from "@/lib/auth";
+import {
+  SIDE_NAV_WIDTH,
+  SIDE_NAV_COLLAPSED_WIDTH,
+  HEADER_HEIGHT,
+} from "@/constants/theme.constant";
+import { useState, useEffect, useRef } from "react";
 import { useFilteredNavigation } from "@/hooks/useFilteredNavigation";
 import { useAuthStore } from "@/store/authStore";
+
+const PIN_KEY = "xp_sidebar_pinned";
 
 export function Sidebar() {
   const path = usePathname();
   const navItems = useFilteredNavigation();
   const { clearAuth } = useAuthStore();
+  const user = useAuthStore((s) => s.user);
 
+  const [pinned, setPinned] = useState(false);
+  const [hovered, setHovered] = useState(false);
   const [openGroups, setOpenGroups] = useState<string[]>([]);
   const [openSubGroups, setOpenSubGroups] = useState<string[]>([]);
+  const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Sidebar is expanded if pinned OR hovered
+  const expanded = pinned || hovered;
+
+  // Restore pin state
   useEffect(() => {
-    const active = navItems.find((item) =>
+    if (localStorage.getItem(PIN_KEY) === "true") setPinned(true);
+  }, []);
+
+  // Auto-open the group that contains the current path
+  useEffect(() => {
+    if (!expanded) return;
+
+    const activeGroup = navItems.find((item) =>
       item.children?.some(
         (c) =>
-          path.startsWith(c.path) ||
+          (c.path !== "#" && path.startsWith(c.path)) ||
           c.children?.some((sc) => path.startsWith(sc.path)),
       ),
     );
-    if (active) setOpenGroups([active.label]);
+    if (activeGroup) {
+      setOpenGroups([activeGroup.label]);
+    }
 
-    // Auto-open sub-group containing active path
+    const activeSubGroups: string[] = [];
     navItems.forEach((item) => {
       item.children?.forEach((child) => {
         if (child.children?.some((sc) => path.startsWith(sc.path))) {
-          setOpenSubGroups((prev) =>
-            prev.includes(child.label) ? prev : [...prev, child.label],
-          );
+          activeSubGroups.push(child.label);
         }
       });
     });
-  }, [path]);
+    if (activeSubGroups.length > 0) {
+      setOpenSubGroups(activeSubGroups);
+    }
+  }, [path, expanded, navItems]);
+
+  const togglePin = () => {
+    const next = !pinned;
+    setPinned(next);
+    localStorage.setItem(PIN_KEY, String(next));
+    if (!next) {
+      setOpenGroups([]);
+      setOpenSubGroups([]);
+      setHovered(false);
+    }
+  };
+
+  const handleMouseEnter = () => {
+    if (pinned) return;
+    if (hoverTimer.current) clearTimeout(hoverTimer.current);
+    hoverTimer.current = setTimeout(() => setHovered(true), 120);
+  };
+
+  const handleMouseLeave = () => {
+    if (pinned) return;
+    if (hoverTimer.current) clearTimeout(hoverTimer.current);
+    hoverTimer.current = setTimeout(() => {
+      setHovered(false);
+      setOpenGroups([]);
+      setOpenSubGroups([]);
+    }, 200);
+  };
 
   const toggleGroup = (label: string) => {
+    if (!expanded) return;
     setOpenGroups((prev) => (prev.includes(label) ? [] : [label]));
   };
 
@@ -55,164 +107,290 @@ export function Sidebar() {
     window.location.href = "/login";
   };
 
+  const initials = (n?: string) =>
+    (n ?? "AP")
+      .split(" ")
+      .map((w) => w[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase();
+
+  const width = expanded ? SIDE_NAV_WIDTH : SIDE_NAV_COLLAPSED_WIDTH;
+
+  const navCls = (active: boolean) =>
+    `flex items-center rounded-md text-sm font-medium transition-all duration-150 border-l-2 ${
+      active
+        ? "bg-[var(--xp-primary-bg)] text-[var(--xp-primary-fg)] border-blue-500"
+        : "text-[var(--xp-text-2)] hover:bg-[var(--xp-surface-hi)] hover:text-[var(--xp-text-1)] border-transparent"
+    }`;
+
+  const childCls = (active: boolean) =>
+    `flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-150 ${
+      active
+        ? "text-[var(--xp-primary-fg)] bg-[var(--xp-primary-bg)]"
+        : "text-[var(--xp-text-2)] hover:text-[var(--xp-text-1)] hover:bg-[var(--xp-surface-hi)]"
+    }`;
+
+  const subChildCls = (active: boolean) =>
+    `flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-150 ${
+      active
+        ? "text-[var(--xp-primary-fg)] bg-[var(--xp-primary-bg)]"
+        : "text-[var(--xp-text-2)] hover:text-[var(--xp-text-1)] hover:bg-[var(--xp-surface-hi)]"
+    }`;
+
   return (
     <div
-      className="side-nav side-nav-bg side-nav-expand hidden lg:flex flex-col fixed inset-y-0 left-0 z-40"
-      style={{ width: SIDE_NAV_WIDTH, minWidth: SIDE_NAV_WIDTH }}
+      className="hidden lg:flex flex-col fixed inset-y-0 left-0 z-40 bg-[var(--xp-surface)] border-r border-[var(--xp-border)]"
+      style={{ width, minWidth: width, transition: "width 0.2s ease" }}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
     >
-      {/* Logo */}
+      {/* Brand */}
       <div
-        className="side-nav-header flex items-center px-6 border-b border-gray-200 dark:border-gray-700 flex-shrink-0"
-        style={{ height: HEADER_HEIGHT, minHeight: HEADER_HEIGHT }}
+        className="flex items-center flex-shrink-0 border-b border-[var(--xp-border)] overflow-hidden"
+        style={{
+          height: HEADER_HEIGHT,
+          minHeight: HEADER_HEIGHT,
+          padding: expanded ? "0 12px 0 20px" : "0 0 0 22px",
+          justifyContent: expanded ? "space-between" : "flex-start",
+          transition: "padding 0.2s ease",
+        }}
       >
-        <span className="text-lg font-bold tracking-tight text-gray-900 dark:text-gray-100">
-          Xpay<span className="text-primary">Roll</span>
-        </span>
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div
+            className="w-7 h-7 rounded-lg flex items-center justify-center text-white font-bold flex-shrink-0 text-sm"
+            style={{ background: "linear-gradient(135deg,#1d4ed8,#6d28d9)" }}
+          >
+            X
+          </div>
+          {expanded && (
+            <div className="overflow-hidden">
+              <div className="text-sm font-semibold text-[var(--xp-text-1)] whitespace-nowrap">
+                XpayRoll
+              </div>
+              <div className="text-[10px] text-[var(--xp-text-2)] whitespace-nowrap mt-px">
+                Enterprise Suite
+              </div>
+            </div>
+          )}
+        </div>
+        {expanded && (
+          <button
+            onClick={togglePin}
+            className={`w-7 h-7 flex items-center justify-center rounded-md transition-colors flex-shrink-0 ${
+              pinned
+                ? "text-blue-500 bg-[var(--xp-primary-bg)] hover:bg-[var(--xp-primary-bg)]"
+                : "text-[var(--xp-text-2)] hover:text-[var(--xp-text-1)] hover:bg-[var(--xp-surface-hi)]"
+            }`}
+            aria-label={pinned ? "Unpin sidebar" : "Pin sidebar"}
+            title={pinned ? "Unpin sidebar" : "Pin sidebar open"}
+          >
+            <AlignJustify size={14} />
+          </button>
+        )}
       </div>
 
       {/* Nav */}
-      <div className="flex-1 overflow-y-auto side-nav-content py-4 px-3">
+      <div
+        className="flex-1 overflow-y-auto py-3 px-2"
+        style={{ scrollbarWidth: "none" }}
+      >
         <div className="space-y-0.5">
           {navItems.map((item) => {
-            // ── Top-level link (no children) ──────────────────
-            if (!item.children || item.children.length === 0) {
+            const Icon = item.icon;
+
+            // ── Group with children ───────────────────────────────
+            if (item.children && item.children.length > 0) {
+              const isOpen = openGroups.includes(item.label);
+              const isActive = item.children.some(
+                (c) =>
+                  (c.path !== "#" && path.startsWith(c.path)) ||
+                  c.children?.some((sc) => path.startsWith(sc.path)),
+              );
+
               return (
-                <Link
-                  key={item.key}
-                  href={item.path}
-                  className={`flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                    path.startsWith(item.path)
-                      ? "bg-primary text-white"
-                      : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"
-                  }`}
-                >
-                  <item.icon size={18} />
-                  <span>{item.label}</span>
-                </Link>
+                <div key={item.key}>
+                  <button
+                    onClick={() => toggleGroup(item.label)}
+                    title={!expanded ? item.label : undefined}
+                    className={navCls(isActive)}
+                    style={{
+                      width: "100%",
+                      gap: expanded ? 10 : 0,
+                      padding: expanded ? "9px 10px" : "9px 0",
+                      justifyContent: expanded ? "flex-start" : "center",
+                    }}
+                  >
+                    <span className="flex items-center justify-center flex-shrink-0 w-[18px]">
+                      <Icon size={16} />
+                    </span>
+                    {expanded && (
+                      <>
+                        <span className="flex-1 text-left whitespace-nowrap overflow-hidden">
+                          {item.label}
+                        </span>
+                        <ChevronDown
+                          size={13}
+                          className={`text-[var(--xp-text-3)] transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
+                        />
+                      </>
+                    )}
+                  </button>
+
+                  {/* Children list */}
+                  {isOpen && expanded && (
+                    <div className="pl-3 mt-0.5 space-y-0.5">
+                      {item.children.map((child) => {
+                        const ChildIcon = child.icon;
+
+                        // ── Sub-group ─────────────────────────────
+                        if (child.children && child.children.length > 0) {
+                          const subOpen = openSubGroups.includes(child.label);
+                          const subActive = child.children.some((sc) =>
+                            path.startsWith(sc.path),
+                          );
+
+                          return (
+                            <div key={child.key}>
+                              <button
+                                onClick={() => toggleSubGroup(child.label)}
+                                className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-150 ${
+                                  subActive
+                                    ? "text-[var(--xp-primary-fg)] bg-[var(--xp-primary-bg)]"
+                                    : "text-[var(--xp-text-2)] hover:text-[var(--xp-text-1)] hover:bg-[var(--xp-surface-hi)]"
+                                }`}
+                              >
+                                <ChildIcon
+                                  size={12}
+                                  className="flex-shrink-0"
+                                />
+                                <span className="flex-1 text-left whitespace-nowrap overflow-hidden">
+                                  {child.label}
+                                </span>
+                                <ChevronDown
+                                  size={11}
+                                  className={`text-[var(--xp-text-3)] transition-transform duration-200 ${subOpen ? "rotate-180" : ""}`}
+                                />
+                              </button>
+
+                              {subOpen && (
+                                <div className="pl-4 mt-0.5 space-y-0.5">
+                                  {child.children.map((sub) => {
+                                    const subActive = path.startsWith(sub.path);
+                                    return (
+                                      <Link
+                                        key={sub.key}
+                                        href={sub.path}
+                                        className={subChildCls(subActive)}
+                                      >
+                                        <Minus
+                                          size={8}
+                                          className="text-[var(--xp-border-dim)] flex-shrink-0"
+                                        />
+                                        <span className="whitespace-nowrap overflow-hidden">
+                                          {sub.label}
+                                        </span>
+                                      </Link>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        }
+
+                        // ── Regular child link ────────────────────
+                        const ca =
+                          child.path !== "#" && path.startsWith(child.path);
+                        return (
+                          <Link
+                            key={child.key}
+                            href={child.path}
+                            className={childCls(ca)}
+                          >
+                            <Minus
+                              size={10}
+                              className="text-[var(--xp-border-dim)] flex-shrink-0"
+                            />
+                            <span className="whitespace-nowrap overflow-hidden">
+                              {child.label}
+                            </span>
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               );
             }
 
-            // ── Group with children ───────────────────────────
-            const isOpen = openGroups.includes(item.label);
-            const isActive = item.children.some(
-              (c) =>
-                path.startsWith(c.path) ||
-                c.children?.some((sc) => path.startsWith(sc.path)),
-            );
-
+            // ── Top-level link ────────────────────────────────────
+            const isActive =
+              path === item.path ||
+              (item.path !== "/" && path.startsWith(item.path));
             return (
-              <div key={item.key}>
-                <button
-                  onClick={() => toggleGroup(item.label)}
-                  className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                    isActive
-                      ? "text-primary dark:text-primary"
-                      : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"
-                  }`}
-                >
-                  <item.icon size={18} />
-                  <span className="flex-1 text-left">{item.label}</span>
-                  <ChevronDown
-                    size={16}
-                    className={`transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
-                  />
-                </button>
-
-                <div
-                  className={`overflow-hidden transition-all duration-200 ${
-                    isOpen ? "max-h-[2000px] opacity-100" : "max-h-0 opacity-0"
-                  }`}
-                >
-                  <div className="ml-4 mt-0.5 space-y-0.5 border-l border-gray-200 dark:border-gray-700 pl-3">
-                    {item.children.map((child) => {
-                      // ── Sub-group (has its own children) ─────
-                      if (child.children && child.children.length > 0) {
-                        const subOpen = openSubGroups.includes(child.label);
-                        const subActive = child.children.some((sc) =>
-                          path.startsWith(sc.path),
-                        );
-
-                        return (
-                          <div key={child.key}>
-                            <button
-                              onClick={() => toggleSubGroup(child.label)}
-                              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                                subActive
-                                  ? "text-primary dark:text-primary"
-                                  : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"
-                              }`}
-                            >
-                              <child.icon size={15} />
-                              <span className="flex-1 text-left">
-                                {child.label}
-                              </span>
-                              <ChevronDown
-                                size={14}
-                                className={`transition-transform duration-200 ${subOpen ? "rotate-180" : ""}`}
-                              />
-                            </button>
-
-                            <div
-                              className={`overflow-hidden transition-all duration-200 ${
-                                subOpen
-                                  ? "max-h-[1000px] opacity-100"
-                                  : "max-h-0 opacity-0"
-                              }`}
-                            >
-                              <div className="ml-4 mt-0.5 space-y-0.5 border-l border-gray-200 dark:border-gray-700 pl-3">
-                                {child.children.map((sub) => (
-                                  <Link
-                                    key={sub.key}
-                                    href={sub.path}
-                                    className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                                      path.startsWith(sub.path)
-                                        ? "bg-primary text-white"
-                                        : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"
-                                    }`}
-                                  >
-                                    <sub.icon size={14} />
-                                    <span>{sub.label}</span>
-                                  </Link>
-                                ))}
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      }
-
-                      // ── Regular child link ────────────────────
-                      return (
-                        <Link
-                          key={child.key}
-                          href={child.path}
-                          className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                            path.startsWith(child.path)
-                              ? "bg-primary text-white"
-                              : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"
-                          }`}
-                        >
-                          <child.icon size={15} />
-                          <span>{child.label}</span>
-                        </Link>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
+              <Link
+                key={item.key}
+                href={item.path}
+                title={!expanded ? item.label : undefined}
+                className={navCls(isActive)}
+                style={{
+                  gap: expanded ? 10 : 0,
+                  padding: expanded ? "9px 10px" : "9px 0",
+                  justifyContent: expanded ? "flex-start" : "center",
+                }}
+              >
+                <span className="flex items-center justify-center flex-shrink-0 w-[18px]">
+                  <Icon size={16} />
+                </span>
+                {expanded && (
+                  <span className="flex-1 whitespace-nowrap overflow-hidden">
+                    {item.label}
+                  </span>
+                )}
+              </Link>
             );
           })}
         </div>
       </div>
 
-      {/* Sign out */}
-      <div className="flex-shrink-0 p-3 border-t border-gray-200 dark:border-gray-700">
-        <button
-          onClick={handleSignOut}
-          className="flex w-full items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+      {/* User */}
+      <div className="border-t border-[var(--xp-border)] p-2">
+        <div
+          className="flex items-center rounded-md hover:bg-[var(--xp-surface-hi)] transition-colors cursor-pointer"
+          style={{
+            gap: expanded ? 10 : 0,
+            padding: expanded ? "8px 10px" : "8px 0",
+            justifyContent: expanded ? "flex-start" : "center",
+          }}
+          title={!expanded ? (user?.fullName ?? "Admin Portal") : undefined}
         >
-          <LogOut size={18} />
-          <span>Sign out</span>
-        </button>
+          <div
+            className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[11px] font-semibold flex-shrink-0"
+            style={{ background: "linear-gradient(135deg,#1d4ed8,#6d28d9)" }}
+          >
+            {initials(user?.fullName)}
+          </div>
+          {expanded && (
+            <>
+              <div className="flex-1 leading-tight overflow-hidden">
+                <div className="text-xs font-medium text-[var(--xp-text-1)] whitespace-nowrap overflow-hidden">
+                  {user?.fullName ?? "Admin Portal"}
+                </div>
+                <div className="text-[10px] text-[var(--xp-text-2)]">
+                  {user?.systemRole ?? "Administrator"}
+                </div>
+              </div>
+              <button
+                onClick={handleSignOut}
+                className="text-[var(--xp-text-2)] hover:text-red-400 hover:bg-red-500/10 p-1 rounded-md transition-colors flex-shrink-0"
+                aria-label="Sign out"
+              >
+                <LogOut size={13} />
+              </button>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );

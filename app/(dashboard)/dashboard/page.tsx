@@ -163,12 +163,12 @@ function DragWrap({ id, onStart, onEnter, onEnd, children }: {
 }
 
 // ─── Shared atoms ─────────────────────────────────────────────────────────────
-const Skel = ({ h='h-32' }: { h?: string }) => <div className={`animate-pulse rounded-2xl bg-gray-100 dark:bg-gray-800 ${h}`} />
+const Skel = ({ h='h-32' }: { h?: string }) => <div className={`animate-pulse rounded-2xl bg-gray-100 dark:!bg-[#122131] ${h}`} />
 const Grip = (p: React.HTMLAttributes<HTMLSpanElement>) => (
     <span {...p} className="cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-400 select-none touch-none shrink-0"><GripVertical size={15} /></span>
 )
 function WCard({ children, cls='' }: { children: React.ReactNode; cls?: string }) {
-    return <div className={`bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 overflow-hidden h-full ${cls}`}>{children}</div>
+    return <div className={`bg-white dark:bg-[#0d1c2d] rounded-2xl shadow-sm border border-gray-100 dark:border-[#273647] overflow-hidden h-full [.dark_&]:!bg-[#0d1c2d] ${cls}`}>{children}</div>
 }
 function WHead({ title, href, router, grip }: { title:string; href?:string; router:ReturnType<typeof useRouter>; grip?:React.HTMLAttributes<HTMLSpanElement> }) {
     return (
@@ -214,12 +214,12 @@ function KpiRow({ d, loading, router, grip }: { d:DashboardSummary|null; loading
         { label:'New This Month',  value:fmt(d?.newThisMonth??0),     sub:`${d?.onProbation??0} on probation`,                                  icon:<UserPlus size={20}/>,    color:'from-sky-400 to-cyan-500',      light:'bg-sky-50 text-sky-500',       href:'/employees' },
     ]
     return (
-        <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 p-5">
+        <div className="bg-white dark:bg-[#0d1c2d] rounded-2xl shadow-sm border border-gray-100 dark:border-[#273647] p-5 [.dark_&]:!bg-[#0d1c2d]">
             <div className="flex items-center gap-2 mb-4">{grip && <Grip {...grip} />}<span className="font-semibold text-gray-700 dark:text-gray-100 text-sm">Key Metrics</span></div>
             {loading ? <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">{Array.from({length:6}).map((_,i)=><Skel key={i} h="h-24"/>)}</div> : (
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
                     {cards.map(c=>(
-                        <div key={c.label} onClick={()=>c.href&&router.push(c.href)} className={`relative rounded-xl p-4 overflow-hidden group ${c.href?'cursor-pointer':''}`} style={{background:'linear-gradient(135deg,#f8faff 0%,#f0f4ff 100%)'}}>
+                        <div key={c.label} onClick={()=>c.href&&router.push(c.href)} className={`relative rounded-xl p-4 overflow-hidden group xp-metric-card-bg ${c.href?'cursor-pointer':''}`}>
                             <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${c.color}`}/>
                             <div className={`inline-flex p-2 rounded-lg mb-3 ${c.light}`}>{c.icon}</div>
                             <p className="text-2xl font-bold text-gray-800 dark:text-white leading-none">{c.value}</p>
@@ -263,7 +263,7 @@ function AttendanceWidget({ d, loading, router, grip }: { d:DashboardSummary|nul
                         </div>
                         <div className="mt-3 flex rounded-full overflow-hidden h-1.5 gap-px">
                             {segments.map(s=><div key={s.label} style={{width:`${Math.round((s.value/total)*100)}%`,background:s.color}}/>)}
-                            <div className="flex-1 bg-gray-100 dark:bg-gray-700"/>
+                            <div className="flex-1 bg-gray-100 dark:bg-[#1c2b3c]"/>
                         </div>
                     </>
                 )}
@@ -308,7 +308,7 @@ function PayrollRunWidget({ d, loading, router, grip }: { d:DashboardSummary|nul
                     <div className="text-center py-8 text-gray-300"><Banknote size={36} className="mx-auto mb-2"/><p className="text-sm">No completed run yet</p></div>
                 ) : (
                     <>
-                        <div className="rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 p-4 mb-4 text-white">
+                        <div className="rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 dark:from-indigo-950 dark:to-violet-950 dark:border dark:border-indigo-800/50 p-4 mb-4 text-white dark:text-indigo-200">
                             <p className="text-xs text-indigo-200 mb-1">Net Pay</p>
                             <p className="text-2xl font-bold">{fmtC(d.lastRunNetPay)}</p>
                             <p className="text-xs text-indigo-200 mt-1">{d.lastRunPeriod}</p>
@@ -337,13 +337,13 @@ function LoansWidget({ d, loading, router, grip }: { d:DashboardSummary|null; lo
             <div className="px-5 pb-5">
                 {loading ? <Skel h="h-40"/> : (
                     <>
-                        <div className="rounded-xl bg-gradient-to-br from-rose-400 to-pink-600 p-4 mb-4 text-white">
+                        <div className="rounded-xl bg-gradient-to-br from-rose-400 to-pink-600 dark:from-rose-950 dark:to-pink-950 dark:border dark:border-rose-800/50 p-4 mb-4 text-white dark:text-rose-200">
                             <p className="text-xs text-rose-200 mb-1">Total Outstanding</p>
                             <p className="text-2xl font-bold">{fmtC(d?.totalOutstanding??0)}</p>
                             <p className="text-xs text-rose-200 mt-1">Across all active loans</p>
                         </div>
                         <div className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 dark:bg-gray-800">
-                            <div className="p-2 bg-white dark:bg-gray-700 rounded-lg shadow-sm"><CreditCard size={16} className="text-rose-500"/></div>
+                            <div className="p-2 bg-white dark:bg-[#1c2b3c] rounded-lg shadow-sm"><CreditCard size={16} className="text-rose-500"/></div>
                             <div><p className="text-xs text-gray-400">Active Loans</p><p className="text-lg font-bold text-gray-800 dark:text-white">{fmt(d?.activeLoans??0)}</p></div>
                         </div>
                     </>
@@ -364,8 +364,8 @@ function PayrollTrendWidget({ trend, loading, router, grip }: { trend:PayrollTre
                     <ResponsiveContainer width="100%" height={210}>
                         <BarChart data={trend} margin={{top:4,right:4,left:0,bottom:0}} barCategoryGap="30%">
                             <defs><linearGradient id="barGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#6366f1"/><stop offset="100%" stopColor="#8b5cf6"/></linearGradient></defs>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false}/>
-                            <XAxis dataKey="monthLabel" tick={{fontSize:11,fill:'#9ca3af'}} axisLine={false} tickLine={false}/>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#273647" stroke="#f0f0f0" vertical={false}/>
+                            <XAxis dataKey="monthLabel" tick={{fill:"#8d90a0"}} axisLine={{stroke:"#273647"}} tickLine={false} tick={{fontSize:11,fill:'#9ca3af'}} axisLine={false} tickLine={false}/>
                             <YAxis tickFormatter={fmtS} tick={{fontSize:11,fill:'#9ca3af'}} axisLine={false} tickLine={false} width={68}/>
                             <Tooltip formatter={(v:number)=>[fmtC(v),'Net Pay']} contentStyle={{borderRadius:10,border:'none',boxShadow:'0 4px 20px rgba(0,0,0,0.1)',fontSize:12}} cursor={{fill:'rgba(99,102,241,0.06)'}}/>
                             <Bar dataKey="netPay" fill="url(#barGrad)" radius={[6,6,0,0]}/>
@@ -387,8 +387,8 @@ function AttTrendWidget({ trend, loading, router, grip }: { trend:AttTrend[]; lo
                 ) : (
                     <ResponsiveContainer width="100%" height={210}>
                         <LineChart data={trend} margin={{top:4,right:4,left:0,bottom:0}}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false}/>
-                            <XAxis dataKey="dayLabel" tick={{fontSize:10,fill:'#9ca3af'}} axisLine={false} tickLine={false} interval={4}/>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#273647" stroke="#f0f0f0" vertical={false}/>
+                            <XAxis dataKey="dayLabel" tick={{fill:"#8d90a0"}} axisLine={{stroke:"#273647"}} tickLine={false} tick={{fontSize:10,fill:'#9ca3af'}} axisLine={false} tickLine={false} interval={4}/>
                             <YAxis tick={{fontSize:11,fill:'#9ca3af'}} axisLine={false} tickLine={false}/>
                             <Tooltip contentStyle={{borderRadius:10,border:'none',boxShadow:'0 4px 20px rgba(0,0,0,0.1)',fontSize:12}}/>
                             <Line type="monotone" dataKey="presentCt" name="Present" stroke="#10b981" strokeWidth={2.5} dot={false} activeDot={{r:4}}/>
@@ -448,9 +448,9 @@ function CalendarWidget({ events, year, month, onNavigate, loading, router, grip
             <div className="flex items-center justify-between px-5 pt-5 pb-3">
                 <div className="flex items-center gap-2">{grip&&<Grip {...grip}/>}<span className="font-semibold text-gray-700 dark:text-gray-100 text-sm">Calendar</span></div>
                 <div className="flex items-center gap-1">
-                    <button onClick={prev} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500"><ChevronLeft size={15}/></button>
+                    <button onClick={prev} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:!bg-[#122131] text-gray-500"><ChevronLeft size={15}/></button>
                     <span className="text-sm font-semibold text-gray-700 dark:text-gray-200 min-w-[130px] text-center">{monthName}</span>
-                    <button onClick={next} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500"><ChevronRight size={15}/></button>
+                    <button onClick={next} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:!bg-[#122131] text-gray-500"><ChevronRight size={15}/></button>
                 </div>
             </div>
             <div className="px-4 pb-2">
@@ -462,7 +462,7 @@ function CalendarWidget({ events, year, month, onNavigate, loading, router, grip
                             const dayEvents=eventMap.get(d)??[]; const hasH=dayEvents.some(e=>e.eventType==='holiday'); const hasL=dayEvents.some(e=>e.eventType==='leave'); const lCount=dayEvents.filter(e=>e.eventType==='leave').length
                             const isTod=isToday(d); const isSel=selected===d; const dow=(firstDay+d-1)%7; const isWe=dow===0||dow===6; const hasEv=dayEvents.length>0
                             return (
-                                <div key={d} onClick={()=>setSelected(hasEv?(isSel?null:d):null)} className={['relative flex flex-col items-center pt-1.5 pb-2 rounded-xl transition-all text-sm select-none',hasEv?'cursor-pointer':'',isTod?'bg-indigo-600 text-white font-bold shadow-md shadow-indigo-200':'',isSel&&!isTod?'bg-indigo-50 dark:bg-indigo-900/30 ring-2 ring-indigo-300':'',!isTod&&!isSel&&isWe?'text-red-400':'',!isTod&&!isSel&&!isWe?'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800/40':''].filter(Boolean).join(' ')}>
+                                <div key={d} onClick={()=>setSelected(hasEv?(isSel?null:d):null)} className={['relative flex flex-col items-center pt-1.5 pb-2 rounded-xl transition-all text-sm select-none',hasEv?'cursor-pointer':'',isTod?'bg-indigo-600 text-white font-bold shadow-md shadow-indigo-200':'',isSel&&!isTod?'bg-indigo-50 dark:bg-indigo-900/30 ring-2 ring-indigo-300':'',!isTod&&!isSel&&isWe?'text-red-400':'',!isTod&&!isSel&&!isWe?'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:!bg-[#122131]/40':''].filter(Boolean).join(' ')}>
                                     <span className="leading-none">{d}</span>
                                     <div className="flex gap-0.5 mt-1 h-1.5 items-center">
                                         {hasH&&<span className={`w-1.5 h-1.5 rounded-full ${isTod?'bg-yellow-300':'bg-amber-400'}`}/>}
@@ -515,8 +515,8 @@ function DeptHeadcountWidget({ data, loading, router, grip }: { data:DeptHeadcou
                 ) : (
                     <ResponsiveContainer width="100%" height={Math.max(200, data.length * 36)}>
                         <BarChart data={data} layout="vertical" margin={{top:0,right:48,left:0,bottom:0}} barCategoryGap="25%">
-                            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" horizontal={false}/>
-                            <XAxis type="number" tick={{fontSize:11,fill:'#9ca3af'}} axisLine={false} tickLine={false}/>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#273647" stroke="#f0f0f0" horizontal={false}/>
+                            <XAxis type="number" tick={{fill:"#8d90a0"}} axisLine={{stroke:"#273647"}} tickLine={false} tick={{fontSize:11,fill:'#9ca3af'}} axisLine={false} tickLine={false}/>
                             <YAxis type="category" dataKey="departmentName" tick={{fontSize:11,fill:'#6b7280'}} axisLine={false} tickLine={false} width={110}/>
                             <Tooltip contentStyle={{borderRadius:10,border:'none',boxShadow:'0 4px 20px rgba(0,0,0,0.1)',fontSize:12}} cursor={{fill:'rgba(99,102,241,0.06)'}}/>
                             <Bar dataKey="active" name="Active" fill="#6366f1" radius={[0,6,6,0]} label={{position:'right',fontSize:11,fill:'#6366f1',fontWeight:600}}/>
@@ -589,7 +589,7 @@ function BirthdaysWidget({ data, loading, router, grip }: { data:UpcomingBirthda
                     <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
                         {data.map(b=>(
                             <div key={b.employeeId} onClick={()=>router.push(`/employees/${b.employeeId}`)}
-                                className="flex items-center justify-between p-3 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800/40 cursor-pointer transition-colors group">
+                                className="flex items-center justify-between p-3 rounded-xl hover:bg-gray-50 dark:hover:!bg-[#122131]/40 cursor-pointer transition-colors group">
                                 <div className="flex items-center gap-3 min-w-0">
                                     <div className="relative">
                                         <Avatar name={b.fullName} color="pink"/>
@@ -633,7 +633,7 @@ function AnniversariesWidget({ data, loading, router, grip }: { data:WorkAnniver
                             const m = milestoneColor(a.years)
                             return (
                                 <div key={a.employeeId} onClick={()=>router.push(`/employees/${a.employeeId}`)}
-                                    className="flex items-center justify-between p-3 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800/40 cursor-pointer transition-colors group">
+                                    className="flex items-center justify-between p-3 rounded-xl hover:bg-gray-50 dark:hover:!bg-[#122131]/40 cursor-pointer transition-colors group">
                                     <div className="flex items-center gap-3 min-w-0">
                                         <Avatar name={a.fullName} color="indigo"/>
                                         <div className="min-w-0">
@@ -671,12 +671,12 @@ function SettingsPanel({ prefs, onToggle, onResize, onClose }: { prefs:Prefs; on
             <div className="relative z-10 w-80 bg-white dark:bg-gray-900 h-full shadow-2xl flex flex-col">
                 <div className="flex items-center justify-between p-4 border-b border-gray-100 dark:border-gray-800">
                     <div><p className="font-semibold text-gray-800 dark:text-white text-sm">Customise Dashboard</p><p className="text-xs text-gray-400 mt-0.5">Toggle, resize, and drag to reorder</p></div>
-                    <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500"><X size={16}/></button>
+                    <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:!bg-[#122131] text-gray-500"><X size={16}/></button>
                 </div>
                 <div className="flex-1 overflow-y-auto p-4 space-y-2">
                     {prefs.order.map(id=>(
                         <div key={id} className="rounded-xl border border-gray-100 dark:border-gray-800 overflow-hidden">
-                            <div className="flex items-center justify-between px-3 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-800/40">
+                            <div className="flex items-center justify-between px-3 py-2.5 hover:bg-gray-50 dark:hover:!bg-[#122131]/40">
                                 <div className="flex items-center gap-2"><GripVertical size={14} className="text-gray-300"/><span className="text-sm text-gray-700 dark:text-gray-200">{WIDGET_LABELS[id]}</span></div>
                                 <button onClick={()=>onToggle(id)} className={`p-1.5 rounded-lg transition-colors ${prefs.visible[id]?'text-indigo-500 bg-indigo-50 dark:bg-indigo-900/30':'text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}>
                                     {prefs.visible[id]?<Eye size={15}/>:<EyeOff size={15}/>}
@@ -685,7 +685,7 @@ function SettingsPanel({ prefs, onToggle, onResize, onClose }: { prefs:Prefs; on
                             {prefs.visible[id]&&(
                                 <div className="flex border-t border-gray-50 dark:border-gray-800">
                                     {SIZE_OPTS.map(opt=>(
-                                        <button key={opt.size} onClick={()=>onResize(id,opt.size)} className={['flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium transition-colors',prefs.sizes[id]===opt.size?'bg-indigo-500 text-white':'text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800/60 hover:text-gray-600'].join(' ')}>
+                                        <button key={opt.size} onClick={()=>onResize(id,opt.size)} className={['flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium transition-colors',prefs.sizes[id]===opt.size?'bg-indigo-500 text-white':'text-gray-400 hover:bg-gray-50 dark:hover:!bg-[#122131]/60 hover:text-gray-600'].join(' ')}>
                                             {opt.icon} {opt.label}
                                         </button>
                                     ))}
@@ -789,7 +789,7 @@ export default function DashboardPage() {
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
             {/* Welcome banner */}
-            <div className="relative overflow-hidden bg-gradient-to-br from-indigo-600 via-indigo-700 to-violet-800 px-8 py-8">
+            <div className="relative overflow-hidden bg-gradient-to-br from-indigo-600 via-indigo-700 to-violet-800 dark:from-indigo-950 dark:via-indigo-900 dark:to-violet-950 px-8 py-8">
                 <div className="absolute -top-10 -right-10 w-64 h-64 rounded-full bg-white/5"/>
                 <div className="absolute top-4 right-32 w-32 h-32 rounded-full bg-white/5"/>
                 <div className="absolute -bottom-16 right-10 w-48 h-48 rounded-full bg-white/5"/>

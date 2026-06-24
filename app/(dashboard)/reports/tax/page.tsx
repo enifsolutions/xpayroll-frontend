@@ -58,23 +58,27 @@ const REPORTS = [
 ];
 
 export default function TaxReportsHubPage() {
-  usePermission('Tax.Reports.View');
+  useRequirePermission("Tax.Reports.View");
 
   const router     = useRouter();
-  const userId     = useAuthStore((s) => s.user?.userId ?? '1');
+  const userId = useAuthStore((s) => s.user?.userId);
   const yearOptions = getYearOptions();
 
   const [selectedYear, setSelectedYear] = useState(yearOptions[0]);
   const [generating,   setGenerating]   = useState(false);
 
   async function generate() {
+    if (!userId) return; // guard — user not loaded yet
     setGenerating(true);
     try {
-      const startYear = parseInt(selectedYear.split('/')[0]);
-      await api.post('tax-reports/generate', { year: startYear, userId: parseInt(userId) });
+      const startYear = parseInt(selectedYear.split("/")[0]);
+      await api.post("tax-reports/generate", {
+        year: startYear,
+        userId: parseInt(userId),
+      });
       showSuccess(`Tax summary generated for ${selectedYear}.`);
     } catch {
-      showError('Failed to generate tax summary.');
+      showError("Failed to generate tax summary.");
     } finally {
       setGenerating(false);
     }

@@ -53,6 +53,10 @@ export const Permissions = {
       View: "MasterData.DeductionTypes.View",
       Manage: "MasterData.DeductionTypes.Manage",
     },
+    LeaveTypes: {
+      View: "MasterData.LeaveTypes.View",
+      Manage: "MasterData.LeaveTypes.Manage",
+    },
   },
   HR: {
     Employee: {

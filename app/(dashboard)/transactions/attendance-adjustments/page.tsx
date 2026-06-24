@@ -1,7 +1,16 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { CheckCircle, XCircle, Eye } from "lucide-react";
+import {
+  CheckCircle,
+  XCircle,
+  Eye,
+  Clock,
+  ListChecks,
+  ThumbsUp,
+  ThumbsDown,
+  Search,
+} from "lucide-react";
 import { useRequirePermission } from "@/hooks/useRequirePermission";
 import { usePermission } from "@/hooks/usePermission";
 import { useAuthStore } from "@/store/authStore";
@@ -15,6 +24,97 @@ import type { AttendanceAdjustmentRequest } from "@/types/attendance-log.types";
 
 const STATUSES = ["Pending", "Approved", "Rejected"];
 
+/* ── Avatar helpers (same pattern as Employees page) ── */
+const AVATAR_COLORS = [
+  "bg-blue-500",
+  "bg-violet-500",
+  "bg-rose-500",
+  "bg-emerald-500",
+  "bg-amber-500",
+  "bg-cyan-500",
+  "bg-fuchsia-500",
+  "bg-orange-500",
+];
+
+function getAvatarColor(name: string): string {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+}
+
+function getInitials(name: string): string {
+  const parts = name.trim().split(" ").filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0][0].toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+interface EmployeeAvatarProps {
+  name: string;
+  profilePictureUrl?: string | null;
+  size?: "sm" | "md";
+}
+
+function EmployeeAvatar({ name, profilePictureUrl, size = "sm" }: EmployeeAvatarProps) {
+  const [imgError, setImgError] = useState(false);
+  const dimension = size === "md" ? "w-9 h-9 text-sm" : "w-8 h-8 text-xs";
+  const color = getAvatarColor(name);
+
+  if (profilePictureUrl && !imgError) {
+    const src = profilePictureUrl.startsWith("http")
+      ? profilePictureUrl
+      : `https://192.168.8.135:7208${profilePictureUrl}`;
+    return (
+      <img
+        src={src}
+        alt={name}
+        onError={() => setImgError(true)}
+        className={`${dimension} rounded-full object-cover flex-shrink-0`}
+      />
+    );
+  }
+
+  return (
+    <div
+      className={`${dimension} ${color} rounded-full flex items-center justify-center font-semibold text-white flex-shrink-0`}
+    >
+      {getInitials(name)}
+    </div>
+  );
+}
+
+/* ── KPI Card ── */
+interface StatCardProps {
+  label: string;
+  value: number;
+  icon: React.ReactNode;
+  iconBg: string;
+  sub?: React.ReactNode;
+}
+
+function StatCard({ label, value, icon, iconBg, sub }: StatCardProps) {
+  return (
+    <div className="card">
+      <div className="card-body">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
+              {label}
+            </p>
+            <p className="text-2xl font-bold">{value.toLocaleString()}</p>
+            {sub && <div className="mt-1 text-xs text-gray-400">{sub}</div>}
+          </div>
+          <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${iconBg}`}>
+            {icon}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function AttendanceAdjustmentsPage() {
   useRequirePermission("Attendance.Adjustment.View");
   const canApprove = usePermission("Attendance.Adjustment.Approve");
@@ -24,6 +124,7 @@ export default function AttendanceAdjustmentsPage() {
   const [items, setItems] = useState<AttendanceAdjustmentRequest[]>([]);
   const [loading, setLoading] = useState(false);
   const [statusFilter, setStatusFilter] = useState("Pending");
+  const [search, setSearch] = useState("");
 
   const [detailOpen, setDetailOpen] = useState(false);
   const [selected, setSelected] = useState<AttendanceAdjustmentRequest | null>(
@@ -69,6 +170,21 @@ export default function AttendanceAdjustmentsPage() {
     initialized.current = true;
     load();
   }, []);
+
+  /* ── KPI counts derived from current loaded items ── */
+  const totalCount = items.length;
+  const pendingCount = items.filter((i) => i.status === "Pending").length;
+  const approvedCount = items.filter((i) => i.status === "Approved").length;
+  const rejectedCount = items.filter((i) => i.status === "Rejected").length;
+
+  /* ── Client-side search filter ── */
+  const filtered = search.trim()
+    ? items.filter(
+        (i) =>
+          i.employeeName.toLowerCase().includes(search.toLowerCase()) ||
+          i.employeeCode.toLowerCase().includes(search.toLowerCase()),
+      )
+    : items;
 
   const openDetail = (item: AttendanceAdjustmentRequest) => {
     setSelected(item);
@@ -148,11 +264,6 @@ export default function AttendanceAdjustmentsPage() {
     });
   };
 
-  const toUTC = (localDt: string | null): string | null => {
-    if (!localDt) return null;
-    return new Date(localDt).toISOString();
-  };
-
   return (
     <div>
       {/* Header */}
@@ -167,10 +278,77 @@ export default function AttendanceAdjustmentsPage() {
         </div>
       </div>
 
+      {/* KPI Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-5">
+        <StatCard
+          label="Total Requests"
+          value={totalCount}
+          iconBg="bg-blue-50 dark:bg-blue-900/30"
+          icon={<ListChecks size={20} className="text-blue-500" />}
+          sub={<span className="text-gray-400">In selected range</span>}
+        />
+        <StatCard
+          label="Pending Review"
+          value={pendingCount}
+          iconBg="bg-amber-50 dark:bg-amber-900/30"
+          icon={<Clock size={20} className="text-amber-500" />}
+          sub={
+            pendingCount > 0 ? (
+              <span className="text-amber-500 font-medium">
+                Requires action
+              </span>
+            ) : (
+              <span className="text-emerald-500 font-medium">All clear</span>
+            )
+          }
+        />
+        <StatCard
+          label="Approved"
+          value={approvedCount}
+          iconBg="bg-emerald-50 dark:bg-emerald-900/30"
+          icon={<ThumbsUp size={20} className="text-emerald-500" />}
+          sub={
+            totalCount > 0 ? (
+              <span className="text-gray-400">
+                {Math.round((approvedCount / totalCount) * 100)}% approval rate
+              </span>
+            ) : null
+          }
+        />
+        <StatCard
+          label="Rejected"
+          value={rejectedCount}
+          iconBg="bg-rose-50 dark:bg-rose-900/30"
+          icon={<ThumbsDown size={20} className="text-rose-500" />}
+          sub={
+            totalCount > 0 ? (
+              <span className="text-gray-400">
+                {Math.round((rejectedCount / totalCount) * 100)}% rejection rate
+              </span>
+            ) : null
+          }
+        />
+      </div>
+
       {/* Filters */}
       <div className="card mb-4">
         <div className="card-body">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+            {/* Search */}
+            <div className="relative">
+              <Search
+                size={15}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+              />
+              <input
+                type="text"
+                className="input input-md w-full pl-9"
+                placeholder="Search employee..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+            {/* Status */}
             <select
               className="input input-md w-full"
               value={statusFilter}
@@ -194,7 +372,7 @@ export default function AttendanceAdjustmentsPage() {
               onChange={(e) => setDateTo(e.target.value)}
             />
             <Button variant="solid" color="primary" onClick={load}>
-              Search
+              Apply Filters
             </Button>
           </div>
         </div>
@@ -222,19 +400,31 @@ export default function AttendanceAdjustmentsPage() {
                 </tr>
               </thead>
               <tbody>
-                {items.length === 0 ? (
+                {filtered.length === 0 ? (
                   <tr>
                     <td colSpan={8} className="text-center py-10 text-gray-400">
-                      No adjustment requests found.
+                      {search
+                        ? "No results match your search."
+                        : "No adjustment requests found."}
                     </td>
                   </tr>
                 ) : (
-                  items.map((item) => (
+                  filtered.map((item) => (
                     <tr key={item.id}>
                       <td>
-                        <div className="font-medium">{item.employeeName}</div>
-                        <div className="text-xs text-gray-400">
-                          {item.employeeCode}
+                        <div className="flex items-center gap-2.5">
+                          <EmployeeAvatar
+                            name={item.employeeName}
+                            profilePictureUrl={(item as any).profilePictureUrl}
+                          />
+                          <div>
+                            <div className="font-medium leading-tight">
+                              {item.employeeName}
+                            </div>
+                            <div className="text-xs text-gray-400">
+                              {item.employeeCode}
+                            </div>
+                          </div>
                         </div>
                       </td>
                       <td>{item.workDate}</td>
@@ -315,12 +505,27 @@ export default function AttendanceAdjustmentsPage() {
       >
         {selected && (
           <>
-            <h5 className="mb-1 font-semibold">
-              Adjustment Request — {selected.employeeName}
-            </h5>
-            <p className="text-sm text-gray-400 mb-5">
-              {selected.workDate} · {selected.employeeCode}
-            </p>
+            {/* Dialog header with employee avatar */}
+            <div className="flex items-center gap-3 mb-5">
+              <EmployeeAvatar
+                name={selected.employeeName}
+                profilePictureUrl={(selected as any).profilePictureUrl}
+                size="md"
+              />
+              <div>
+                <h5 className="font-semibold leading-tight">
+                  {selected.employeeName}
+                </h5>
+                <p className="text-sm text-gray-400">
+                  {selected.employeeCode} · {selected.workDate}
+                </p>
+              </div>
+              <div className="ml-auto">
+                <span className={statusBadge(selected.status)}>
+                  {selected.status}
+                </span>
+              </div>
+            </div>
 
             {/* Comparison table */}
             <div className="grid grid-cols-2 gap-4 mb-5">
@@ -339,9 +544,6 @@ export default function AttendanceAdjustmentsPage() {
                   <div className="flex justify-between">
                     <span className="text-gray-500">Check In</span>
                     <span>{fmtTime(selected.oldCheckIn)}</span>
-                  </div>
-                  <div className="text-xs text-gray-400">
-                    {selected.oldCheckIn}
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-500">Check Out</span>
@@ -444,7 +646,10 @@ export default function AttendanceAdjustmentsPage() {
                     variant="solid"
                     color="danger"
                     loading={saving}
-                    onClick={() => setConfirmAction("REJECT")}
+                    onClick={() => {
+                      setDetailOpen(false);
+                      setConfirmAction("REJECT");
+                    }}
                   >
                     Reject
                   </Button>
@@ -452,7 +657,10 @@ export default function AttendanceAdjustmentsPage() {
                     variant="solid"
                     color="primary"
                     loading={saving}
-                    onClick={() => setConfirmAction("APPROVE")}
+                    onClick={() => {
+                      setDetailOpen(false);
+                      setConfirmAction("APPROVE");
+                    }}
                   >
                     Approve
                   </Button>

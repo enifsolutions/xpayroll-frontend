@@ -36,42 +36,4 @@ html {
   .xp-badge-neutral {
     @apply bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300;
   }
-
-
-  /* ── Entity avatar (rounded square, like app icons) ── */
-  .xp-avatar {
-    @apply inline-flex items-center justify-center
-           rounded-xl font-bold select-none flex-shrink-0;
-  }
-
- 
-
-  .xp-avatar-sm  { @apply w-8  h-8  text-xs  rounded-lg; }
-  .xp-avatar-md  { @apply w-10 h-10 text-sm  rounded-xl; }
-  .xp-avatar-lg  { @apply w-12 h-12 text-base rounded-2xl; }
-
-  /* Colour variants */
-  .xp-avatar-violet  { @apply bg-violet-500  text-white; }
-  .xp-avatar-blue    { @apply bg-blue-500    text-white; }
-  .xp-avatar-emerald { @apply bg-emerald-500 text-white; }
-  .xp-avatar-amber   { @apply bg-amber-500   text-white; }
-  .xp-avatar-rose    { @apply bg-rose-500    text-white; }
-  .xp-avatar-cyan    { @apply bg-cyan-500    text-white; }
-  .xp-avatar-pink    { @apply bg-pink-500    text-white; }
-  .xp-avatar-indigo  { @apply bg-indigo-500  text-white; }
-
-  
-}
-
-.table-default tbody tr td {
-  color: rgb(31 41 55);
-}
-
-.dark .table-default tbody tr td {
-  color: rgb(229 231 235);
-}
-
-/* restore badge colours — don't let td rule bleed into spans */
-.table-default tbody tr td .xp-badge {
-  color: revert;
 }

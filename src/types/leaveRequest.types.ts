@@ -9,6 +9,7 @@ export interface LeaveRequest {
   id: string;
   employeeId: string;
   employeeName: string;
+  profilePictureUrl?: string | null;
   employeeCode: string;
   department: string;
   leaveTypeId: string;
