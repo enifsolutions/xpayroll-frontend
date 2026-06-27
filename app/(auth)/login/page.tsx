@@ -94,7 +94,7 @@ function ShadowInput({
     const input = document.createElement('input');
     input.type        = type;
     input.placeholder = placeholder;
-    input.autocomplete = autoComplete;
+    input.autocomplete = autoComplete as AutoFill;
     input.required    = required;
     input.value       = value;
 
