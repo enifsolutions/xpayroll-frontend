@@ -30,17 +30,21 @@ export function Sidebar() {
   // Sidebar is expanded if pinned OR hovered
   const expanded = pinned || hovered;
 
-  // Notify layout whenever expanded state changes
-  useEffect(() => {
-    window.dispatchEvent(
-      new CustomEvent("xp:sidebar", { detail: { expanded } }),
-    );
-  }, [expanded]);
-
-  // Restore pin state
+  // Restore pin state on mount
   useEffect(() => {
     if (localStorage.getItem(PIN_KEY) === "true") setPinned(true);
   }, []);
+
+  // Notify layout whenever expanded state changes
+  // setTimeout(0) defers to next tick — ensures layout listener is registered first (prod build)
+  useEffect(() => {
+    const t = setTimeout(() => {
+      window.dispatchEvent(
+        new CustomEvent("xp:sidebar", { detail: { expanded } }),
+      );
+    }, 0);
+    return () => clearTimeout(t);
+  }, [expanded]);
 
   // Auto-open the group that contains the current path
   useEffect(() => {
