@@ -74,18 +74,18 @@ jobs:
           port: 22
           script: |
             set -e
-            cd /opt/xpayroll
+            cd /opt/xpayroll/app
 
             echo "=== Pulling latest frontend image ==="
             echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u ${{ secrets.GHCR_USER }} --password-stdin
-            docker compose pull frontend
+            docker compose -f docker-compose.prod.yml pull frontend
 
             echo "=== Recreating frontend container ==="
-            docker compose up -d --no-deps --force-recreate frontend
+            docker compose -f docker-compose.prod.yml up -d --no-deps --force-recreate frontend
 
             echo "=== Waiting for health check ==="
             sleep 8
-            docker compose ps frontend
+            docker compose -f docker-compose.prod.yml ps frontend
 
             echo "=== Pruning old images ==="
             docker image prune -f --filter "label=org.opencontainers.image.source=https://github.com/enifsolutions/xpayroll-frontend"
