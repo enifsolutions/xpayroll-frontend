@@ -364,7 +364,7 @@ function PayrollTrendWidget({ trend, loading, router, grip }: { trend:PayrollTre
                     <ResponsiveContainer width="100%" height={210}>
                         <BarChart data={trend} margin={{top:4,right:4,left:0,bottom:0}} barCategoryGap="30%">
                             <defs><linearGradient id="barGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#6366f1"/><stop offset="100%" stopColor="#8b5cf6"/></linearGradient></defs>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#273647" stroke="#f0f0f0" vertical={false}/>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false}/>
                             <XAxis dataKey="monthLabel" tick={{fill:"#8d90a0"}} axisLine={{stroke:"#273647"}} tickLine={false} tick={{fontSize:11,fill:'#9ca3af'}} axisLine={false} tickLine={false}/>
                             <YAxis tickFormatter={fmtS} tick={{fontSize:11,fill:'#9ca3af'}} axisLine={false} tickLine={false} width={68}/>
                             <Tooltip formatter={(v:number)=>[fmtC(v),'Net Pay']} contentStyle={{borderRadius:10,border:'none',boxShadow:'0 4px 20px rgba(0,0,0,0.1)',fontSize:12}} cursor={{fill:'rgba(99,102,241,0.06)'}}/>
@@ -387,7 +387,7 @@ function AttTrendWidget({ trend, loading, router, grip }: { trend:AttTrend[]; lo
                 ) : (
                     <ResponsiveContainer width="100%" height={210}>
                         <LineChart data={trend} margin={{top:4,right:4,left:0,bottom:0}}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#273647" stroke="#f0f0f0" vertical={false}/>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false}/>
                             <XAxis dataKey="dayLabel" tick={{fill:"#8d90a0"}} axisLine={{stroke:"#273647"}} tickLine={false} tick={{fontSize:10,fill:'#9ca3af'}} axisLine={false} tickLine={false} interval={4}/>
                             <YAxis tick={{fontSize:11,fill:'#9ca3af'}} axisLine={false} tickLine={false}/>
                             <Tooltip contentStyle={{borderRadius:10,border:'none',boxShadow:'0 4px 20px rgba(0,0,0,0.1)',fontSize:12}}/>
@@ -515,7 +515,7 @@ function DeptHeadcountWidget({ data, loading, router, grip }: { data:DeptHeadcou
                 ) : (
                     <ResponsiveContainer width="100%" height={Math.max(200, data.length * 36)}>
                         <BarChart data={data} layout="vertical" margin={{top:0,right:48,left:0,bottom:0}} barCategoryGap="25%">
-                            <CartesianGrid strokeDasharray="3 3" stroke="#273647" stroke="#f0f0f0" horizontal={false}/>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" horizontal={false}/>
                             <XAxis type="number" tick={{fill:"#8d90a0"}} axisLine={{stroke:"#273647"}} tickLine={false} tick={{fontSize:11,fill:'#9ca3af'}} axisLine={false} tickLine={false}/>
                             <YAxis type="category" dataKey="departmentName" tick={{fontSize:11,fill:'#6b7280'}} axisLine={false} tickLine={false} width={110}/>
                             <Tooltip contentStyle={{borderRadius:10,border:'none',boxShadow:'0 4px 20px rgba(0,0,0,0.1)',fontSize:12}} cursor={{fill:'rgba(99,102,241,0.06)'}}/>
