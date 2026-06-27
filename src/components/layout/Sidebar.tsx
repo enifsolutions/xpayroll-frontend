@@ -30,6 +30,13 @@ export function Sidebar() {
   // Sidebar is expanded if pinned OR hovered
   const expanded = pinned || hovered;
 
+  // Notify layout whenever expanded state changes
+  useEffect(() => {
+    window.dispatchEvent(
+      new CustomEvent("xp:sidebar", { detail: { expanded } }),
+    );
+  }, [expanded]);
+
   // Restore pin state
   useEffect(() => {
     if (localStorage.getItem(PIN_KEY) === "true") setPinned(true);

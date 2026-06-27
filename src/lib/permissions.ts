@@ -57,6 +57,12 @@ export const Permissions = {
       View: "MasterData.LeaveTypes.View",
       Manage: "MasterData.LeaveTypes.Manage",
     },
+    LeaveTemplate: {
+      View: "MasterData.LeaveTemplate.View",
+      Create: "MasterData.LeaveTemplate.Create",
+      Edit: "MasterData.LeaveTemplate.Edit",
+      Delete: "MasterData.LeaveTemplate.Delete",
+    },
   },
   HR: {
     Employee: {

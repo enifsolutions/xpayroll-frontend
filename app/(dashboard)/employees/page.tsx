@@ -56,6 +56,12 @@ import {
 } from "./employee.types";
 import { Permissions } from '@/lib/permissions';
 
+interface LeaveTemplateOption {
+  id: string;
+  name: string;
+  code: string;
+}
+
 /* ─────────────────────────────── constants ─────────────────────────────── */
 
 const PAGE_SIZE = 10;
@@ -411,6 +417,8 @@ export default function EmployeesPage() {
   const [wizardSaving, setWizardSaving] = useState(false);
   const [wizardError, setWizardError] = useState("");
   const [createdId, setCreatedId] = useState<string | null>(null);
+  const [leaveTemplates, setLeaveTemplates] = useState<LeaveTemplateOption[]>([]);
+  const [wizardLeaveTemplateId, setWizardLeaveTemplateId] = useState("");
   const [form1, setForm1] = useState<EmployeeForm>(EMPTY_EMPLOYEE);
   const [form2, setForm2] = useState<ContractForm>(EMPTY_CONTRACT);
 
@@ -489,7 +497,7 @@ export default function EmployeesPage() {
   const load = async () => {
     try {
       setLoading(true);
-      const [empRes, brRes, deptRes, desigRes, crewRes, groupRes, bankRes] =
+      const [empRes, brRes, deptRes, desigRes, crewRes, groupRes, bankRes, ltRes] =
         await Promise.all([
           api.get<Employee[]>("/employees"),
           api.get<Branch[]>("/branches"),
@@ -498,6 +506,7 @@ export default function EmployeesPage() {
           api.get<CrewOption[]>("/crews?isActive=true"),
           api.get<GroupOption[]>("/groups?isActive=true"),
           api.get<BankBranchOption[]>("/bank-branches?isActive=true"),
+          api.get<LeaveTemplateOption[]>("/LeaveTemplate"),
         ]);
       setItems(empRes.data);
       setBranches(
@@ -522,6 +531,11 @@ export default function EmployeesPage() {
       setCrews(crewRes.data);
       setGroups(groupRes.data);
       setBankBranches(bankRes.data);
+      setLeaveTemplates(
+        (ltRes.data as any[])
+          .filter((t: any) => t.isActive)
+          .map((t: any) => ({ id: String(t.id), name: t.name, code: t.code }))
+      );
     } catch (err: any) {
       showError(
         "Load failed",
@@ -544,6 +558,7 @@ export default function EmployeesPage() {
     setWizardStep(1);
     setWizardError("");
     setCreatedId(null);
+    setWizardLeaveTemplateId("");
     setForm1({ ...EMPTY_EMPLOYEE });
     setForm2({ ...EMPTY_CONTRACT });
     setWizardOpen(true);
@@ -586,6 +601,10 @@ export default function EmployeesPage() {
       setWizardError("Join date is required.");
       return;
     }
+    if (!wizardLeaveTemplateId) {
+      setWizardError("Leave template is required.");
+      return;
+    }
     setWizardSaving(true);
     try {
       await api.post("/employees/save", {
@@ -616,6 +635,7 @@ export default function EmployeesPage() {
         notes: form1.notes.trim() || null,
         crewId: form1.crewId || null,
         groupId: form1.groupId || null,
+        leaveTemplateId: wizardLeaveTemplateId,
         userId: 1,
       });
       const res = await api.get<Employee[]>(
@@ -1278,6 +1298,46 @@ export default function EmployeesPage() {
                 crews={crews}
                 groups={groups}
               />
+
+              {/* Leave Template — mandatory, assigned once at onboarding */}
+              <div className="mt-5">
+                <Field label="Leave Template" required>
+                  <select
+                    style={{
+                      height: "40px",
+                      width: "100%",
+                      borderRadius: "10px",
+                      border: wizardLeaveTemplateId ? "1px solid #e5e7eb" : "1px solid #fca5a5",
+                      backgroundColor: "#f3f4f6",
+                      padding: "0 12px",
+                      fontSize: "14px",
+                      color: wizardLeaveTemplateId ? "#1f2937" : "#6b7280",
+                      outline: "none",
+                      appearance: "auto",
+                    }}
+                    value={wizardLeaveTemplateId}
+                    onChange={(e) => setWizardLeaveTemplateId(e.target.value)}
+                  >
+                    <option value="">— Select leave template —</option>
+                    {leaveTemplates.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name} ({t.code})
+                      </option>
+                    ))}
+                  </select>
+                  {wizardLeaveTemplateId && (
+                    <p className="text-xs text-amber-600 mt-1">
+                      ⚠ This template seeds leave balances and cannot be changed after saving.
+                    </p>
+                  )}
+                  {leaveTemplates.length === 0 && (
+                    <p className="text-xs text-red-500 mt-1">
+                      No active leave templates found. Please create one in Master Data first.
+                    </p>
+                  )}
+                </Field>
+              </div>
+
               <Section title="Bank Details" />
               <div className="grid grid-cols-3 gap-x-6 gap-y-5">
                 <div className="col-span-3">

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from "react";
 import Dialog from '@/components/ui/Dialog'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
@@ -15,6 +15,12 @@ interface Props {
   open: boolean
   onClose: () => void
   onSaved: () => void
+}
+
+interface LeaveTemplateOption {
+  id: string;
+  name: string;
+  code: string;
 }
 
 interface Step1Form {
@@ -43,6 +49,7 @@ interface Step1Form {
   crew: string;
   groupName: string;
   notes: string;
+  leaveTemplateId: string;
 }
 
 interface Step2Form {
@@ -87,6 +94,7 @@ const defaultStep1: Step1Form = {
   crew: "",
   groupName: "",
   notes: "",
+  leaveTemplateId: "",
 };
 
 const defaultStep2: Step2Form = {
@@ -100,36 +108,82 @@ const defaultStep2: Step2Form = {
 }
 
 export default function AddEmployeeWizard({ open, onClose, onSaved }: Props) {
-  const [step, setStep] = useState(1)
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState('')
-  const [createdEmployeeId, setCreatedEmployeeId] = useState<string | null>(null)
-  const [form1, setForm1] = useState<Step1Form>(defaultStep1)
-  const [form2, setForm2] = useState<Step2Form>(defaultStep2)
+  const [step, setStep] = useState(1);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [createdEmployeeId, setCreatedEmployeeId] = useState<string | null>(
+    null,
+  );
+  const [form1, setForm1] = useState<Step1Form>(defaultStep1);
+  const [form2, setForm2] = useState<Step2Form>(defaultStep2);
+  const [leaveTemplates, setLeaveTemplates] = useState<LeaveTemplateOption[]>(
+    [],
+  );
 
-  const f1 = (field: keyof Step1Form) =>
-    (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
-      setForm1(p => ({ ...p, [field]: e.target.value }))
+  useEffect(() => {
+    api
+      .get<LeaveTemplateOption[]>("/LeaveTemplate?isActive=true")
+      .then((r) =>
+        setLeaveTemplates(r.data.map((t) => ({ ...t, id: String(t.id) }))),
+      )
+      .catch(() => {});
+  }, []);
 
-  const f2 = (field: keyof Step2Form) =>
-    (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
-      setForm2(p => ({ ...p, [field]: e.target.value }))
+  const f1 =
+    (field: keyof Step1Form) =>
+    (
+      e: React.ChangeEvent<
+        HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
+      >,
+    ) =>
+      setForm1((p) => ({ ...p, [field]: e.target.value }));
+
+  const f2 =
+    (field: keyof Step2Form) =>
+    (
+      e: React.ChangeEvent<
+        HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
+      >,
+    ) =>
+      setForm2((p) => ({ ...p, [field]: e.target.value }));
 
   const reset = () => {
-    setStep(1); setError(''); setCreatedEmployeeId(null)
-    setForm1(defaultStep1); setForm2(defaultStep2)
-  }
+    setStep(1);
+    setError("");
+    setCreatedEmployeeId(null);
+    setForm1(defaultStep1);
+    setForm2(defaultStep2);
+  };
 
-  const handleClose = () => { reset(); onClose() }
+  const handleClose = () => {
+    reset();
+    onClose();
+  };
 
   const handleStep1Next = async () => {
-    setError('')
-    if (!form1.employeeCode.trim()) { setError('Employee code is required.'); return }
-    if (!form1.firstName.trim())    { setError('First name is required.'); return }
-    if (!form1.lastName.trim())     { setError('Last name is required.'); return }
-    if (!form1.joinDate)            { setError('Join date is required.'); return }
+    setError("");
+    if (!form1.employeeCode.trim()) {
+      setError("Employee code is required.");
+      return;
+    }
+    if (!form1.firstName.trim()) {
+      setError("First name is required.");
+      return;
+    }
+    if (!form1.lastName.trim()) {
+      setError("Last name is required.");
+      return;
+    }
+    if (!form1.joinDate) {
+      setError("Join date is required.");
+      return;
+    }
+    if (!form1.leaveTemplateId) {
+      setError("Leave template is required.");
+      return;
+    }
 
-    setSaving(true)
+    setSaving(true);
     try {
       await api.post("/employees/save", {
         action: "ADD",
@@ -141,9 +195,13 @@ export default function AddEmployeeWizard({ open, onClose, onSaved }: Props) {
         personalEmail: form1.personalEmail || null,
         phoneNumber: form1.phoneNumber || null,
         nationalIdNumber: form1.nationalIdNumber || null,
+        tinNumber: form1.tinNumber || null,
         bankAccountNumber: form1.bankAccountNumber || null,
         bankName: form1.bankName || null,
         bankBranchCode: form1.bankBranchCode || null,
+        bankBranchName: form1.bankBranchName || null,
+        bankAccountHolderName: form1.bankAccountHolderName || null,
+        bankAccountType: form1.bankAccountType || null,
         dateOfBirth: form1.dateOfBirth || null,
         gender: form1.gender || null,
         nationality: form1.nationality || null,
@@ -151,62 +209,73 @@ export default function AddEmployeeWizard({ open, onClose, onSaved }: Props) {
         joinDate: form1.joinDate,
         employmentType: form1.employmentType,
         status: form1.status,
-        notes: form1.notes || null,
-        tinNumber: form1.tinNumber || null,
-        bankBranchName: form1.bankBranchName || null,
-        bankAccountHolderName: form1.bankAccountHolderName || null,
-        bankAccountType: form1.bankAccountType || null,
         crew: form1.crew || null,
         groupName: form1.groupName || null,
+        notes: form1.notes || null,
+        leaveTemplateId: form1.leaveTemplateId,
         userId: 1,
       });
-      const res = await api.get(`/employees?employeeCode=${form1.employeeCode}`)
-      const created = res.data?.[0]
-      if (!created) throw new Error('Employee saved but could not retrieve ID.')
-      setCreatedEmployeeId(created.id)
-      setForm2(p => ({ ...p, startDate: form1.joinDate }))
-      setStep(2)
+      const res = await api.get(
+        `/employees?employeeCode=${form1.employeeCode}`,
+      );
+      const created = res.data?.[0];
+      if (!created)
+        throw new Error("Employee saved but could not retrieve ID.");
+      setCreatedEmployeeId(created.id);
+      setForm2((p) => ({ ...p, startDate: form1.joinDate }));
+      setStep(2);
     } catch (err: any) {
-      setError(err?.response?.data?.message ?? err?.message ?? 'Failed to save employee.')
+      setError(
+        err?.response?.data?.message ??
+          err?.message ??
+          "Failed to save employee.",
+      );
     } finally {
-      setSaving(false)
+      setSaving(false);
     }
-  }
+  };
 
   const handleStep2Save = async () => {
-    setError('')
-    if (!form2.startDate) { setError('Contract start date is required.'); return }
-
-    setSaving(true)
-    try {
-      await api.post('/employees/contracts/save', {
-        action: 'ADD',
-        employeeId:               createdEmployeeId,
-        contractType:             form2.contractType,
-        payrollBasis:             form2.payrollBasis,
-        basicSalary:              parseFloat(form2.basicSalary) || 0,
-        hourlyRate:               form2.hourlyRate ? parseFloat(form2.hourlyRate) : null,
-        dailyRate:                form2.dailyRate  ? parseFloat(form2.dailyRate)  : null,
-        allowances:               parseFloat(form2.allowances) || 0,
-        currency:                 form2.currency,
-        absentDeductionAfterDays: parseInt(form2.absentDeductionAfterDays) || 0,
-        lateDeductionPerMinute:   parseFloat(form2.lateDeductionPerMinute) || 0,
-        overtimeRateMultiplier:   parseFloat(form2.overtimeRateMultiplier) || 1.5,
-        startDate:                form2.startDate,
-        endDate:                  form2.endDate || null,
-        isActive:                 true,
-        notes:                    form2.contractNotes || null,
-        userId: 1,
-      })
-      showSuccess('Employee added successfully.')
-      reset()
-      onSaved()
-    } catch (err: any) {
-      setError(err?.response?.data?.message ?? err?.message ?? 'Failed to save contract.')
-    } finally {
-      setSaving(false)
+    setError("");
+    if (!form2.startDate) {
+      setError("Contract start date is required.");
+      return;
     }
-  }
+
+    setSaving(true);
+    try {
+      await api.post("/employees/contracts/save", {
+        action: "ADD",
+        employeeId: createdEmployeeId,
+        contractType: form2.contractType,
+        payrollBasis: form2.payrollBasis,
+        basicSalary: parseFloat(form2.basicSalary) || 0,
+        hourlyRate: form2.hourlyRate ? parseFloat(form2.hourlyRate) : null,
+        dailyRate: form2.dailyRate ? parseFloat(form2.dailyRate) : null,
+        allowances: parseFloat(form2.allowances) || 0,
+        currency: form2.currency,
+        absentDeductionAfterDays: parseInt(form2.absentDeductionAfterDays) || 0,
+        lateDeductionPerMinute: parseFloat(form2.lateDeductionPerMinute) || 0,
+        overtimeRateMultiplier: parseFloat(form2.overtimeRateMultiplier) || 1.5,
+        startDate: form2.startDate,
+        endDate: form2.endDate || null,
+        isActive: true,
+        notes: form2.contractNotes || null,
+        userId: 1,
+      });
+      showSuccess("Employee added successfully.");
+      reset();
+      onSaved();
+    } catch (err: any) {
+      setError(
+        err?.response?.data?.message ??
+          err?.message ??
+          "Failed to save contract.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <Dialog isOpen={open} onClose={handleClose} onRequestClose={handleClose}>
@@ -396,6 +465,49 @@ export default function AddEmployeeWizard({ open, onClose, onSaved }: Props) {
                     ))}
                   </select>
                 </div>
+              </div>
+
+              {/* Leave Template — mandatory */}
+              <div>
+                <label className="form-label">
+                  Leave Template <span className="text-red-500">*</span>
+                </label>
+                <select
+                  style={{
+                    height: "40px",
+                    width: "100%",
+                    borderRadius: "10px",
+                    border: form1.leaveTemplateId
+                      ? "1px solid #e5e7eb"
+                      : "1px solid #fca5a5",
+                    backgroundColor: "#f3f4f6",
+                    padding: "0 12px",
+                    fontSize: "14px",
+                    color: form1.leaveTemplateId ? "#1f2937" : "#6b7280",
+                    outline: "none",
+                    appearance: "auto",
+                  }}
+                  value={form1.leaveTemplateId}
+                  onChange={f1("leaveTemplateId")}
+                >
+                  <option value="">— Select leave template —</option>
+                  {leaveTemplates.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name} ({t.code})
+                    </option>
+                  ))}
+                </select>
+                {form1.leaveTemplateId && (
+                  <p className="text-xs text-amber-600 mt-1">
+                    ⚠ This template will seed leave balances and cannot be
+                    changed after saving.
+                  </p>
+                )}
+                {leaveTemplates.length === 0 && (
+                  <p className="text-xs text-red-500 mt-1">
+                    No active leave templates found. Please create one first.
+                  </p>
+                )}
               </div>
 
               <div>

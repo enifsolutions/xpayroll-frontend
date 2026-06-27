@@ -91,6 +91,13 @@ const navigationConfig: NavItem[] = [
         permissionKey: "MasterData.LeaveTypes.View",
       },
       {
+        key: "leave-templates",
+        label: "Leave Templates",
+        path: "/master/leave-templates",
+        icon: FileText,
+        permissionKey: "MasterData.LeaveTemplate.View",
+      },
+      {
         key: "statutory-rates",
         label: "Statutory Rates",
         path: "/master/statutory-rates",
