@@ -1,8 +1,4 @@
 'use client'
-
 import { createContext } from 'react'
-import type { Session } from 'next-auth'
-
-const SessionContext = createContext<Session | null>(null)
-
+const SessionContext = createContext(null)
 export default SessionContext
