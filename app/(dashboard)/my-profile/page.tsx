@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import {
   User, Lock, Eye, EyeOff, Camera, Shield,
@@ -46,7 +46,7 @@ function avatarColor(name: string) {
   return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length]
 }
 
-export default function MyProfilePage() {
+function MyProfileInner() {
   const user        = useAuthStore((s) => s.user)
   const initialized = useRef(false)
   const searchParams = useSearchParams()
@@ -449,5 +449,17 @@ function PasswordStrength({ password }: { password: string }) {
         ))}
       </ul>
     </div>
+  )
+}
+
+export default function MyProfilePage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent" />
+      </div>
+    }>
+      <MyProfileInner />
+    </Suspense>
   )
 }
