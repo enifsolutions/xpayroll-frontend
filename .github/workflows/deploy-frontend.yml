@@ -49,14 +49,14 @@ jobs:
             echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u ${{ secrets.GHCR_USER }} --password-stdin
 
             echo "=== Pulling latest frontend image ==="
-            docker compose -f docker-compose.prod.yml pull xp_frontend
+            docker compose -f docker-compose.prod.yml pull frontend
 
             echo "=== Recreating frontend container ==="
-            docker compose -f docker-compose.prod.yml up -d --no-deps --force-recreate xp_frontend
+            docker compose -f docker-compose.prod.yml up -d --no-deps --force-recreate frontend
 
             echo "=== Container status ==="
             sleep 8
-            docker compose -f docker-compose.prod.yml ps xp_frontend
+            docker compose -f docker-compose.prod.yml ps frontend
 
             echo "=== Pruning old images ==="
             docker image prune -f
