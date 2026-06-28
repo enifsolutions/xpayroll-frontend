@@ -63,6 +63,18 @@ export const Permissions = {
       Edit: "MasterData.LeaveTemplate.Edit",
       Delete: "MasterData.LeaveTemplate.Delete",
     },
+    Crews: {
+      View: "MasterData.Crews.View",
+      Manage: "MasterData.Crews.Manage",
+    },
+    Groups: {
+      View: "MasterData.Groups.View",
+      Manage: "MasterData.Groups.Manage",
+    },
+    BankBranches: {
+      View: "MasterData.BankBranches.View",
+      Manage: "MasterData.BankBranches.Manage",
+    },
   },
   HR: {
     Employee: {
@@ -123,18 +135,6 @@ export const Permissions = {
     Company: {
       View: "Settings.Company.View",
       Manage: "Settings.Company.Manage",
-    },
-    Crews: {
-      View: "Settings.Crews.View",
-      Manage: "Settings.Crews.Manage",
-    },
-    Groups: {
-      View: "Settings.Groups.View",
-      Manage: "Settings.Groups.Manage",
-    },
-    BankBranches: {
-      View: "Settings.BankBranches.View",
-      Manage: "Settings.BankBranches.Manage",
     },
   },
   Attendance: {

@@ -35,20 +35,40 @@ export function UserDropdown() {
 
   const menuItems = [
     {
-      group: 'Account',
+      group: "Account",
       items: [
-        { icon: User,     label: 'My Profile',       sub: 'View and edit profile',    action: () => router.push('/settings/profile') },
-        { icon: Settings, label: 'Preferences',       sub: 'App settings & display',   action: () => router.push('/settings') },
-        { icon: KeyRound, label: 'Change Password',   sub: 'Update your credentials',  action: () => router.push('/settings/password') },
-      ]
+        {
+          icon: User,
+          label: "My Profile",
+          sub: "View and edit profile",
+          action: () => router.push("/my-profile"),
+        },
+        // {
+        //   icon: Settings,
+        //   label: "Preferences",
+        //   sub: "App settings & display",
+        //   action: () => router.push("/settings"),
+        // },
+        {
+          icon: KeyRound,
+          label: "Change Password",
+          sub: "Update your credentials",
+          action: () => router.push("/my-profile?tab=security"),
+        },
+      ],
     },
     {
-      group: 'Admin',
+      group: "Admin",
       items: [
-        { icon: Shield,   label: 'Roles & Permissions', sub: 'Manage access control', action: () => router.push('/settings/roles') },
-      ]
+        {
+          icon: Shield,
+          label: "Roles & Permissions",
+          sub: "Manage access control",
+          action: () => router.push("/settings/roles"),
+        },
+      ],
     },
-  ]
+  ];
 
   return (
     <div ref={ref} className="relative">

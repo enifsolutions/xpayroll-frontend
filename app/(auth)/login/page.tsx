@@ -1,6 +1,13 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import {
+  useState,
+  useRef,
+  useEffect,
+  useCallback,
+  useImperativeHandle,
+  forwardRef,
+} from "react";
 import { useRouter } from 'next/navigation';
 import api from '@/lib/axios';
 import { setTokens } from '@/lib/auth';
@@ -9,53 +16,82 @@ import type { AuthResponse, LoginRequest } from '@/types/auth';
 
 /* ══════════════════════════════════════════════════════════
    SHADOW-ISOLATED INPUT
-   Key fix: onChange/onFocus/onBlur are stored in mutable refs
-   so the shadow DOM's imperative listeners always call the
-   *latest* callback — never a stale closure.
+   Fixes applied:
+   - focusInput() exposed via ref for auto-focus on mount
+   - tabIndex on host div so Tab key reaches the shadow input
+   - keydown Enter forwarded to parent form submit
+   - keydown Tab forwarded to next focusable element
 ══════════════════════════════════════════════════════════ */
-function ShadowInput({
-  type,
-  value,
-  onChange,
-  placeholder = '',
-  autoComplete = 'off',
-  required = false,
-  suffix,
-  focused,
-  onFocus,
-  onBlur,
-}: {
-  type: 'email' | 'text' | 'password';
-  value: string;
-  onChange: (v: string) => void;
-  placeholder?: string;
-  autoComplete?: string;
-  required?: boolean;
-  suffix?: React.ReactNode;
-  focused: boolean;
-  onFocus: () => void;
-  onBlur: () => void;
-}) {
-  const hostRef      = useRef<HTMLDivElement>(null);
-  const inputRef     = useRef<HTMLInputElement | null>(null);
+interface ShadowInputHandle {
+  focusInput: () => void;
+}
+
+const ShadowInput = forwardRef<
+  ShadowInputHandle,
+  {
+    type: "email" | "text" | "password";
+    value: string;
+    onChange: (v: string) => void;
+    placeholder?: string;
+    autoComplete?: string;
+    required?: boolean;
+    suffix?: React.ReactNode;
+    focused: boolean;
+    onFocus: () => void;
+    onBlur: () => void;
+    onEnter?: () => void;
+    tabIndex?: number;
+  }
+>(function ShadowInput(
+  {
+    type,
+    value,
+    onChange,
+    placeholder = "",
+    autoComplete = "off",
+    required = false,
+    suffix,
+    focused,
+    onFocus,
+    onBlur,
+    onEnter,
+    tabIndex = 0,
+  },
+  ref,
+) {
+  const hostRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
-  // Mutable callback refs — updated every render, no stale closures
   const onChangeRef = useRef(onChange);
-  const onFocusRef  = useRef(onFocus);
-  const onBlurRef   = useRef(onBlur);
-  useEffect(() => { onChangeRef.current = onChange; });
-  useEffect(() => { onFocusRef.current  = onFocus;  });
-  useEffect(() => { onBlurRef.current   = onBlur;   });
+  const onFocusRef = useRef(onFocus);
+  const onBlurRef = useRef(onBlur);
+  const onEnterRef = useRef(onEnter);
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  });
+  useEffect(() => {
+    onFocusRef.current = onFocus;
+  });
+  useEffect(() => {
+    onBlurRef.current = onBlur;
+  });
+  useEffect(() => {
+    onEnterRef.current = onEnter;
+  });
 
-  /* Build shadow DOM exactly once */
+  // Expose focusInput() to parent
+  useImperativeHandle(ref, () => ({
+    focusInput: () => inputRef.current?.focus(),
+  }));
+
   useEffect(() => {
     const host = hostRef.current;
     if (!host || host.shadowRoot) return;
 
-    const shadow = host.attachShadow({ mode: 'open' });
+    const shadow = host.attachShadow({ mode: "open" });
 
-    const style = document.createElement('style');
+    const style = document.createElement("style");
     style.textContent = `
       :host { display: block; width: 100%; }
       .wrap {
@@ -87,57 +123,102 @@ function ShadowInput({
     `;
     shadow.appendChild(style);
 
-    const wrap = document.createElement('div');
-    wrap.className = 'wrap';
+    const wrap = document.createElement("div");
+    wrap.className = "wrap";
     containerRef.current = wrap;
 
-    const input = document.createElement('input');
-    input.type        = type;
+    const input = document.createElement("input");
+    input.type = type;
     input.placeholder = placeholder;
     input.autocomplete = autoComplete as AutoFill;
-    input.required    = required;
-    input.value       = value;
+    input.required = required;
+    input.value = value;
 
-    // Use refs so these handlers always call the latest prop callbacks
-    input.addEventListener('input',  (e) => onChangeRef.current((e.target as HTMLInputElement).value));
-    input.addEventListener('focus',  ()  => onFocusRef.current());
-    input.addEventListener('blur',   ()  => onBlurRef.current());
+    input.addEventListener("input", (e) =>
+      onChangeRef.current((e.target as HTMLInputElement).value),
+    );
+    input.addEventListener("focus", () => onFocusRef.current());
+    input.addEventListener("blur", () => onBlurRef.current());
+
+    // FIX: Handle Enter (submit) and Tab (move focus) inside shadow DOM
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        onEnterRef.current?.();
+      } else if (e.key === "Tab") {
+        // Let the browser handle Tab naturally — shadow DOM traps it otherwise
+        // We blur this input and let the host div's tabIndex chain take over
+        const focusable = Array.from(
+          document.querySelectorAll<HTMLElement>(
+            'input, button, [tabindex]:not([tabindex="-1"])',
+          ),
+        ).filter((el) => !el.closest("[data-shadow-host]") || el === host);
+
+        const host2 = input.getRootNode() as ShadowRoot;
+        const hostEl = host2.host as HTMLElement;
+        const allFocusable = Array.from(
+          document.querySelectorAll<HTMLElement>(
+            '[data-shadow-host], button:not([tabindex="-1"])',
+          ),
+        );
+        const idx = allFocusable.indexOf(hostEl);
+        if (idx !== -1) {
+          e.preventDefault();
+          const next = e.shiftKey
+            ? allFocusable[idx - 1]
+            : allFocusable[idx + 1];
+          if (next) {
+            // If it's another shadow host, focus its inner input
+            const innerInput = next.shadowRoot?.querySelector(
+              "input",
+            ) as HTMLInputElement | null;
+            if (innerInput) {
+              innerInput.focus();
+            } else {
+              next.focus();
+            }
+          }
+        }
+      }
+    });
 
     inputRef.current = input;
     wrap.appendChild(input);
 
-    const suffixDiv = document.createElement('div');
-    suffixDiv.className = 'suffix-slot';
-    suffixDiv.appendChild(document.createElement('slot'));
+    const suffixDiv = document.createElement("div");
+    suffixDiv.className = "suffix-slot";
+    suffixDiv.appendChild(document.createElement("slot"));
     wrap.appendChild(suffixDiv);
 
     shadow.appendChild(wrap);
-    wrap.addEventListener('click', () => input.focus());
+    wrap.addEventListener("click", () => input.focus());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /* Sync type (password ↔ text toggle) */
   useEffect(() => {
     if (inputRef.current) inputRef.current.type = type;
   }, [type]);
 
-  /* Sync value — only patch DOM when React and DOM disagree */
   useEffect(() => {
     const el = inputRef.current;
     if (el && el.value !== value) el.value = value;
   }, [value]);
 
-  /* Sync focus ring class */
   useEffect(() => {
-    containerRef.current?.classList.toggle('focused', focused);
+    containerRef.current?.classList.toggle("focused", focused);
   }, [focused]);
 
   return (
-    <div ref={hostRef} style={{ display: 'block', width: '100%' }}>
+    <div
+      ref={hostRef}
+      data-shadow-host
+      tabIndex={-1}
+      style={{ display: "block", width: "100%" }}
+    >
       {suffix}
     </div>
   );
-}
+});
 
 /* ── Eye toggle ── */
 function EyeBtn({ show, onToggle }: { show: boolean; onToggle: () => void }) {
@@ -165,31 +246,62 @@ function EyeBtn({ show, onToggle }: { show: boolean; onToggle: () => void }) {
   );
 }
 
-/* ── Field wrapper (manages its own focus state) ── */
-function Field({
-  label, labelRight, type, value, onChange,
-  placeholder, autoComplete, required, suffix,
-}: {
-  label: string;
-  labelRight?: React.ReactNode;
-  type: 'email' | 'text' | 'password';
-  value: string;
-  onChange: (v: string) => void;
-  placeholder?: string;
-  autoComplete?: string;
-  required?: boolean;
-  suffix?: React.ReactNode;
-}) {
+/* ── Field wrapper ── */
+const Field = forwardRef<
+  ShadowInputHandle,
+  {
+    label: string;
+    labelRight?: React.ReactNode;
+    type: "email" | "text" | "password";
+    value: string;
+    onChange: (v: string) => void;
+    placeholder?: string;
+    autoComplete?: string;
+    required?: boolean;
+    suffix?: React.ReactNode;
+    onEnter?: () => void;
+  }
+>(function Field(
+  {
+    label,
+    labelRight,
+    type,
+    value,
+    onChange,
+    placeholder,
+    autoComplete,
+    required,
+    suffix,
+    onEnter,
+  },
+  ref,
+) {
   const [focused, setFocused] = useState(false);
   return (
     <div>
-      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:6 }}>
-        <label style={{ fontSize:12.5, fontWeight:500, color:'#374151', WebkitTextFillColor:'#374151', fontFamily:'Inter,sans-serif' }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          marginBottom: 6,
+        }}
+      >
+        <label
+          style={{
+            fontSize: 12.5,
+            fontWeight: 500,
+            color: "#374151",
+            WebkitTextFillColor: "#374151",
+            fontFamily: "Inter,sans-serif",
+          }}
+        >
           {label}
         </label>
         {labelRight}
       </div>
       <ShadowInput
+        ref={ref}
         type={type}
         value={value}
         onChange={onChange}
@@ -200,10 +312,11 @@ function Field({
         focused={focused}
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
+        onEnter={onEnter}
       />
     </div>
   );
-}
+});
 
 /* ══════════════════════════════════════════════════════════
    PAGE
@@ -224,7 +337,25 @@ export default function LoginPage() {
   const [forgotError, setForgotError] = useState("");
   const [forgotSuccess, setForgotSuccess] = useState(false);
 
-  // Use functional updaters to avoid stale-closure issues
+  // Refs for programmatic focus
+  const emailRef = useRef<ShadowInputHandle>(null);
+  const passwordRef = useRef<ShadowInputHandle>(null);
+  const forgotRef = useRef<ShadowInputHandle>(null);
+
+  // FIX 1: Auto-focus email field on mount
+  useEffect(() => {
+    const t = setTimeout(() => emailRef.current?.focusInput(), 100);
+    return () => clearTimeout(t);
+  }, []);
+
+  // Re-focus forgot email when panel opens
+  useEffect(() => {
+    if (showForgot) {
+      const t = setTimeout(() => forgotRef.current?.focusInput(), 100);
+      return () => clearTimeout(t);
+    }
+  }, [showForgot]);
+
   const setEmail = useCallback(
     (v: string) => setForm((f) => ({ ...f, email: v })),
     [],
@@ -234,8 +365,8 @@ export default function LoginPage() {
     [],
   );
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (e?: React.FormEvent) => {
+    e?.preventDefault();
     setError("");
     setLoading(true);
     try {
@@ -255,15 +386,15 @@ export default function LoginPage() {
       );
       router.push(data.isTempPassword ? "/change-password" : "/dashboard");
     } catch (err) {
-      console.error('LOGIN ERROR:', err);
+      console.error("LOGIN ERROR:", err);
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setLoading(false);
     }
   };
 
-  const handleForgotPassword = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleForgotPassword = async (e?: React.FormEvent) => {
+    e?.preventDefault();
     setForgotError("");
     if (!forgotEmail.trim()) {
       setForgotError("Email is required.");
@@ -309,8 +440,6 @@ export default function LoginPage() {
         .xp-spinner{width:16px;height:16px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:xp-spin .7s linear infinite;flex-shrink:0}
         .xp-badge{display:flex;align-items:center;gap:14px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:13px 16px;transition:background .2s,border-color .2s}
         .xp-badge:hover{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.14)}
-
-        /* Custom checkbox — lives in normal DOM so we style it here */
         .xp-check-wrap { display:flex; align-items:center; gap:9px; cursor:pointer; user-select:none; }
         .xp-check-box {
           width:17px; height:17px; border-radius:5px;
@@ -320,7 +449,6 @@ export default function LoginPage() {
         }
         .xp-check-box.checked { border-color:#3b82f6; background:#3b82f6; }
         .xp-check-label { font-size:12.5px; color:#6b7280; font-family:Inter,sans-serif; }
-
         @media(max-width:768px){.xp-left-panel{display:none!important}.xp-right-panel{padding:32px 24px!important}}
       `}</style>
 
@@ -562,6 +690,7 @@ export default function LoginPage() {
                   Sign in to your XpayRoll account to continue.
                 </p>
 
+                {/* FIX 3: onSubmit on the form, Enter from each field calls handleSubmit() */}
                 <form onSubmit={handleSubmit}>
                   <div
                     style={{
@@ -571,6 +700,7 @@ export default function LoginPage() {
                     }}
                   >
                     <Field
+                      ref={emailRef}
                       label="Email address"
                       type="email"
                       value={form.email}
@@ -578,9 +708,12 @@ export default function LoginPage() {
                       placeholder="you@company.com"
                       autoComplete="email"
                       required
+                      // FIX 2: Tab from email moves to password
+                      onEnter={() => passwordRef.current?.focusInput()}
                     />
 
                     <Field
+                      ref={passwordRef}
                       label="Password"
                       labelRight={
                         <button
@@ -606,6 +739,8 @@ export default function LoginPage() {
                       placeholder="••••••••"
                       autoComplete="current-password"
                       required
+                      // FIX 3: Enter in password field submits
+                      onEnter={() => handleSubmit()}
                       suffix={
                         <EyeBtn
                           show={showPassword}
@@ -615,7 +750,7 @@ export default function LoginPage() {
                     />
                   </div>
 
-                  {/* ── Remember me ── */}
+                  {/* Remember me */}
                   <div style={{ marginTop: 16 }}>
                     <label
                       className="xp-check-wrap"
@@ -742,6 +877,7 @@ export default function LoginPage() {
                 </p>
                 <form onSubmit={handleForgotPassword}>
                   <Field
+                    ref={forgotRef}
                     label="Email address"
                     type="email"
                     value={forgotEmail}
@@ -749,6 +885,7 @@ export default function LoginPage() {
                     placeholder="your@email.com"
                     autoComplete="email"
                     required
+                    onEnter={() => handleForgotPassword()}
                   />
                   {forgotError && (
                     <div

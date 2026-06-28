@@ -146,6 +146,27 @@ const navigationConfig: NavItem[] = [
         icon: BellRing,
         permissionKey: "MasterData.NotificationTemplates.View",
       },
+      {
+        key: "crews",
+        label: "Crews",
+        path: "/master/crews",
+        icon: Users,
+        permissionKey: "MasterData.Crews.View",
+      },
+      {
+        key: "groups",
+        label: "Groups",
+        path: "/master/groups",
+        icon: GitBranch,
+        permissionKey: "MasterData.Groups.View",
+      },
+      {
+        key: "bank-branches",
+        label: "Bank Branches",
+        path: "/master/bank-branches",
+        icon: Landmark,
+        permissionKey: "MasterData.BankBranches.View",
+      },
     ],
   },
   {
@@ -363,27 +384,7 @@ const navigationConfig: NavItem[] = [
         icon: Shield,
         permissionKey: "Settings.Roles.View",
       },
-      {
-        key: "crews",
-        label: "Crews",
-        path: "/settings/crews",
-        icon: Users,
-        permissionKey: "Settings.Crews.View",
-      },
-      {
-        key: "groups",
-        label: "Groups",
-        path: "/settings/groups",
-        icon: GitBranch,
-        permissionKey: "Settings.Groups.View",
-      },
-      {
-        key: "bank-branches",
-        label: "Bank Branches",
-        path: "/settings/bank-branches",
-        icon: CreditCard,
-        permissionKey: "Settings.BankBranches.View",
-      },
+
     ],
   },
 ];
