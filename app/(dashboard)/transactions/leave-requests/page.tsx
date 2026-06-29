@@ -10,36 +10,10 @@ import { statusBadgeClass, statusLabel } from "@/utils/leaveRequestUtils";
 import type { LeaveRequest } from "@/types/leaveRequest.types";
 import Button from "@/components/ui/Button";
 import LeaveRequestDetailDialog from "./LeaveRequestDetailDialog";
+import ApplyLeaveDialog from "./ApplyLeaveDialog";
 
 /* TODO: replace with real ApplyLeaveDialog once built */
-function ApplyLeaveDialog({
-  isOpen,
-  onClose,
-  onDone,
-}: {
-  isOpen: boolean;
-  onClose: () => void;
-  onDone: () => void;
-}) {
-  if (!isOpen) return null;
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="card w-full max-w-md mx-4">
-        <div className="card-body">
-          <h5 className="mb-1">Apply for Leave</h5>
-          <p className="text-sm text-gray-500 mb-4">
-            This dialog is under construction.
-          </p>
-          <div className="flex justify-end gap-2">
-            <button className="btn btn-default" onClick={onClose}>
-              Close
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
+
 
 /* ── Avatar helpers (same pattern as Employees page) ── */
 const AVATAR_COLORS = [

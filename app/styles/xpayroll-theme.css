@@ -55,3 +55,9 @@
   color: #ffffff !important;
   stroke: #ffffff !important;
 }
+
+.dark .xp-badge-success { background: rgba(16,185,129,0.2); color: #fff; }
+.dark .xp-badge-warning { background: rgba(245,158,11,0.25); color: #fff; }
+.dark .xp-badge-danger  { background: rgba(239,68,68,0.2);   color: #fff; }
+.dark .xp-badge-info    { background: rgba(59,130,246,0.2);  color: #fff; }
+.dark .xp-badge-neutral { background: rgba(107,114,128,0.2); color: #fff; }

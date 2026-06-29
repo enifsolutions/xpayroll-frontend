@@ -1,170 +1,412 @@
-'use client'
+"use client";
+import { useRef, useState, useEffect } from "react";
+import {
+  Bell,
+  UserPlus,
+  FileText,
+  CalendarOff,
+  ClipboardList,
+  Clock,
+  Cake,
+  CalendarDays,
+  RefreshCw,
+  X,
+} from "lucide-react";
+import {
+  useNotifications,
+  NotificationItem,
+  NotificationType,
+  BadgeType,
+} from "@/hooks/useNotifications";
+import { useRouter } from "next/navigation";
 
-import { useState, useRef, useEffect } from 'react'
-import { Bell, Check, CheckCheck, AlertTriangle, Clock, Shield, X } from 'lucide-react'
+const ICONS: Record<string, React.ElementType> = {
+  UserPlus,
+  FileText,
+  CalendarOff,
+  ClipboardList,
+  Clock,
+  Cake,
+  CalendarDays,
+};
 
-const NOTIFICATIONS = [
-  {
-    id: 1, unread: false,
-    icon: <Check size={16} className="text-emerald-500" />,
-    iconBg: 'bg-emerald-100 dark:bg-emerald-900/30',
-    title: 'Payroll Approved',
-    body: 'Batch #402 for Engineering department has been processed successfully.',
-    time: '2 minutes ago',
-    actions: null,
-  },
-  {
-    id: 2, unread: true,
-    icon: <span className="text-blue-500 font-bold text-sm">!</span>,
-    iconBg: 'bg-blue-100 dark:bg-blue-900/30',
-    title: 'New Leave Request (Sarah Mitchell)',
-    body: 'Annual Leave: June 15 - June 22 (5 working days)',
-    time: '1 hour ago',
-    actions: ['Approve', 'Deny'],
-  },
-  {
-    id: 3, unread: false,
-    icon: <Clock size={16} className="text-orange-500" />,
-    iconBg: 'bg-orange-100 dark:bg-orange-900/30',
-    title: 'System Upgrade Scheduled',
-    body: 'HRMS Portal will be offline for maintenance on Sunday, 2:00 AM EST.',
-    time: '3 hours ago',
-    actions: null,
-  },
-  {
-    id: 4, unread: false,
-    icon: <Shield size={16} className="text-red-500" />,
-    iconBg: 'bg-red-100 dark:bg-red-900/30',
-    title: 'New Login Detected',
-    body: 'A login to your account from a new Chrome browser on MacOS (San Francisco, CA).',
-    time: '5 hours ago',
-    actions: null,
-    titleCls: 'text-red-500',
-  },
-]
+const SECTION_LABELS: Record<NotificationType, string> = {
+  new_employee: "New Onboards",
+  payroll_run: "Payroll Runs",
+  leave_today: "Leave Today",
+  attendance_today: "Attendance Today",
+  leave_pending: "Pending Leave Requests",
+  birthday: "Birthdays Today 🎂",
+  leave_upcoming: "Upcoming Leaves (3 days)",
+};
 
-export function NotificationDropdown() {
-  const [open, setOpen]       = useState(false)
-  const [notes, setNotes]     = useState(NOTIFICATIONS)
-  const ref                   = useRef<HTMLDivElement>(null)
-  const unreadCount           = notes.filter(n => n.unread).length
+const SECTION_ORDER: NotificationType[] = [
+  "birthday",
+  "leave_pending",
+  "attendance_today",
+  "leave_today",
+  "new_employee",
+  "leave_upcoming",
+  "payroll_run",
+];
 
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [])
+// Human-readable label per notification type
+const BADGE_LABELS: Record<NotificationType, string> = {
+  new_employee: "New",
+  payroll_run: "Payroll",
+  leave_today: "On Leave",
+  attendance_today: "Today",
+  leave_pending: "Pending",
+  birthday: "Birthday",
+  leave_upcoming: "Upcoming",
+};
 
-  const markAllRead = () => setNotes(prev => prev.map(n => ({ ...n, unread: false })))
-  const dismiss     = (id: number) => setNotes(prev => prev.filter(n => n.id !== id))
+// Map badge type → existing xp-badge-* class from globals.css
+const BADGE_CLASS: Record<BadgeType, string> = {
+  success: "xp-badge xp-badge-success",
+  warning: "xp-badge xp-badge-warning",
+  danger: "xp-badge xp-badge-danger",
+  info: "xp-badge xp-badge-info",
+  neutral: "xp-badge xp-badge-neutral",
+};
+
+// Icon circle bg — inline style so CSS vars apply in both modes
+const ICON_COLORS: Record<BadgeType, { bg: string; color: string }> = {
+  success: { bg: "rgba(16,185,129,0.12)", color: "#10b981" },
+  warning: { bg: "rgba(245,158,11,0.12)", color: "#f59e0b" },
+  danger: { bg: "rgba(239,68,68,0.12)", color: "#ef4444" },
+  info: { bg: "rgba(59,130,246,0.12)", color: "#3b82f6" },
+  neutral: { bg: "rgba(107,114,128,0.12)", color: "#6b7280" },
+};
+
+const NAV_MAP: Partial<
+  Record<NotificationType, (item: NotificationItem) => string>
+> = {
+  new_employee: (item) => `/employees/${item.refId}`,
+  payroll_run: (item) => `/payroll-runs/${item.refId}`,
+  leave_pending: (item) => `/transactions/leave-requests`,
+  birthday: (item) => `/employees/${item.refId}`,
+  leave_upcoming: (item) => `/transactions/leave-requests`,
+  attendance_today: () => "/attendance",
+  leave_today: () => "/transactions/leave-requests",
+};
+
+function NotifRow({
+  item,
+  notifType,
+  onClick,
+}: {
+  item: NotificationItem;
+  notifType: NotificationType;
+  onClick: (item: NotificationItem) => void;
+}) {
+  const Icon = ICONS[item.iconKey] ?? Bell;
+  const iconColors = ICON_COLORS[item.badge];
+  const badgeLabel = BADGE_LABELS[notifType] ?? item.badge;
 
   return (
-    <div ref={ref} className="relative">
+    <button
+      onClick={() => onClick(item)}
+      style={{ width: "100%" }}
+      className="flex items-start gap-3 px-4 py-3 text-left transition-colors"
+      onMouseEnter={(e) =>
+        (e.currentTarget.style.background = "var(--xp-surface-hi)")
+      }
+      onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+    >
+      {/* Icon circle */}
+      <span
+        className="mt-0.5 flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center"
+        style={{ background: iconColors.bg, color: iconColors.color }}
+      >
+        <Icon size={15} />
+      </span>
+
+      {/* Text */}
+      <div className="flex-1 min-w-0">
+        <p
+          className="text-sm font-medium truncate leading-snug"
+          style={{ color: "var(--xp-text-1)" }}
+        >
+          {item.title}
+        </p>
+        <p
+          className="text-xs truncate mt-0.5"
+          style={{ color: "var(--xp-text-2)" }}
+        >
+          {item.subtitle}
+        </p>
+      </div>
+
+      {/* Badge */}
+      <span
+        className={`flex-shrink-0 self-start mt-0.5 ${BADGE_CLASS[item.badge]}`}
+      >
+        {badgeLabel}
+      </span>
+    </button>
+  );
+}
+
+export default function NotificationDropdown() {
+  const { grouped, loading, unreadCount, markRead, refresh } =
+    useNotifications();
+  const [open, setOpen] = useState(false);
+  const [filter, setFilter] = useState<NotificationType | "all">("all");
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
+
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(e.target as Node)
+      )
+        setOpen(false);
+    }
+    if (open) document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  function handleOpen() {
+    setOpen((prev) => !prev);
+    if (!open) markRead();
+  }
+
+  function handleRowClick(item: NotificationItem) {
+    const nav = NAV_MAP[item.notificationType];
+    if (nav) router.push(nav(item));
+    setOpen(false);
+  }
+
+  const visibleSections = SECTION_ORDER.filter((type) => {
+    if (filter !== "all" && filter !== type) return false;
+    return (grouped[type]?.length ?? 0) > 0;
+  });
+
+  const totalCount = SECTION_ORDER.reduce(
+    (sum, t) => sum + (grouped[t]?.length ?? 0),
+    0,
+  );
+
+  return (
+    <div ref={dropdownRef} className="relative">
       {/* Bell button */}
       <button
-        onClick={() => setOpen(o => !o)}
-        className="relative w-9 h-9 flex items-center justify-center rounded-md
-                   text-[var(--xp-text-2)] hover:text-[var(--xp-text-1)]
-                   hover:bg-[var(--xp-surface-hi)] transition-colors"
+        onClick={handleOpen}
+        className="relative p-2 rounded-lg transition-colors"
+        style={{ color: "var(--xp-text-2)" }}
+        onMouseEnter={(e) =>
+          (e.currentTarget.style.background = "var(--xp-surface-hi)")
+        }
+        onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
         aria-label="Notifications"
       >
-        <Bell size={17} />
+        <Bell size={20} />
         {unreadCount > 0 && (
-          <span className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-red-500
-                           border-2 border-[var(--xp-surface)]
-                           flex items-center justify-center text-white text-[9px] font-bold">
-            {unreadCount}
+          <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] bg-rose-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1 leading-none">
+            {unreadCount > 99 ? "99+" : unreadCount}
           </span>
         )}
       </button>
 
-      {/* Dropdown */}
+      {/* Dropdown panel */}
       {open && (
         <div
-          className="absolute right-0 top-[calc(100%+8px)] w-[380px] z-50 rounded-xl
-                     bg-[var(--xp-surface)] border border-[var(--xp-border)]
-                     shadow-2xl shadow-black/20 overflow-hidden"
+          className="absolute right-0 top-full mt-2 w-[420px] z-50 flex flex-col rounded-xl shadow-xl"
+          style={{
+            maxHeight: "600px",
+            background: "var(--xp-surface)",
+            border: "1px solid var(--xp-border)",
+          }}
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--xp-border)]">
+          <div
+            className="flex items-center justify-between px-4 py-3 flex-shrink-0"
+            style={{ borderBottom: "1px solid var(--xp-border)" }}
+          >
             <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold text-[var(--xp-text-1)]">Notifications</span>
-              {unreadCount > 0 && (
-                <span className="text-[10px] font-bold bg-red-500 text-white px-1.5 py-0.5 rounded-full">
-                  {unreadCount}
+              <h3
+                className="text-sm font-semibold"
+                style={{ color: "var(--xp-text-1)" }}
+              >
+                Notifications
+              </h3>
+              {totalCount > 0 && (
+                <span
+                  className="text-xs font-medium px-2 py-0.5 rounded-full"
+                  style={{
+                    background: "var(--xp-surface-hi)",
+                    color: "var(--xp-text-2)",
+                  }}
+                >
+                  {totalCount}
                 </span>
               )}
             </div>
-            <button
-              onClick={markAllRead}
-              className="flex items-center gap-1.5 text-xs text-blue-500 hover:text-blue-400 transition-colors"
-            >
-              <CheckCheck size={13} />
-              Mark all read
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={refresh}
+                className="p-1.5 rounded-lg transition-colors"
+                style={{ color: "var(--xp-text-3)" }}
+                onMouseEnter={(e) =>
+                  (e.currentTarget.style.background = "var(--xp-surface-hi)")
+                }
+                onMouseLeave={(e) =>
+                  (e.currentTarget.style.background = "transparent")
+                }
+                title="Refresh"
+              >
+                <RefreshCw
+                  size={14}
+                  className={loading ? "animate-spin" : ""}
+                />
+              </button>
+              <button
+                onClick={() => setOpen(false)}
+                className="p-1.5 rounded-lg transition-colors"
+                style={{ color: "var(--xp-text-3)" }}
+                onMouseEnter={(e) =>
+                  (e.currentTarget.style.background = "var(--xp-surface-hi)")
+                }
+                onMouseLeave={(e) =>
+                  (e.currentTarget.style.background = "transparent")
+                }
+              >
+                <X size={14} />
+              </button>
+            </div>
           </div>
 
-          {/* List */}
-          <div className="max-h-[420px] overflow-y-auto">
-            {notes.map((n, i) => (
-              <div
-                key={n.id}
-                className={`relative px-4 py-3.5 transition-colors group
-                  ${n.unread ? 'bg-blue-500/5 dark:bg-blue-500/8' : 'hover:bg-[var(--xp-surface-hi)]'}
-                  ${i < notes.length - 1 ? 'border-b border-[var(--xp-border)]' : ''}`}
+          {/* Filter tabs */}
+          {totalCount > 0 && (
+            <div
+              className="flex items-center gap-1 px-3 py-2 overflow-x-auto flex-shrink-0"
+              style={{ borderBottom: "1px solid var(--xp-border)" }}
+            >
+              <button
+                onClick={() => setFilter("all")}
+                className="flex-shrink-0 text-xs px-3 py-1 rounded-full font-medium transition-colors"
+                style={
+                  filter === "all"
+                    ? { background: "var(--primary)", color: "#fff" }
+                    : {
+                        background: "var(--xp-surface-hi)",
+                        color: "var(--xp-text-2)",
+                      }
+                }
               >
-                {n.unread && (
-                  <span className="absolute left-2 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-blue-500" />
-                )}
-                <div className="flex gap-3">
-                  <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${n.iconBg}`}>
-                    {n.icon}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className={`text-sm font-semibold leading-snug ${(n as any).titleCls ?? 'text-[var(--xp-text-1)]'}`}>
-                      {n.title}
-                    </div>
-                    <div className="text-xs text-[var(--xp-text-2)] mt-0.5 leading-relaxed">{n.body}</div>
-                    {n.actions && (
-                      <div className="flex gap-2 mt-2">
-                        <button className="px-3 py-1 text-xs font-medium bg-blue-600 hover:bg-blue-500 text-white rounded-md transition-colors">
-                          {n.actions[0]}
-                        </button>
-                        <button className="px-3 py-1 text-xs font-medium border border-[var(--xp-border)] text-[var(--xp-text-1)] hover:bg-[var(--xp-surface-hi)] rounded-md transition-colors">
-                          {n.actions[1]}
-                        </button>
-                      </div>
-                    )}
-                    <div className="text-[10px] text-[var(--xp-text-3)] mt-1.5">{n.time}</div>
-                  </div>
+                All
+              </button>
+              {SECTION_ORDER.filter((t) => (grouped[t]?.length ?? 0) > 0).map(
+                (type) => (
                   <button
-                    onClick={() => dismiss(n.id)}
-                    className="opacity-0 group-hover:opacity-100 flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-md text-[var(--xp-text-3)] hover:text-[var(--xp-text-1)] hover:bg-[var(--xp-surface-hi)] transition-all"
+                    key={type}
+                    onClick={() => setFilter(type)}
+                    className="flex-shrink-0 text-xs px-3 py-1 rounded-full font-medium transition-colors whitespace-nowrap"
+                    style={
+                      filter === type
+                        ? { background: "var(--primary)", color: "#fff" }
+                        : {
+                            background: "var(--xp-surface-hi)",
+                            color: "var(--xp-text-2)",
+                          }
+                    }
                   >
-                    <X size={12} />
+                    {SECTION_LABELS[type]}
+                    <span className="ml-1 opacity-60">
+                      {grouped[type]?.length}
+                    </span>
                   </button>
-                </div>
-              </div>
-            ))}
+                ),
+              )}
+            </div>
+          )}
 
-            {notes.length === 0 && (
-              <div className="py-12 text-center text-[var(--xp-text-2)] text-sm">
-                <Bell size={24} className="mx-auto mb-2 opacity-30" />
-                No notifications
+          {/* Body */}
+          <div className="overflow-y-auto flex-1">
+            {loading && totalCount === 0 ? (
+              <div className="flex items-center justify-center py-12">
+                <div
+                  className="w-6 h-6 border-2 border-t-transparent rounded-full animate-spin"
+                  style={{
+                    borderColor: "var(--primary)",
+                    borderTopColor: "transparent",
+                  }}
+                />
               </div>
+            ) : totalCount === 0 ? (
+              <div
+                className="flex flex-col items-center justify-center py-12"
+                style={{ color: "var(--xp-text-3)" }}
+              >
+                <Bell size={32} className="mb-2 opacity-30" />
+                <p className="text-sm">No notifications</p>
+              </div>
+            ) : visibleSections.length === 0 ? (
+              <div
+                className="flex items-center justify-center py-10"
+                style={{ color: "var(--xp-text-3)" }}
+              >
+                <p className="text-sm">No items in this category</p>
+              </div>
+            ) : (
+              visibleSections.map((type) => (
+                <div key={type}>
+                  {/* Section header */}
+                  <div
+                    className="sticky top-0 px-4 py-2 flex items-center justify-between z-10"
+                    style={{
+                      background: "var(--xp-surface-hi)",
+                      borderBottom: "1px solid var(--xp-border)",
+                    }}
+                  >
+                    <span
+                      className="text-[10px] font-semibold uppercase tracking-widest"
+                      style={{ color: "var(--xp-text-3)" }}
+                    >
+                      {SECTION_LABELS[type]}
+                    </span>
+                    <span
+                      className="text-xs"
+                      style={{ color: "var(--xp-text-3)" }}
+                    >
+                      {grouped[type]?.length}
+                    </span>
+                  </div>
+                  {grouped[type]?.map((item, idx) => (
+                    <NotifRow
+                      key={`${item.notificationType}-${item.refId}-${idx}`}
+                      item={item}
+                      notifType={type}
+                      onClick={handleRowClick}
+                    />
+                  ))}
+                </div>
+              ))
             )}
           </div>
 
           {/* Footer */}
-          <div className="px-4 py-3 border-t border-[var(--xp-border)] text-center">
-            <button className="text-xs text-blue-500 hover:text-blue-400 font-medium transition-colors">
-              View All Activity
-            </button>
-          </div>
+          {totalCount > 0 && (
+            <div
+              className="px-4 py-2.5 text-center flex-shrink-0"
+              style={{ borderTop: "1px solid var(--xp-border)" }}
+            >
+              <button
+                onClick={() => {
+                  router.push("/notifications");
+                  setOpen(false);
+                }}
+                className="text-xs font-medium hover:underline"
+                style={{ color: "var(--xp-primary-fg)" }}
+              >
+                View all notifications
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>
-  )
+  );
 }

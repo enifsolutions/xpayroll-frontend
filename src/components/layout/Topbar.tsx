@@ -2,7 +2,7 @@
 
 import { ThemeToggle } from '@/components/ui/ThemeToggle'
 import { Search, HelpCircle, ChevronDown } from 'lucide-react'
-import { NotificationDropdown } from '@/components/layout/NotificationDropdown'
+import NotificationDropdown from "@/components/layout/NotificationDropdown";
 import { UserDropdown } from '@/components/layout/UserDropdown'
 import { HEADER_HEIGHT } from '@/constants/theme.constant'
 import { useState } from 'react'
