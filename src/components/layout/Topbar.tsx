@@ -7,6 +7,7 @@ import { UserDropdown } from "@/components/layout/UserDropdown";
 import GlobalSearch from "@/components/GlobalSearch";
 import { HEADER_HEIGHT } from "@/constants/theme.constant";
 import { useAuthStore } from "@/store/authStore";
+import Link from "next/link";
 
 export function Topbar({
   title,
@@ -30,12 +31,19 @@ export function Topbar({
 
       <div className="flex items-center gap-1 ml-auto">
         <NotificationDropdown />
-        <button
+        {/* <button
           className="w-9 h-9 flex items-center justify-center rounded-md text-[var(--xp-text-2)] hover:text-[var(--xp-text-1)] hover:bg-[var(--xp-surface-hi)] transition-colors"
           aria-label="Help"
         >
           <HelpCircle size={17} />
-        </button>
+        </button> */}
+        <Link
+          href="/system/help-center"
+          className="w-9 h-9 flex items-center justify-center rounded-md text-[var(--xp-text-2)] hover:text-[var(--xp-text-1)] hover:bg-[var(--xp-surface-hi)] transition-colors"
+          aria-label="Help"
+        >
+          <HelpCircle size={17} />
+        </Link>
         <ThemeToggle />
         <div className="w-px h-5 bg-[var(--xp-border)] mx-1.5" />
         <div className="flex items-center gap-2 px-3 py-1.5 rounded-md cursor-pointer border border-[var(--xp-border)] hover:bg-[var(--xp-surface-hi)] transition-colors">

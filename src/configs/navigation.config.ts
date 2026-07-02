@@ -197,13 +197,13 @@ const navigationConfig: NavItem[] = [
         icon: DollarSign,
         permissionKey: "Payroll.PayrollRun.View",
       },
-      {
-        key: "loans",
-        label: "Loans",
-        path: "/payroll/loans",
-        icon: Minus,
-        permissionKey: "Payroll.Loan.View",
-      },
+      // {
+      //   key: "loans",
+      //   label: "Loans",
+      //   path: "/payroll/loans",
+      //   icon: Minus,
+      //   permissionKey: "Payroll.Loan.View",
+      // },
     ],
   },
   {
@@ -384,7 +384,6 @@ const navigationConfig: NavItem[] = [
         icon: Shield,
         permissionKey: "Settings.Roles.View",
       },
-
     ],
   },
 ];
