@@ -83,6 +83,7 @@ export const Permissions = {
       Update: "HR.Employee.Update",
       Delete: "HR.Employee.Delete",
       ViewSalary: "HR.Employee.ViewSalary",
+      ParseCv: "HR.Employee.ParseCv",
     },
     Contract: { View: "HR.Contract.View", Manage: "HR.Contract.Manage" },
     ShiftAssignment: {

@@ -55,6 +55,14 @@ import {
   STATUS_COLORS,
 } from "./employee.types";
 import { Permissions } from '@/lib/permissions';
+import CvUploadButton from "@/components/employees/CvUploadButton";
+import {
+  CvParseResult,
+  RecentCvParse,
+  getRecentCvParses,
+  getCvParseById,
+  consumeCvParse,
+} from "@/lib/api/cvParser";
 
 interface LeaveTemplateOption {
   id: string;
@@ -180,11 +188,7 @@ const EmploymentFields = ({
   f: EmployeeForm;
   onChange: (
     field: keyof EmployeeForm,
-  ) => (
-    e: React.ChangeEvent<
-      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
-    >,
-  ) => void;
+  ) => (e: { target: { value: string } }) => void;
   isEdit?: boolean;
   branches: Branch[];
   departments: Department[];
@@ -387,9 +391,10 @@ function Pagination({ page, total, pageSize, onChange }: {
 
 export default function EmployeesPage() {
   useRequirePermission(Permissions.HR.Employee.View);
-  const canEdit = usePermission(Permissions.HR.Employee.Edit);
-  const canAdd = usePermission(Permissions.HR.Employee.Add);
-  const canUnmaskSalary = usePermission(Permissions.HR.Employee.UnmaskSalary);
+  const canEdit = usePermission(Permissions.HR.Employee.Update);
+  const canAdd = usePermission(Permissions.HR.Employee.Create);
+  const canUnmaskSalary = usePermission(Permissions.HR.Employee.ViewSalary);
+  const canParseCv = usePermission(Permissions.HR.Employee.ParseCv);
   const router = useRouter();
   const initialized = useRef(false);
 
@@ -421,6 +426,12 @@ export default function EmployeesPage() {
   const [wizardLeaveTemplateId, setWizardLeaveTemplateId] = useState("");
   const [form1, setForm1] = useState<EmployeeForm>(EMPTY_EMPLOYEE);
   const [form2, setForm2] = useState<ContractForm>(EMPTY_CONTRACT);
+  const [pendingCvQualifications, setPendingCvQualifications] = useState<
+    CvParseResult["qualifications"]
+  >([]);
+  const [parseLogId, setParseLogId] = useState<number | null>(null);
+  const [recentParses, setRecentParses] = useState<RecentCvParse[]>([]);
+  const [recallOpen, setRecallOpen] = useState(false);
 
   // edit
   const [editOpen, setEditOpen] = useState(false);
@@ -561,48 +572,66 @@ export default function EmployeesPage() {
     setWizardLeaveTemplateId("");
     setForm1({ ...EMPTY_EMPLOYEE });
     setForm2({ ...EMPTY_CONTRACT });
+    setPendingCvQualifications([]);
+    setParseLogId(null);
+    setRecallOpen(false); 
     setWizardOpen(true);
   };
   const closeWizard = () => setWizardOpen(false);
 
   const s1 =
-    (field: keyof EmployeeForm) =>
-    (
-      e: React.ChangeEvent<
-        HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
-      >,
-    ) =>
+    (field: keyof EmployeeForm) => (e: { target: { value: string } }) =>
       setForm1((f) => ({ ...f, [field]: e.target.value }));
 
-  const s2 =
-    (field: keyof ContractForm) =>
-    (
-      e: React.ChangeEvent<
-        HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
-      >,
-    ) =>
-      setForm2((f) => ({ ...f, [field]: e.target.value }));
+const s2 = (field: keyof ContractForm) => (e: { target: { value: string } }) =>
+  setForm2((f) => ({ ...f, [field]: e.target.value }));
+
+  const handleCvParsed = (result: CvParseResult) => {
+    setForm1((f) => ({
+      ...f,
+      firstName: result.personalInfo.firstName || f.firstName,
+      lastName: result.personalInfo.lastName || f.lastName,
+      middleName: result.personalInfo.middleName || f.middleName,
+      personalEmail: result.personalInfo.email || f.personalEmail,
+      phoneNumber: result.personalInfo.phoneNumber || f.phoneNumber,
+      dateOfBirth: result.personalInfo.dateOfBirth || f.dateOfBirth,
+      gender: (GENDERS as readonly string[]).includes(
+        result.personalInfo.gender,
+      )
+        ? result.personalInfo.gender
+        : f.gender,
+      nationality: result.personalInfo.nationality || f.nationality,
+      address: result.personalInfo.address || f.address,
+      nationalIdNumber:
+        result.personalInfo.nationalIdNumber || f.nationalIdNumber,
+    }));
+
+    if (result.qualifications.length > 0) {
+      setPendingCvQualifications(result.qualifications);
+    }
+    setParseLogId(result.parseLogId ?? null);
+  };
 
   const handleStep1Next = async () => {
     setWizardError("");
     if (!form1.employeeCode.trim()) {
-      setWizardError("Employee code is required.");
+      showError("Missing information", "Employee code is required.");
       return;
     }
     if (!form1.firstName.trim()) {
-      setWizardError("First name is required.");
+      showError("Missing information", "First name is required.");
       return;
     }
     if (!form1.lastName.trim()) {
-      setWizardError("Last name is required.");
+      showError("Missing information", "Last name is required.");
       return;
     }
     if (!form1.joinDate) {
-      setWizardError("Join date is required.");
+      showError("Missing information", "Join date is required.");
       return;
     }
     if (!wizardLeaveTemplateId) {
-      setWizardError("Leave template is required.");
+      showError("Missing information", "Leave template is required.");
       return;
     }
     setWizardSaving(true);
@@ -644,14 +673,51 @@ export default function EmployeesPage() {
       const created = res.data?.[0];
       if (!created)
         throw new Error("Employee saved but ID could not be retrieved.");
-      setCreatedId(created.id);
+      setCreatedId(String(created.id));
       setForm2((f) => ({ ...f, startDate: form1.joinDate }));
+
+      // Bulk-save any qualifications extracted from the CV parse — best effort,
+      // does not block wizard progression if one entry fails.
+      if (pendingCvQualifications.length > 0) {
+        const results = await Promise.allSettled(
+          pendingCvQualifications.map((q) =>
+            api.post("employee-qualifications/save", {
+              action: "ADD",
+              employeeId: String(created.id),
+              category: q.category,
+              title: q.title || "Untitled",
+              institution: q.institution || null,
+              fromDate: q.fromDate || null,
+              toDate: q.toDate || null,
+              isCurrent: q.isCurrent,
+              grade: q.grade || null,
+              description: q.description || null,
+              userId: 1,
+            }),
+          ),
+        );
+        const failed = results.filter((r) => r.status === "rejected").length;
+        if (failed > 0) {
+          showError(
+            "Some qualifications not saved",
+            `${failed} of ${pendingCvQualifications.length} CV entries failed — add them manually in the Qualifications tab after saving.`,
+          );
+        }
+      }
+
+      if (parseLogId) {
+        try {
+          await consumeCvParse(parseLogId, created.id);
+        } catch {
+          // non-critical — log stays recallable if this fails
+        }
+      }
+
       setWizardStep(2);
     } catch (err: any) {
-      setWizardError(
-        err?.response?.data?.message ??
-          err?.message ??
-          "Failed to save employee.",
+      showError(
+        "Failed to save employee",
+        err?.response?.data?.message ?? err?.message ?? "Please try again.",
       );
     } finally {
       setWizardSaving(false);
@@ -661,14 +727,14 @@ export default function EmployeesPage() {
   const handleStep2Save = async () => {
     setWizardError("");
     if (!form2.startDate) {
-      setWizardError("Start date is required.");
+      showError("Missing information", "Start date is required.");
       return;
     }
     setWizardSaving(true);
     try {
       await api.post("/employees/contracts/save", {
         action: "ADD",
-        employeeId: createdId,
+        employeeId: String(createdId),
         designationId: form1.designationId || null,
         contractType: form2.contractType,
         payrollBasis: form2.payrollBasis,
@@ -690,11 +756,11 @@ export default function EmployeesPage() {
       closeWizard();
       await load();
     } catch (err: any) {
-      setWizardError(
-        err?.response?.data?.message ??
-          err?.message ??
-          "Failed to save contract.",
+      showError(
+        "Failed to save contract.",
+        err?.response?.data?.message ?? err?.message ?? "Please try again.",
       );
+
     } finally {
       setWizardSaving(false);
     }
@@ -780,22 +846,11 @@ export default function EmployeesPage() {
   };
 
   const ef =
-    (field: keyof EmployeeForm) =>
-    (
-      e: React.ChangeEvent<
-        HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
-      >,
-    ) =>
+    (field: keyof EmployeeForm) => (e: { target: { value: string } }) =>
       setEditForm((f) => ({ ...f, [field]: e.target.value }));
 
-  const cf =
-    (field: keyof ContractForm) =>
-    (
-      e: React.ChangeEvent<
-        HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
-      >,
-    ) =>
-      setContractForm((f) => ({ ...f, [field]: e.target.value }));
+const cf = (field: keyof ContractForm) => (e: { target: { value: string } }) =>
+  setContractForm((f) => ({ ...f, [field]: e.target.value }));
 
   const handleEditSave = async () => {
     setEditError("");
@@ -1078,13 +1133,20 @@ export default function EmployeesPage() {
                                   className="w-9 h-9 rounded-lg object-cover shrink-0"
                                   onError={(e) => {
                                     e.currentTarget.style.display = "none";
-                                    (e.currentTarget.nextElementSibling as HTMLElement | null)?.removeAttribute("style");
+                                    (
+                                      e.currentTarget
+                                        .nextElementSibling as HTMLElement | null
+                                    )?.removeAttribute("style");
                                   }}
                                 />
                               ) : null}
                               <div
                                 className={`w-9 h-9 rounded-lg flex items-center justify-center text-xs font-bold shrink-0 ${avatarColor(`${item.firstName} ${item.lastName}`)}`}
-                                style={item.profilePictureUrl ? { display: "none" } : undefined}
+                                style={
+                                  item.profilePictureUrl
+                                    ? { display: "none" }
+                                    : undefined
+                                }
                               >
                                 {initials(item.firstName, item.lastName)}
                               </div>
@@ -1198,9 +1260,61 @@ export default function EmployeesPage() {
         {/* Step 1 — Employee Details */}
         {wizardStep === 1 && (
           <>
-            <div className="px-8 pt-6 pb-2 shrink-0">
+            <div className="px-8 pt-6 pb-2 shrink-0 flex items-center justify-between">
               <h5 className="h5">Employee Details</h5>
+              <div className="flex items-center gap-2">
+                {canParseCv && (
+                  <Button
+                    variant="plain"
+                    size="sm"
+                    onClick={async () => {
+                      const parses = await getRecentCvParses(1);
+                      setRecentParses(parses);
+                      setRecallOpen(true);
+                    }}
+                  >
+                    Recall recent parse
+                  </Button>
+                )}
+                {canParseCv && <CvUploadButton onParsed={handleCvParsed} />}
+              </div>
             </div>
+
+            {recallOpen && (
+              <div className="mx-8 mb-2 p-3 border border-gray-200 dark:border-gray-700 rounded-lg">
+                {recentParses.length === 0 ? (
+                  <p className="text-xs text-gray-400">
+                    No recent unsaved parses in the last 24 hours.
+                  </p>
+                ) : (
+                  recentParses.map((p) => (
+                    <button
+                      key={p.id}
+                      className="w-full text-left text-sm px-2 py-1.5 rounded hover:bg-gray-50 dark:hover:bg-gray-800 flex justify-between"
+                      onClick={async () => {
+                        const result = await getCvParseById(p.id);
+                        handleCvParsed(result);
+                        setRecallOpen(false);
+                      }}
+                    >
+                      <span>
+                        {p.firstName} {p.lastName} — {p.fileName}
+                      </span>
+                      <span className="text-gray-400">
+                        {new Date(p.createdAt).toLocaleTimeString()}
+                      </span>
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
+            {pendingCvQualifications.length > 0 && (
+              <div className="mx-8 mb-2 px-4 py-2 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 rounded-lg text-xs">
+                {pendingCvQualifications.length} qualification(s) detected from
+                CV — will be added automatically after this step. Review fields
+                below before continuing.
+              </div>
+            )}
             <div className="flex-1 overflow-y-auto px-8 py-4">
               <Section title="Personal Information" />
               <div className="grid grid-cols-3 gap-x-6 gap-y-5">
@@ -1307,7 +1421,9 @@ export default function EmployeesPage() {
                       height: "40px",
                       width: "100%",
                       borderRadius: "10px",
-                      border: wizardLeaveTemplateId ? "1px solid #e5e7eb" : "1px solid #fca5a5",
+                      border: wizardLeaveTemplateId
+                        ? "1px solid #e5e7eb"
+                        : "1px solid #fca5a5",
                       backgroundColor: "#f3f4f6",
                       padding: "0 12px",
                       fontSize: "14px",
@@ -1327,12 +1443,14 @@ export default function EmployeesPage() {
                   </select>
                   {wizardLeaveTemplateId && (
                     <p className="text-xs text-amber-600 mt-1">
-                      ⚠ This template seeds leave balances and cannot be changed after saving.
+                      ⚠ This template seeds leave balances and cannot be changed
+                      after saving.
                     </p>
                   )}
                   {leaveTemplates.length === 0 && (
                     <p className="text-xs text-red-500 mt-1">
-                      No active leave templates found. Please create one in Master Data first.
+                      No active leave templates found. Please create one in
+                      Master Data first.
                     </p>
                   )}
                 </Field>
@@ -1396,9 +1514,6 @@ export default function EmployeesPage() {
               </div>
             </div>
             <div className="px-8 py-5 border-t border-gray-100 dark:border-gray-700 shrink-0">
-              {wizardError && (
-                <p className="text-error text-sm mb-3">{wizardError}</p>
-              )}
               <div className="flex justify-end gap-3">
                 <Button variant="plain" onClick={closeWizard}>
                   Cancel
