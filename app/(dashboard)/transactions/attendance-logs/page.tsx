@@ -127,7 +127,7 @@ export default function AttendanceLogsPage() {
   const canRequestAdj = usePermission("Attendance.Adjustment.Request");
   const canApprove = usePermission("Attendance.Adjustment.Approve");
 
-  const userId = useAuthStore((s) => s.user?.userId ?? "1");
+  const userId = useAuthStore((s) => s.user?.userId);
   const router = useRouter();
 
   const initialized = useRef(false);
@@ -500,6 +500,11 @@ export default function AttendanceLogsPage() {
       setAdjError("Status is required.");
       return;
     }
+    
+    if (!userId) {
+      setError("Session not fully loaded yet — please refresh and try again.");
+      return;
+    }
     setAdjSaving(true);
     try {
       await api.post("/attendance-adjustments/save", {
@@ -553,6 +558,11 @@ export default function AttendanceLogsPage() {
     }
     if (!form.workDate) {
       setError("Work date is required.");
+      return;
+    }
+    
+    if (!userId) {
+      setError("Session not fully loaded yet — please refresh and try again.");
       return;
     }
     setSaving(true);
@@ -609,6 +619,10 @@ export default function AttendanceLogsPage() {
   const handleDelete = async () => {
     const item = confirmDelete;
     if (!item) return;
+    if (!userId) {
+      showError("Session not fully loaded yet — please refresh and try again.");
+      return;
+    }
     setConfirmDelete(null);
     setDeleting(item.id);
     try {
@@ -632,6 +646,11 @@ export default function AttendanceLogsPage() {
   };
 
   const handleRunGeneration = async () => {
+    
+    if (!userId) {
+      setError("Session not fully loaded yet — please refresh and try again.");
+      return;
+    }
     setGenRunning(true);
     try {
       await api.post("/attendance-generation/run", {

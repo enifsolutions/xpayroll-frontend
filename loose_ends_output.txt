@@ -1,0 +1,47 @@
+
+=== 1. FIND useRequirePermission HOOK DEFINITION ===
+src/hooks/useRequirePermission.ts
+src/hooks/useRequirePermission.ts
+
+=== 2. SHOW HOOK SOURCE (if found) ===
+Found: src/hooks/useRequirePermission.ts
+'use client'
+
+import { useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { useAuthStore } from '@/store/authStore'
+
+/**
+ * Call at the top of any protected page component.
+ * Redirects to /403 immediately if the user lacks the permission.
+ * Reads from in-memory store — zero network calls.
+ *
+ * @example
+ * export default function BranchesPage() {
+ *   useRequirePermission(Permissions.MasterData.Branches.View)
+ *   // ...rest of page
+ * }
+ */
+export function useRequirePermission(key: string): void {
+  const router    = useRouter()
+  const hasAccess = useAuthStore((s) => s.hasPermission(key))
+
+  useEffect(() => {
+    if (!hasAccess) {
+      router.replace('/403')
+    }
+  }, [hasAccess, router])
+}
+
+=== 3. SHOW ONE EXAMPLE USAGE (any existing page that calls it) ===
+
+=== 4. CONFIRM OverrideScoreLimit STATUS IN permissions.ts (backlog check) ===
+224:      OverrideScoreLimit: "Recruitment.Ai.OverrideScoreLimit",
+
+=== 5. CONFIRM pipeline/page.tsx:160 STILL REFERENCES IT / STILL ERRORS ===
+
+=== 6. RUN A QUICK TYPE CHECK TO CONFIRM THE BACKLOG ITEM IS RESOLVED ===
+app/(dashboard)/recruitment/pipeline/page.tsx(385,15): error TS2322: Type '"twoTone"' is not assignable to type '"default" | "solid" | "plain" | undefined'.
+No pipeline/page.tsx errors found — backlog item appears resolved.
+
+=== DONE ===

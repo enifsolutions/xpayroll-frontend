@@ -22,6 +22,7 @@ import {
 import { useRequirePermission } from "@/hooks/useRequirePermission";
 import { usePermission } from "@/hooks/usePermission";
 import { Permissions } from "@/lib/permissions";
+import { useAuthStore } from "@/store/authStore";
 
 interface LeaveType {
   id: string;
@@ -114,6 +115,7 @@ const initials = (name: string) =>
 export default function LeaveTypesPage() {
   useRequirePermission(Permissions.MasterData.LeaveTypes.View);
   const canManage = usePermission(Permissions.MasterData.LeaveTypes.Manage);
+  const userId = useAuthStore((s) => s.user?.userId);
 
   const [items, setItems] = useState<LeaveType[]>([]);
   const [stats, setStats] = useState<LeaveTypeStats | null>(null);
@@ -241,7 +243,7 @@ export default function LeaveTypesPage() {
         genderRestriction: form.genderRestriction || null,
         isCoveringEmployee: form.isCoveringEmployee,
         isActive: form.isActive,
-        userId: null,
+        userId,
       });
       setDialogOpen(false);
       await load();

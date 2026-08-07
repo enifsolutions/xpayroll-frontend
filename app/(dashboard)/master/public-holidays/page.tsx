@@ -130,7 +130,7 @@ function parseIcs(
 export default function PublicHolidaysPage() {
   useRequirePermission(Permissions.MasterData.PublicHolidays.View);
   const canManage = usePermission(Permissions.MasterData.PublicHolidays.Manage);
-  const userId = useAuthStore((s) => s.user?.userId ?? "1");
+  const userId = useAuthStore((s) => s.user?.userId);
 
   const [items, setItems] = useState<PublicHoliday[]>([]);
   const [loading, setLoading] = useState(true);
@@ -211,6 +211,10 @@ export default function PublicHolidaysPage() {
       setError("Date is required.");
       return;
     }
+    if (!userId) {
+      setError("Session not fully loaded yet — please refresh and try again.");
+      return;
+    }
     setSaving(true);
     setError("");
     try {
@@ -238,6 +242,10 @@ export default function PublicHolidaysPage() {
 
   const handleDelete = async (item: PublicHoliday) => {
     if (!confirm(`Delete "${item.name}"?`)) return;
+    if (!userId) {
+      setError("Session not fully loaded yet — please refresh and try again.");
+      return;
+    }
     try {
       await api.post("/PublicHolidays/save", {
         action: "DELETE",
@@ -291,6 +299,10 @@ export default function PublicHolidaysPage() {
     const toImport = icsHolidays.filter((h) => h.selected && !h.duplicate);
     if (toImport.length === 0) {
       showError("Nothing selected", "Select at least one holiday to import.");
+      return;
+    }
+    if (!userId) {
+      setError("Session not fully loaded yet — please refresh and try again.");
       return;
     }
     setImporting(true);

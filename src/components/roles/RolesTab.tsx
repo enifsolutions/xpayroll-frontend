@@ -26,8 +26,7 @@ export default function RolesTab({
   onRefresh,
   addTrigger,
 }: Props) {
-  const userId = useAuthStore((s) => s.user?.userId ?? "1");
-
+  const userId = useAuthStore((s) => s.user?.userId);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [matrixOpen, setMatrixOpen] = useState(false);
   const [editing, setEditing] = useState<Role | null>(null);
@@ -64,6 +63,10 @@ export default function RolesTab({
       setError("Role name is required.");
       return;
     }
+    if (!userId) {
+      setError("Session not fully loaded yet — please refresh and try again.");
+      return;
+    }
     setSaving(true);
     try {
       await api.post("/roles/save", {
@@ -88,6 +91,10 @@ export default function RolesTab({
 
   const handleDelete = async (role: Role) => {
     if (!confirm(`Delete role "${role.name}"? This cannot be undone.`)) return;
+    if (!userId) {
+      showError("Session Error", "Please refresh and try again.");
+      return;
+    }
     try {
       await api.post("/roles/save", { action: "DELETE", id: role.id, userId });
       await onRefresh();

@@ -43,7 +43,7 @@ export default function PermissionMatrixDialog({
   role,
   permissions,
 }: Props) {
-  const userId = useAuthStore((s) => s.user?.userId ?? "1");
+  const userId = useAuthStore((s) => s.user?.userId);
 
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
@@ -91,6 +91,10 @@ export default function PermissionMatrixDialog({
   };
 
   const handleSave = async () => {
+    if (!userId) {
+      showError("Session Error", "Please refresh and try again.");
+      return;
+    }
     setSaving(true);
     try {
       await api.post(`/roles/${role.id}/permissions/save`, {

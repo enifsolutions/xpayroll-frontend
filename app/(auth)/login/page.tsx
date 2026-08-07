@@ -109,14 +109,15 @@ const ShadowInput = forwardRef<
       input {
         flex: 1; border: none; outline: none; background: transparent;
         font-size: 14px; color: #111827; font-family: Inter, -apple-system, sans-serif;
-        height: 100%; caret-color: #3b82f6; -webkit-text-fill-color: #111827;
+        height: 100%; caret-color: #3b82f6; 
+        // -webkit-text-fill-color: #111827;
         padding: 0; margin: 0; -webkit-appearance: none; appearance: none; box-shadow: none;
       }
       input::placeholder { color: #9ca3af; -webkit-text-fill-color: #9ca3af; opacity: 1; }
       input:-webkit-autofill,
       input:-webkit-autofill:focus {
         -webkit-box-shadow: 0 0 0 1000px #f9fafb inset !important;
-        -webkit-text-fill-color: #111827 !important;
+        // -webkit-text-fill-color: #111827 !important;
         transition: background-color 9999s 0s;
       }
       .suffix-slot { display: flex; align-items: center; flex-shrink: 0; }

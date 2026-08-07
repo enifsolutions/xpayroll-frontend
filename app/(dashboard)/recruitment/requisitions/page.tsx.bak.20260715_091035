@@ -1,0 +1,1125 @@
+"use client";
+
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import {
+  Plus,
+  Pencil,
+  Trash2,
+  Send,
+  DoorOpen,
+  PauseCircle,
+  XCircle,
+  CheckCircle2,
+  Users,
+  RefreshCw,
+  Briefcase,
+  Clock,
+  CheckCheck,
+} from "lucide-react";
+
+import Button from "@/components/ui/Button";
+import Dialog from "@/components/ui/Dialog";
+import Input from "@/components/ui/Input";
+import api from "@/lib/axios";
+import { showSuccess, showError } from "@/lib/toast";
+import { useRequirePermission } from "@/hooks/useRequirePermission";
+import { usePermission } from "@/hooks/usePermission";
+import { Permissions } from "@/lib/permissions";
+
+interface Requisition {
+  id: string;
+  requisitionCode: string;
+  title: string;
+  branchId: string | null;
+  branchName: string | null;
+  departmentId: string | null;
+  departmentName: string | null;
+  designationId: string | null;
+  designationTitle: string | null;
+  hiringManagerId: string | null;
+  hiringManagerName: string | null;
+  headcount: number;
+  headcountFilled: number;
+  employmentType: string;
+  salaryMin: number | null;
+  salaryMax: number | null;
+  experienceMinYears: number | null;
+  justification: string | null;
+  requirements: string | null;
+  responsibilities: string | null;
+  targetStartDate: string | null;
+  status: string;
+  rejectionReason: string | null;
+  l1Decision: string | null;
+  l1ActionedByName: string | null;
+  l2Decision: string | null;
+  l2ActionedByName: string | null;
+  applicationCount: number;
+  createdAt: string;
+}
+
+interface Lookup {
+  id: string;
+  name: string;
+}
+
+interface RequisitionForm {
+  title: string;
+  branchId: string;
+  departmentId: string;
+  designationId: string;
+  headcount: string;
+  employmentType: string;
+  salaryMin: string;
+  salaryMax: string;
+  experienceMinYears: string;
+  targetStartDate: string;
+  justification: string;
+  requirements: string;
+  responsibilities: string;
+}
+
+const EMPTY: RequisitionForm = {
+  title: "",
+  branchId: "",
+  departmentId: "",
+  designationId: "",
+  headcount: "1",
+  employmentType: "FullTime",
+  salaryMin: "",
+  salaryMax: "",
+  experienceMinYears: "",
+  targetStartDate: "",
+  justification: "",
+  requirements: "",
+  responsibilities: "",
+};
+
+const EMPLOYMENT_TYPES = [
+  { value: "FullTime", label: "Full Time" },
+  { value: "PartTime", label: "Part Time" },
+  { value: "Contract", label: "Contract" },
+  { value: "Intern", label: "Intern" },
+  { value: "Freelance", label: "Freelance" },
+];
+
+const STATUS_BADGE: Record<string, string> = {
+  Draft: "xp-badge-neutral",
+  PendingApproval: "xp-badge-warning",
+  Approved: "xp-badge-info",
+  Rejected: "xp-badge-danger",
+  Open: "xp-badge-success",
+  OnHold: "xp-badge-warning",
+  Closed: "xp-badge-neutral",
+  Cancelled: "xp-badge-danger",
+};
+
+const STATUS_LABEL: Record<string, string> = {
+  PendingApproval: "Pending Approval",
+  OnHold: "On Hold",
+};
+
+type ReqAction = "DELETE" | "SUBMIT" | "OPEN" | "HOLD" | "CLOSE" | "CANCEL";
+
+function KpiCard({
+  label,
+  value,
+  sub,
+  icon: Icon,
+  color,
+}: {
+  label: string;
+  value: string | number;
+  sub?: string;
+  icon: React.ElementType;
+  color: string;
+}) {
+  return (
+    <div className="card">
+      <div className="card-body flex items-center gap-4">
+        <div
+          className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${color}`}
+        >
+          <Icon size={22} />
+        </div>
+        <div className="min-w-0">
+          <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide truncate">
+            {label}
+          </p>
+          <p className="text-2xl font-bold text-gray-900 dark:text-white">
+            {value}
+          </p>
+          {sub && (
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+              {sub}
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ApprovalChip({
+  level,
+  decision,
+}: {
+  level: string;
+  decision: string | null;
+}) {
+  if (!decision || decision === "Pending") {
+    return (
+      <span className="text-[11px] font-medium px-1.5 py-0.5 rounded border border-gray-200 dark:border-gray-700 text-gray-400">
+        {level}
+      </span>
+    );
+  }
+  const cls = decision === "Approved" ? "xp-badge-success" : "xp-badge-danger";
+  return (
+    <span className={`xp-badge ${cls} text-[11px]`} title={decision}>
+      {level}
+    </span>
+  );
+}
+
+export default function RequisitionsPage() {
+  useRequirePermission("Recruitment.Requisition.View");
+
+  const canManage = usePermission(Permissions.Recruitment.Requisition.Create);
+  const canApproveL1 = usePermission(
+    Permissions.Recruitment.Requisition.ApproveL1,
+  );
+  const canApproveL2 = usePermission(
+    Permissions.Recruitment.Requisition.ApproveL2,
+  );
+
+  const router = useRouter();
+  const initialized = useRef(false);
+
+  const [items, setItems] = useState<Requisition[]>([]);
+  const [branches, setBranches] = useState<Lookup[]>([]);
+  const [departments, setDepartments] = useState<Lookup[]>([]);
+  const [designations, setDesignations] = useState<Lookup[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editing, setEditing] = useState<Requisition | null>(null);
+  const [form, setForm] = useState<RequisitionForm>(EMPTY);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  const [confirmRow, setConfirmRow] = useState<Requisition | null>(null);
+  const [confirmAction, setConfirmAction] = useState<ReqAction | null>(null);
+  const [acting, setActing] = useState(false);
+
+  const [approveRow, setApproveRow] = useState<Requisition | null>(null);
+  const [approveLevel, setApproveLevel] = useState<"L1" | "L2">("L1");
+  const [approveComments, setApproveComments] = useState("");
+  const [approveError, setApproveError] = useState("");
+  const [approving, setApproving] = useState(false);
+
+  const load = async () => {
+    try {
+      setLoading(true);
+      const res = await api.get<Requisition[]>("/requisitions");
+      setItems(res.data ?? []);
+    } catch (err: any) {
+      showError(
+        "Load failed",
+        err?.response?.data?.error ?? "Could not load requisitions.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadLookups = async () => {
+    try {
+      const [b, d, dg] = await Promise.all([
+        api.get("/branches"),
+        api.get("/departments"),
+        api.get("/designations"),
+      ]);
+      setBranches((b.data ?? []).map((x: any) => ({ id: x.id, name: x.name })));
+      setDepartments(
+        (d.data ?? []).map((x: any) => ({ id: x.id, name: x.name })),
+      );
+      // designations uses `title`, not `name`
+      setDesignations(
+        (dg.data ?? []).map((x: any) => ({ id: x.id, name: x.title })),
+      );
+    } catch {
+      // lookups are non-fatal — the form still works with them empty
+    }
+  };
+
+  useEffect(() => {
+    if (initialized.current) return;
+    initialized.current = true;
+    load();
+    loadLookups();
+  }, []);
+
+  const filtered = useMemo(() => {
+    return items.filter((r) => {
+      if (statusFilter && r.status !== statusFilter) return false;
+      if (search) {
+        const q = search.toLowerCase();
+        if (
+          !r.title.toLowerCase().includes(q) &&
+          !r.requisitionCode.toLowerCase().includes(q) &&
+          !(r.departmentName ?? "").toLowerCase().includes(q)
+        )
+          return false;
+      }
+      return true;
+    });
+  }, [items, search, statusFilter]);
+
+  const stats = useMemo(
+    () => ({
+      total: items.length,
+      pending: items.filter((r) => r.status === "PendingApproval").length,
+      open: items.filter((r) => r.status === "Open").length,
+      applicants: items.reduce((sum, r) => sum + r.applicationCount, 0),
+    }),
+    [items],
+  );
+
+  const openAdd = () => {
+    setEditing(null);
+    setForm({ ...EMPTY });
+    setError("");
+    setDialogOpen(true);
+  };
+
+  const openEdit = (r: Requisition) => {
+    setEditing(r);
+    setForm({
+      title: r.title ?? "",
+      branchId: r.branchId ?? "",
+      departmentId: r.departmentId ?? "",
+      designationId: r.designationId ?? "",
+      headcount: String(r.headcount ?? 1),
+      employmentType: r.employmentType ?? "FullTime",
+      salaryMin: r.salaryMin?.toString() ?? "",
+      salaryMax: r.salaryMax?.toString() ?? "",
+      experienceMinYears: r.experienceMinYears?.toString() ?? "",
+      targetStartDate: r.targetStartDate ?? "",
+      justification: r.justification ?? "",
+      requirements: r.requirements ?? "",
+      responsibilities: r.responsibilities ?? "",
+    });
+    setError("");
+    setDialogOpen(true);
+  };
+
+  const handleSave = async () => {
+    if (!form.title.trim()) {
+      setError("Title is required.");
+      return;
+    }
+    const headcount = parseInt(form.headcount);
+    if (!headcount || headcount < 1) {
+      setError("Headcount must be at least 1.");
+      return;
+    }
+    const min = form.salaryMin ? parseFloat(form.salaryMin) : null;
+    const max = form.salaryMax ? parseFloat(form.salaryMax) : null;
+    if (min !== null && max !== null && max < min) {
+      setError("Maximum salary must be greater than or equal to minimum.");
+      return;
+    }
+
+    setSaving(true);
+    setError("");
+    try {
+      await api.post("/requisitions/save", {
+        action: editing ? "UPDATE" : "ADD",
+        id: editing?.id ?? null,
+        title: form.title.trim(),
+        branchId: form.branchId || null,
+        departmentId: form.departmentId || null,
+        designationId: form.designationId || null,
+        headcount,
+        employmentType: form.employmentType,
+        salaryMin: min,
+        salaryMax: max,
+        experienceMinYears: form.experienceMinYears
+          ? parseFloat(form.experienceMinYears)
+          : null,
+        targetStartDate: form.targetStartDate || null,
+        justification: form.justification.trim() || null,
+      });
+      setDialogOpen(false);
+      await load();
+      showSuccess(
+        editing ? "Requisition updated" : "Requisition created",
+        form.title,
+      );
+    } catch (err: any) {
+      const msg = err?.response?.data?.message ?? err?.response?.data?.error;
+      setError(msg ?? "Could not save requisition.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const askConfirm = (r: Requisition, action: ReqAction) => {
+    setConfirmRow(r);
+    setConfirmAction(action);
+  };
+
+  const closeConfirm = () => {
+    setConfirmRow(null);
+    setConfirmAction(null);
+  };
+
+  const runAction = async () => {
+    if (!confirmRow || !confirmAction) return;
+    setActing(true);
+    try {
+      await api.post("/requisitions/save", {
+        action: confirmAction,
+        id: confirmRow.id,
+      });
+      closeConfirm();
+      await load();
+      showSuccess("Requisition updated", confirmRow.requisitionCode);
+    } catch (err: any) {
+      showError(
+        "Action failed",
+        err?.response?.data?.message ??
+          err?.response?.data?.error ??
+          "Could not complete the action.",
+      );
+    } finally {
+      setActing(false);
+    }
+  };
+
+  const openApprove = (r: Requisition, level: "L1" | "L2") => {
+    setApproveRow(r);
+    setApproveLevel(level);
+    setApproveComments("");
+    setApproveError("");
+  };
+
+  const submitApproval = async (decision: "APPROVE" | "REJECT") => {
+    if (!approveRow) return;
+    if (decision === "REJECT" && !approveComments.trim()) {
+      setApproveError("A comment is required when rejecting.");
+      return;
+    }
+    setApproving(true);
+    setApproveError("");
+    try {
+      const path =
+        approveLevel === "L1"
+          ? "/requisitions/approve/l1"
+          : "/requisitions/approve/l2";
+      await api.post(path, {
+        requisitionId: approveRow.id,
+        action: decision,
+        comments: approveComments.trim() || null,
+      });
+      setApproveRow(null);
+      await load();
+      showSuccess(
+        decision === "APPROVE"
+          ? "Requisition approved"
+          : "Requisition rejected",
+        approveRow.requisitionCode,
+      );
+    } catch (err: any) {
+      setApproveError(
+        err?.response?.data?.message ??
+          err?.response?.data?.error ??
+          "Could not record the decision.",
+      );
+    } finally {
+      setApproving(false);
+    }
+  };
+
+  const confirmCopy = (): {
+    title: string;
+    message: string;
+    danger: boolean;
+  } => {
+    const code = confirmRow?.requisitionCode ?? "";
+    switch (confirmAction) {
+      case "DELETE":
+        return {
+          title: "Delete requisition",
+          message: `${code} will be soft-deleted. This cannot be undone.`,
+          danger: true,
+        };
+      case "SUBMIT":
+        return {
+          title: "Submit for approval",
+          message: `${code} will go for two-level approval and cannot be edited while pending.`,
+          danger: false,
+        };
+      case "OPEN":
+        return {
+          title: "Open requisition",
+          message: `${code} will start accepting applications.`,
+          danger: false,
+        };
+      case "HOLD":
+        return {
+          title: "Put on hold",
+          message: `${code} will stop accepting new applications.`,
+          danger: false,
+        };
+      case "CLOSE":
+        return {
+          title: "Close requisition",
+          message: `${code} will be closed and any live job postings expired.`,
+          danger: false,
+        };
+      case "CANCEL":
+        return {
+          title: "Cancel requisition",
+          message: `${code} will be cancelled and any live job postings expired.`,
+          danger: true,
+        };
+      default:
+        return { title: "", message: "", danger: false };
+    }
+  };
+
+  const money = (n: number | null) =>
+    n === null ? null : n.toLocaleString("en-LK", { maximumFractionDigits: 0 });
+
+  const band = (r: Requisition) => {
+    const lo = money(r.salaryMin);
+    const hi = money(r.salaryMax);
+    if (!lo && !hi) return "—";
+    if (lo && hi) return `${lo} – ${hi}`;
+    return lo ?? hi ?? "—";
+  };
+
+  const isEditable = (s: string) => s === "Draft" || s === "Rejected";
+
+  const pendingL1 = (r: Requisition) =>
+    r.status === "PendingApproval" &&
+    (!r.l1Decision || r.l1Decision === "Pending");
+
+  const pendingL2 = (r: Requisition) =>
+    r.status === "PendingApproval" &&
+    r.l1Decision === "Approved" &&
+    (!r.l2Decision || r.l2Decision === "Pending");
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+        <div>
+          <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+            Job Requisitions
+          </h3>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+            Raise headcount requests, route them for two-level approval, and
+            open them for hiring
+          </p>
+        </div>
+        {canManage && (
+          <Button
+            variant="solid"
+            size="sm"
+            icon={<Plus size={15} />}
+            onClick={openAdd}
+          >
+            New Requisition
+          </Button>
+        )}
+      </div>
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <KpiCard
+          label="Total"
+          value={loading ? "—" : stats.total}
+          sub="All requisitions"
+          icon={Briefcase}
+          color="bg-violet-100 text-violet-600 dark:bg-violet-900/40 dark:text-violet-400"
+        />
+        <KpiCard
+          label="Pending Approval"
+          value={loading ? "—" : stats.pending}
+          sub="Awaiting sign-off"
+          icon={Clock}
+          color="bg-amber-100 text-amber-600 dark:bg-amber-900/40 dark:text-amber-400"
+        />
+        <KpiCard
+          label="Open"
+          value={loading ? "—" : stats.open}
+          sub="Accepting applications"
+          icon={CheckCheck}
+          color="bg-emerald-100 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-400"
+        />
+        <KpiCard
+          label="Applicants"
+          value={loading ? "—" : stats.applicants}
+          sub="Across all requisitions"
+          icon={Users}
+          color="bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-400"
+        />
+      </div>
+
+      <div className="card">
+        <div className="card-body">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-5">
+            <div className="flex-1 max-w-xs">
+              <Input
+                placeholder="Search code, title or department…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+
+            <select
+              className="input"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              style={{ minWidth: 170 }}
+            >
+              <option value="">All Statuses</option>
+              <option value="Draft">Draft</option>
+              <option value="PendingApproval">Pending Approval</option>
+              <option value="Approved">Approved</option>
+              <option value="Open">Open</option>
+              <option value="OnHold">On Hold</option>
+              <option value="Rejected">Rejected</option>
+              <option value="Closed">Closed</option>
+              <option value="Cancelled">Cancelled</option>
+            </select>
+
+            <button
+              onClick={load}
+              className="p-2 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-500 transition-colors"
+              title="Refresh"
+            >
+              <RefreshCw size={15} className={loading ? "animate-spin" : ""} />
+            </button>
+
+            <span className="text-sm text-gray-400 ml-auto whitespace-nowrap">
+              {filtered.length} requisition{filtered.length !== 1 ? "s" : ""}
+            </span>
+          </div>
+
+          {loading ? (
+            <div className="flex items-center justify-center py-16">
+              <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-gray-400">
+              <Briefcase size={40} className="mb-3 opacity-30" />
+              <p className="text-sm">No requisitions found</p>
+              {(search || statusFilter) && (
+                <button
+                  onClick={() => {
+                    setSearch("");
+                    setStatusFilter("");
+                  }}
+                  className="text-xs text-violet-500 hover:underline mt-1"
+                >
+                  Clear filters
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="table-default table-hover w-full">
+                <thead>
+                  <tr>
+                    <th>Code</th>
+                    <th>Position</th>
+                    <th>Department</th>
+                    <th>Headcount</th>
+                    <th>Salary Band</th>
+                    <th>Approvals</th>
+                    <th>Status</th>
+                    <th>Applicants</th>
+                    <th className="text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map((r) => (
+                    <tr key={r.id}>
+                      <td>
+                        <span className="font-mono text-xs bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 px-2 py-1 rounded-md">
+                          {r.requisitionCode}
+                        </span>
+                      </td>
+
+                      <td>
+                        <button
+                          onClick={() =>
+                            router.push(`/recruitment/requisitions/${r.id}`)
+                          }
+                          className="font-semibold text-gray-900 dark:text-white text-sm text-left hover:text-violet-500"
+                        >
+                          {r.title}
+                        </button>
+                        <p className="text-xs text-gray-400">
+                          {r.designationTitle ?? r.employmentType}
+                        </p>
+                      </td>
+
+                      <td>
+                        <span className="text-sm text-gray-500 dark:text-gray-400">
+                          {r.departmentName ?? "—"}
+                        </span>
+                      </td>
+
+                      <td>
+                        <span className="text-sm">
+                          {r.headcountFilled} / {r.headcount}
+                        </span>
+                      </td>
+
+                      <td>
+                        <span className="text-sm text-gray-500 dark:text-gray-400">
+                          {band(r)}
+                        </span>
+                      </td>
+
+                      <td>
+                        <div className="flex items-center gap-1">
+                          <ApprovalChip level="L1" decision={r.l1Decision} />
+                          <ApprovalChip level="L2" decision={r.l2Decision} />
+                        </div>
+                      </td>
+
+                      <td>
+                        <span
+                          className={`xp-badge ${STATUS_BADGE[r.status] ?? "xp-badge-neutral"}`}
+                        >
+                          {STATUS_LABEL[r.status] ?? r.status}
+                        </span>
+                      </td>
+
+                      <td>
+                        {r.applicationCount > 0 ? (
+                          <button
+                            onClick={() =>
+                              router.push(
+                                `/recruitment/pipeline?requisitionId=${r.id}`,
+                              )
+                            }
+                            className="inline-flex items-center gap-1 text-sm text-violet-500 hover:underline"
+                          >
+                            <Users size={13} />
+                            {r.applicationCount}
+                          </button>
+                        ) : (
+                          <span className="text-sm text-gray-400">0</span>
+                        )}
+                      </td>
+
+                      <td>
+                        <div className="flex items-center justify-end gap-1">
+                          {canApproveL1 && pendingL1(r) && (
+                            <button
+                              onClick={() => openApprove(r, "L1")}
+                              className="p-1.5 rounded-lg hover:bg-amber-50 dark:hover:bg-amber-900/20 text-amber-500 transition-colors"
+                              title="Approve / reject (L1)"
+                            >
+                              <CheckCircle2 size={15} />
+                            </button>
+                          )}
+
+                          {canApproveL2 && pendingL2(r) && (
+                            <button
+                              onClick={() => openApprove(r, "L2")}
+                              className="p-1.5 rounded-lg hover:bg-amber-50 dark:hover:bg-amber-900/20 text-amber-600 transition-colors"
+                              title="Approve / reject (L2)"
+                            >
+                              <CheckCircle2 size={15} />
+                            </button>
+                          )}
+
+                          {canManage && isEditable(r.status) && (
+                            <>
+                              <button
+                                onClick={() => askConfirm(r, "SUBMIT")}
+                                className="p-1.5 rounded-lg hover:bg-violet-50 dark:hover:bg-violet-900/20 text-violet-500 transition-colors"
+                                title="Submit for approval"
+                              >
+                                <Send size={15} />
+                              </button>
+                              <button
+                                onClick={() => openEdit(r)}
+                                className="p-1.5 rounded-lg hover:bg-violet-50 dark:hover:bg-violet-900/20 text-violet-500 transition-colors"
+                                title="Edit"
+                              >
+                                <Pencil size={15} />
+                              </button>
+                              <button
+                                onClick={() => askConfirm(r, "DELETE")}
+                                className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-red-500 transition-colors"
+                                title="Delete"
+                              >
+                                <Trash2 size={15} />
+                              </button>
+                            </>
+                          )}
+
+                          {canManage && r.status === "Approved" && (
+                            <button
+                              onClick={() => askConfirm(r, "OPEN")}
+                              className="p-1.5 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-900/20 text-emerald-500 transition-colors"
+                              title="Open for applications"
+                            >
+                              <DoorOpen size={15} />
+                            </button>
+                          )}
+
+                          {canManage && r.status === "Open" && (
+                            <button
+                              onClick={() => askConfirm(r, "HOLD")}
+                              className="p-1.5 rounded-lg hover:bg-amber-50 dark:hover:bg-amber-900/20 text-amber-500 transition-colors"
+                              title="Put on hold"
+                            >
+                              <PauseCircle size={15} />
+                            </button>
+                          )}
+
+                          {canManage &&
+                            (r.status === "Open" || r.status === "OnHold") && (
+                              <button
+                                onClick={() => askConfirm(r, "CLOSE")}
+                                className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 transition-colors"
+                                title="Close"
+                              >
+                                <CheckCheck size={15} />
+                              </button>
+                            )}
+
+                          {canManage &&
+                            !["Closed", "Cancelled", "Draft"].includes(
+                              r.status,
+                            ) && (
+                              <button
+                                onClick={() => askConfirm(r, "CANCEL")}
+                                className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-red-500 transition-colors"
+                                title="Cancel"
+                              >
+                                <XCircle size={15} />
+                              </button>
+                            )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Add / Edit */}
+      <Dialog
+        isOpen={dialogOpen}
+        onClose={() => setDialogOpen(false)}
+        onRequestClose={() => setDialogOpen(false)}
+        width={720}
+      >
+        <h5 className="h5 mb-4">
+          {editing ? `Edit ${editing.requisitionCode}` : "New Requisition"}
+        </h5>
+
+        <div className="space-y-4">
+          <div>
+            <label className="form-label">
+              Title <span className="text-error">*</span>
+            </label>
+            <Input
+              placeholder="e.g. Senior Payroll Analyst"
+              value={form.title}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, title: e.target.value }))
+              }
+            />
+          </div>
+
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <label className="form-label">Branch</label>
+              <select
+                className="input w-full"
+                value={form.branchId}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, branchId: e.target.value }))
+                }
+              >
+                <option value="">— Select —</option>
+                {branches.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="form-label">Department</label>
+              <select
+                className="input w-full"
+                value={form.departmentId}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, departmentId: e.target.value }))
+                }
+              >
+                <option value="">— Select —</option>
+                {departments.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="form-label">Designation</label>
+              <select
+                className="input w-full"
+                value={form.designationId}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, designationId: e.target.value }))
+                }
+              >
+                <option value="">— Select —</option>
+                {designations.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <label className="form-label">
+                Headcount <span className="text-error">*</span>
+              </label>
+              <Input
+                type="number"
+                min="1"
+                value={form.headcount}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, headcount: e.target.value }))
+                }
+              />
+            </div>
+            <div>
+              <label className="form-label">Employment Type</label>
+              <select
+                className="input w-full"
+                value={form.employmentType}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, employmentType: e.target.value }))
+                }
+              >
+                {EMPLOYMENT_TYPES.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="form-label">Min. Experience (yrs)</label>
+              <Input
+                type="number"
+                min="0"
+                step="0.5"
+                placeholder="Optional"
+                value={form.experienceMinYears}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, experienceMinYears: e.target.value }))
+                }
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <label className="form-label">Salary Min (LKR)</label>
+              <Input
+                type="number"
+                min="0"
+                placeholder="Optional"
+                value={form.salaryMin}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, salaryMin: e.target.value }))
+                }
+              />
+            </div>
+            <div>
+              <label className="form-label">Salary Max (LKR)</label>
+              <Input
+                type="number"
+                min="0"
+                placeholder="Optional"
+                value={form.salaryMax}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, salaryMax: e.target.value }))
+                }
+              />
+            </div>
+            <div>
+              <label className="form-label">Target Start Date</label>
+              <Input
+                type="date"
+                value={form.targetStartDate}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, targetStartDate: e.target.value }))
+                }
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="form-label">Justification</label>
+            <textarea
+              className="input w-full resize-none"
+              rows={2}
+              placeholder="Why is this headcount needed?"
+              value={form.justification}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, justification: e.target.value }))
+              }
+            />
+          </div>
+
+          {error && (
+            <p className="text-sm text-red-500 bg-red-50 dark:bg-red-900/20 rounded-lg px-3 py-2">
+              {error}
+            </p>
+          )}
+        </div>
+
+        <div className="flex justify-end gap-2 mt-6">
+          <Button variant="default" onClick={() => setDialogOpen(false)}>
+            Cancel
+          </Button>
+          <Button variant="solid" loading={saving} onClick={handleSave}>
+            {editing ? "Save Changes" : "Create"}
+          </Button>
+        </div>
+      </Dialog>
+
+      {/* Approve / reject */}
+      <Dialog
+        isOpen={!!approveRow}
+        onClose={() => setApproveRow(null)}
+        onRequestClose={() => setApproveRow(null)}
+        width={520}
+      >
+        <h5 className="h5 mb-1">
+          {approveLevel} Approval — {approveRow?.requisitionCode}
+        </h5>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+          {approveRow?.title} · {approveRow?.headcount} position
+          {(approveRow?.headcount ?? 0) !== 1 ? "s" : ""}
+          {approveRow?.departmentName ? ` · ${approveRow.departmentName}` : ""}
+        </p>
+
+        <div className="space-y-4">
+          <div>
+            <label className="form-label">Comments</label>
+            <textarea
+              className="input w-full resize-none"
+              rows={3}
+              placeholder="Required if rejecting."
+              value={approveComments}
+              onChange={(e) => setApproveComments(e.target.value)}
+            />
+          </div>
+
+          {approveError && (
+            <p className="text-sm text-red-500 bg-red-50 dark:bg-red-900/20 rounded-lg px-3 py-2">
+              {approveError}
+            </p>
+          )}
+        </div>
+
+        <div className="flex justify-end gap-2 mt-6">
+          <Button variant="default" onClick={() => setApproveRow(null)}>
+            Cancel
+          </Button>
+          <Button
+            variant="solid"
+            className="bg-red-500 hover:bg-red-600 text-white border-red-500"
+            loading={approving}
+            onClick={() => submitApproval("REJECT")}
+          >
+            Reject
+          </Button>
+          <Button
+            variant="solid"
+            loading={approving}
+            onClick={() => submitApproval("APPROVE")}
+          >
+            Approve
+          </Button>
+        </div>
+      </Dialog>
+
+      {/* Confirm action */}
+      <Dialog
+        isOpen={!!confirmAction}
+        onClose={closeConfirm}
+        onRequestClose={closeConfirm}
+        width={420}
+      >
+        <div className="text-center space-y-4">
+          <div
+            className={`w-14 h-14 rounded-full flex items-center justify-center mx-auto ${
+              confirmCopy().danger
+                ? "bg-red-100 dark:bg-red-900/30"
+                : "bg-violet-100 dark:bg-violet-900/30"
+            }`}
+          >
+            {confirmCopy().danger ? (
+              <Trash2 size={24} className="text-red-500" />
+            ) : (
+              <CheckCircle2 size={24} className="text-violet-500" />
+            )}
+          </div>
+          <div>
+            <h5 className="font-semibold text-gray-900 dark:text-white">
+              {confirmCopy().title}
+            </h5>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+              {confirmCopy().message}
+            </p>
+          </div>
+          <div className="flex justify-center gap-3 pt-1">
+            <Button variant="default" onClick={closeConfirm}>
+              Cancel
+            </Button>
+            <Button
+              variant="solid"
+              loading={acting}
+              className={
+                confirmCopy().danger
+                  ? "bg-red-500 hover:bg-red-600 text-white border-red-500"
+                  : ""
+              }
+              onClick={runAction}
+            >
+              Confirm
+            </Button>
+          </div>
+        </div>
+      </Dialog>
+    </div>
+  );
+}

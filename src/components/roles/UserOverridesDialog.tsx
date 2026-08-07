@@ -28,7 +28,7 @@ export default function UserOverridesDialog({
   user,
   permissions,
 }: Props) {
-  const actingUserId = useAuthStore((s) => s.user?.userId ?? "1");
+  const actingUserId = useAuthStore((s) => s.user?.userId);
 
   const [overrides, setOverrides] = useState<PermissionOverride[]>([]);
   const [loading, setLoading] = useState(false);
@@ -54,6 +54,10 @@ export default function UserOverridesDialog({
 
   const handleAdd = async () => {
     if (!form.permissionId) return;
+    if (!actingUserId) {
+      showError("Session Error", "Please refresh and try again.");
+      return;
+    }
     setSaving(true);
     try {
       await api.post("/roles/users/overrides/save", {
@@ -79,6 +83,10 @@ export default function UserOverridesDialog({
   };
 
   const handleDelete = async (id: string) => {
+    if (!actingUserId) {
+      showError("Session Error", "Please refresh and try again.");
+      return;
+    }
     try {
       await api.post("/roles/users/overrides/save", {
         action: "DELETE",

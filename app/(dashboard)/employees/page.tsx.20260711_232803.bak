@@ -1,0 +1,2237 @@
+'use client';
+import { useRequirePermission } from '@/hooks/useRequirePermission';
+import { usePermission } from "@/hooks/usePermission";
+import { useEffect, useRef, useState, useMemo } from "react";
+import { useRouter } from 'next/navigation';
+import {
+  PlusIcon,
+  Trash2,
+  X,
+  Pencil,
+  ExternalLink,
+  Search,
+  Users,
+  UserCheck,
+  UserX,
+  Briefcase,
+  ChevronLeft,
+  ChevronRight,
+  EyeOff,
+} from "lucide-react";
+import Button from '@/components/ui/Button';
+import Input from '@/components/ui/Input';
+import { showSuccess, showError } from '@/lib/toast';
+import api from '@/lib/axios';
+import DependentsTab from "@/components/employees/DependentsTab";
+import TransportTab from "@/components/employees/TransportTab";
+import QualificationsTab from "@/components/employees/QualificationsTab";
+import DocumentsTab from "@/components/employees/DocumentsTab";
+import ProfileCompletion from "@/components/employees/ProfileCompletion";
+import {
+  EmployeeDependent,
+  EmployeeTransport,
+  EmployeeDocument,
+  EmployeeQualification,
+} from "@/types/employee-extended.types";
+import {
+  Employee,
+  EmployeeForm,
+  ContractForm,
+  EmployeeContract,
+  Branch,
+  Department,
+  Designation,
+  CrewOption,
+  GroupOption,
+  BankBranchOption,
+  EMPLOYMENT_TYPES,
+  EMPLOYEE_STATUSES,
+  GENDERS,
+  PAYROLL_BASES,
+  CONTRACT_TYPES,
+  CURRENCIES,
+  EMPTY_EMPLOYEE,
+  EMPTY_CONTRACT,
+  STATUS_COLORS,
+} from "./employee.types";
+import { Permissions } from '@/lib/permissions';
+import CvUploadButton from "@/components/employees/CvUploadButton";
+import {
+  CvParseResult,
+  RecentCvParse,
+  getRecentCvParses,
+  getCvParseById,
+  consumeCvParse,
+} from "@/lib/api/cvParser";
+import { useAuthStore } from "@/store/authStore";
+
+interface LeaveTemplateOption {
+  id: string;
+  name: string;
+  code: string;
+}
+
+/* ─────────────────────────────── constants ─────────────────────────────── */
+
+const PAGE_SIZE = 10;
+
+const AVATAR_COLORS = [
+  'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300',
+  'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
+  'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
+  'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
+  'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300',
+  'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300',
+  'bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-300',
+  'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300',
+];
+
+function avatarColor(name: string) {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+}
+
+function initials(first: string, last: string) {
+  return ((first[0] ?? '') + (last[0] ?? '')).toUpperCase();
+}
+
+/* ─────────────────────────────── KPI card ───────────────────────────────── */
+
+function KpiCard({
+  icon, label, value, color,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: number | string;
+  color: string;
+}) {
+  return (
+    <div className="card">
+      <div className="card-body !py-4 !px-5">
+        <div className="flex items-center gap-4">
+          <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${color}`}>
+            {icon}
+          </div>
+          <div className="min-w-0">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider truncate">{label}</p>
+            <p className="text-2xl font-bold heading-text leading-tight">{value}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────── helpers ────────────────────────────────── */
+
+function Field({ label, required, children }: {
+  label: string; required?: boolean; children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
+        {label}{required && <span className="text-error ml-1">*</span>}
+      </label>
+      {children}
+    </div>
+  );
+}
+
+function Section({ title }: { title: string }) {
+  return (
+    <p className="text-xs font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-4 mt-6 first:mt-0">
+      {title}
+    </p>
+  );
+}
+
+function WizardModal({ open, onClose, children }: {
+  open: boolean; onClose: () => void; children: React.ReactNode;
+}) {
+  useEffect(() => {
+    if (open) document.body.style.overflow = 'hidden';
+    else document.body.style.overflow = '';
+    return () => { document.body.style.overflow = ''; };
+  }, [open]);
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative z-10 bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-[900px] max-w-[95vw] max-h-[92vh] flex flex-col">
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────── Employment fields ─────────────────────── */
+
+type EditTab =
+  | "details"
+  | "contract"
+  | "dependents"
+  | "transport"
+  | "qualifications"
+  | "documents";
+
+const EmploymentFields = ({
+  f,
+  onChange,
+  isEdit = false,
+  branches,
+  departments,
+  designations,
+  deptsByBranch,
+  crews,
+  groups,
+}: {
+  f: EmployeeForm;
+  onChange: (
+    field: keyof EmployeeForm,
+  ) => (e: { target: { value: string } }) => void;
+  isEdit?: boolean;
+  branches: Branch[];
+  departments: Department[];
+  designations: Designation[];
+  deptsByBranch: (branchId: string) => Department[];
+  crews: CrewOption[];
+  groups: GroupOption[];
+}) => (
+  <div className="grid grid-cols-3 gap-x-6 gap-y-5">
+    <Field label="Employee Code" required={!isEdit}>
+      <Input
+        placeholder="EMP001"
+        value={f.employeeCode}
+        onChange={onChange("employeeCode")}
+      />
+    </Field>
+    <Field label="Date of Joining" required={!isEdit}>
+      <Input type="date" value={f.joinDate} onChange={onChange("joinDate")} />
+    </Field>
+    <Field label="Work Email">
+      <Input
+        type="email"
+        placeholder="work@company.lk"
+        value={f.email}
+        onChange={onChange("email")}
+      />
+    </Field>
+    <Field label="Branch">
+      <select
+        className="input w-full"
+        value={f.branchId}
+        onChange={onChange("branchId")}
+      >
+        <option value="">— Select Branch —</option>
+        {branches.map((b) => (
+          <option key={b.id} value={b.id}>
+            {b.name}
+          </option>
+        ))}
+      </select>
+    </Field>
+    <Field label="Department">
+      <select
+        className="input w-full"
+        value={f.departmentId}
+        onChange={onChange("departmentId")}
+      >
+        <option value="">— Select Department —</option>
+        {deptsByBranch(f.branchId).map((d) => (
+          <option key={d.id} value={d.id}>
+            {d.name}
+          </option>
+        ))}
+      </select>
+    </Field>
+    <Field label="Designation">
+      <select
+        className="input w-full"
+        value={f.designationId}
+        onChange={onChange("designationId")}
+      >
+        <option value="">— Select Designation —</option>
+        {designations.map((d) => (
+          <option key={d.id} value={d.id}>
+            {d.title}
+            {d.level ? ` · ${d.level}` : ""}
+          </option>
+        ))}
+      </select>
+    </Field>
+    <Field label="Employment Type">
+      <select
+        className="input w-full"
+        value={f.employmentType}
+        onChange={onChange("employmentType")}
+      >
+        {EMPLOYMENT_TYPES.map((t) => (
+          <option key={t} value={t}>
+            {t}
+          </option>
+        ))}
+      </select>
+    </Field>
+    <Field label="Status">
+      <select
+        className="input w-full"
+        value={f.status}
+        onChange={onChange("status")}
+      >
+        {EMPLOYEE_STATUSES.map((s) => (
+          <option key={s} value={s}>
+            {s}
+          </option>
+        ))}
+      </select>
+    </Field>
+    <Field label="TIN Number">
+      <Input
+        placeholder="Tax Identification Number"
+        value={f.tinNumber ?? ""}
+        onChange={onChange("tinNumber")}
+      />
+    </Field>
+    <Field label="Crew">
+      <select
+        className="input w-full"
+        value={f.crewId}
+        onChange={onChange("crewId")}
+      >
+        <option value="">— Select Crew —</option>
+        {crews.map((c) => (
+          <option key={c.id} value={c.id}>
+            {c.name} ({c.code})
+          </option>
+        ))}
+      </select>
+    </Field>
+    <Field label="Group">
+      <select
+        className="input w-full"
+        value={f.groupId}
+        onChange={onChange("groupId")}
+      >
+        <option value="">— Select Group —</option>
+        {groups.map((g) => (
+          <option key={g.id} value={g.id}>
+            {g.name} ({g.code})
+          </option>
+        ))}
+      </select>
+    </Field>
+    {isEdit && (
+      <Field label="Termination Date">
+        <Input
+          type="date"
+          value={f.terminationDate}
+          onChange={onChange("terminationDate")}
+        />
+      </Field>
+    )}
+  </div>
+);
+
+/* ─────────────────────────────── Pagination ─────────────────────────────── */
+
+function Pagination({ page, total, pageSize, onChange }: {
+  page: number; total: number; pageSize: number; onChange: (p: number) => void;
+}) {
+  const totalPages = Math.ceil(total / pageSize);
+  if (totalPages <= 1) return null;
+  const pages: (number | '...')[] = [];
+  if (totalPages <= 7) {
+    for (let i = 1; i <= totalPages; i++) pages.push(i);
+  } else {
+    pages.push(1);
+    if (page > 3) pages.push('...');
+    for (let i = Math.max(2, page - 1); i <= Math.min(totalPages - 1, page + 1); i++) pages.push(i);
+    if (page < totalPages - 2) pages.push('...');
+    pages.push(totalPages);
+  }
+  return (
+    <div className="flex items-center justify-between mt-4 px-1">
+      <p className="text-sm text-gray-500">
+        Showing {Math.min((page - 1) * pageSize + 1, total)}–{Math.min(page * pageSize, total)} of {total}
+      </p>
+      <div className="flex items-center gap-1">
+        <button
+          onClick={() => onChange(page - 1)} disabled={page === 1}
+          className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+        >
+          <ChevronLeft size={16} />
+        </button>
+        {pages.map((p, i) => p === '...' ? (
+          <span key={`e${i}`} className="px-2 text-gray-400">…</span>
+        ) : (
+          <button
+            key={p}
+            onClick={() => onChange(p as number)}
+            className={`w-8 h-8 rounded-lg text-sm font-semibold transition-colors ${
+              p === page
+                ? 'bg-primary text-white'
+                : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700'
+            }`}
+          >
+            {p}
+          </button>
+        ))}
+        <button
+          onClick={() => onChange(page + 1)} disabled={page === totalPages}
+          className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+        >
+          <ChevronRight size={16} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────── Page ───────────────────────────────────── */
+
+export default function EmployeesPage() {
+  const userId = useAuthStore((s) => s.user?.userId);
+  useRequirePermission(Permissions.HR.Employee.View);
+  const canEdit = usePermission(Permissions.HR.Employee.Update);
+  const canAdd = usePermission(Permissions.HR.Employee.Create);
+  const canUnmaskSalary = usePermission(Permissions.HR.Employee.ViewSalary);
+  const canParseCv = usePermission(Permissions.HR.Employee.ParseCv);
+  const router = useRouter();
+  const initialized = useRef(false);
+
+  const [items, setItems] = useState<Employee[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // filters
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [typeFilter, setTypeFilter] = useState("");
+  const [branchFilter, setBranchFilter] = useState("");
+  const [page, setPage] = useState(1);
+
+  // lookups
+  const [branches, setBranches] = useState<Branch[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [designations, setDesignations] = useState<Designation[]>([]);
+  const [crews, setCrews] = useState<CrewOption[]>([]);
+  const [groups, setGroups] = useState<GroupOption[]>([]);
+  const [bankBranches, setBankBranches] = useState<BankBranchOption[]>([]);
+
+  // add wizard
+  const [wizardOpen, setWizardOpen] = useState(false);
+  const [wizardStep, setWizardStep] = useState(1);
+  const [wizardSaving, setWizardSaving] = useState(false);
+  const [wizardError, setWizardError] = useState("");
+  const [createdId, setCreatedId] = useState<string | null>(null);
+
+  const [nicChecking, setNicChecking] = useState(false);
+  const [nicError, setNicError] = useState("");
+
+  const [leaveTemplates, setLeaveTemplates] = useState<LeaveTemplateOption[]>(
+    [],
+  );
+  const [wizardLeaveTemplateId, setWizardLeaveTemplateId] = useState("");
+  const [form1, setForm1] = useState<EmployeeForm>(EMPTY_EMPLOYEE);
+  const [form2, setForm2] = useState<ContractForm>(EMPTY_CONTRACT);
+  const [pendingCvQualifications, setPendingCvQualifications] = useState<
+    CvParseResult["qualifications"]
+  >([]);
+  const [parseLogId, setParseLogId] = useState<number | null>(null);
+  const [recentParses, setRecentParses] = useState<RecentCvParse[]>([]);
+  const [recallOpen, setRecallOpen] = useState(false);
+
+  const [retirementAge, setRetirementAge] = useState<number>(60);
+
+  // edit
+  const [editOpen, setEditOpen] = useState(false);
+  const [editing, setEditing] = useState<Employee | null>(null);
+  const [editTab, setEditTab] = useState<EditTab>("details");
+  const [editForm, setEditForm] = useState<EmployeeForm>(EMPTY_EMPLOYEE);
+  const [editSaving, setEditSaving] = useState(false);
+  
+
+  const [editNicChecking, setEditNicChecking] = useState(false);
+  const [editNicError, setEditNicError] = useState("");
+
+  const [contract, setContract] = useState<EmployeeContract | null>(null);
+  const [contractForm, setContractForm] =
+    useState<ContractForm>(EMPTY_CONTRACT);
+  const [contractSaving, setContractSaving] = useState(false);
+  
+  const [dependents, setDependents] = useState<EmployeeDependent[]>([]);
+  const [transport, setTransport] = useState<EmployeeTransport | null>(null);
+  const [documents, setDocuments] = useState<EmployeeDocument[]>([]);
+  const [qualifications, setQualifications] = useState<EmployeeQualification[]>(
+    [],
+  );
+
+  /* ── computed stats ────────────────────────────────────────────────────── */
+
+  const stats = useMemo(
+    () => ({
+      total: items.length,
+      active: items.filter((e) => e.status === "Active").length,
+      inactive: items.filter((e) => e.status !== "Active").length,
+      fullTime: items.filter((e) => e.employmentType === "FullTime").length,
+    }),
+    [items],
+  );
+
+  /* ── filtered + paginated ──────────────────────────────────────────────── */
+
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase();
+    return items.filter((e) => {
+      if (statusFilter && e.status !== statusFilter) return false;
+      if (typeFilter && e.employmentType !== typeFilter) return false;
+      if (branchFilter && String(e.branchId) !== branchFilter) return false;
+      if (q) {
+        const name = `${e.firstName} ${e.lastName}`.toLowerCase();
+        const code = e.employeeCode?.toLowerCase() ?? "";
+        const dept = e.departmentName?.toLowerCase() ?? "";
+        const desig = e.designationName?.toLowerCase() ?? "";
+        if (
+          !name.includes(q) &&
+          !code.includes(q) &&
+          !dept.includes(q) &&
+          !desig.includes(q)
+        )
+          return false;
+      }
+      return true;
+    });
+  }, [items, search, statusFilter, typeFilter, branchFilter]);
+
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  const resetPage = () => setPage(1);
+
+  /* ── helpers ───────────────────────────────────────────────────────────── */
+
+  const deptsByBranch = (branchId: string) =>
+    !branchId
+      ? departments
+      : departments.filter(
+          (d) => !d.branchId || String(d.branchId) === String(branchId),
+        );
+
+  /* ── load ──────────────────────────────────────────────────────────────── */
+
+  const load = async () => {
+    try {
+      setLoading(true);
+      const [
+        empRes,
+        brRes,
+        deptRes,
+        desigRes,
+        crewRes,
+        groupRes,
+        bankRes,
+        ltRes,
+        companyRes,
+      ] = await Promise.all([
+        api.get<Employee[]>("/employees"),
+        api.get<Branch[]>("/branches"),
+        api.get<Department[]>("/departments"),
+        api.get<Designation[]>("/designations"),
+        api.get<CrewOption[]>("/crews?isActive=true"),
+        api.get<GroupOption[]>("/groups?isActive=true"),
+        api.get<BankBranchOption[]>("/bank-branches?isActive=true"),
+        api.get<LeaveTemplateOption[]>("/LeaveTemplate"),
+        api.get<{ retirementAge: number }>("/company"),
+      ]);
+
+      setItems(empRes.data);
+      setRetirementAge(companyRes.data?.retirementAge ?? 60);
+      setBranches(
+        brRes.data
+          .filter((b: any) => b.isActive)
+          .map((b: any) => ({ ...b, id: String(b.id) })),
+      );
+      setDepartments(
+        deptRes.data
+          .filter((d: any) => d.isActive)
+          .map((d: any) => ({
+            ...d,
+            id: String(d.id),
+            branchId: d.branchId ? String(d.branchId) : null,
+          })),
+      );
+      setDesignations(
+        desigRes.data
+          .filter((d: any) => d.isActive)
+          .map((d: any) => ({ ...d, id: String(d.id) })),
+      );
+      setCrews(crewRes.data);
+      setGroups(groupRes.data);
+      setBankBranches(bankRes.data);
+      setLeaveTemplates(
+        (ltRes.data as any[])
+          .filter((t: any) => t.isActive)
+          .map((t: any) => ({ id: String(t.id), name: t.name, code: t.code })),
+      );
+    } catch (err: any) {
+      showError(
+        "Load failed",
+        err?.response?.data?.error ?? "Could not load data.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (initialized.current) return;
+    initialized.current = true;
+    load();
+  }, []);
+
+  // Live NIC duplicate check — Add wizard
+  useEffect(() => {
+    const nic = form1.nationalIdNumber?.trim();
+    if (!nic) {
+      setNicError("");
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        setNicChecking(true);
+        const { data } = await api.get("/employees/check-nic", {
+          params: { nic },
+        });
+        const message = data.isDuplicate
+          ? "An employee with this National ID already exists."
+          : "";
+        setNicError(message);
+        if (message) {
+          showError("Duplicate National ID", message);
+        }
+      } catch {
+        // fail silent — the save-time server check still protects data integrity
+      } finally {
+        setNicChecking(false);
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [form1.nationalIdNumber]);
+
+  // Live NIC duplicate check — Edit modal
+  useEffect(() => {
+    if (!editOpen) return;
+    const nic = editForm.nationalIdNumber?.trim();
+    if (!nic) {
+      setEditNicError("");
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        setEditNicChecking(true);
+        const { data } = await api.get("/employees/check-nic", {
+          params: { nic, excludeId: editing?.id },
+        });
+        const message = data.isDuplicate
+          ? "An employee with this National ID already exists."
+          : "";
+        setEditNicError(message);
+        if (message) {
+          showError("Duplicate National ID", message);
+        }
+      } catch {
+        // fail silent
+      } finally {
+        setEditNicChecking(false);
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [editForm.nationalIdNumber, editOpen, editing?.id]);
+
+  /* ── add wizard ────────────────────────────────────────────────────────── */
+
+  const openWizard = () => {
+    setWizardStep(1);
+    setWizardError("");
+    setCreatedId(null);
+    setWizardLeaveTemplateId("");
+    setForm1({ ...EMPTY_EMPLOYEE });
+    setForm2({ ...EMPTY_CONTRACT });
+    setPendingCvQualifications([]);
+    setParseLogId(null);
+    setRecallOpen(false);
+    setWizardOpen(true);
+  };
+  const closeWizard = () => setWizardOpen(false);
+
+  const s1 =
+    (field: keyof EmployeeForm) => (e: { target: { value: string } }) =>
+      setForm1((f) => ({ ...f, [field]: e.target.value }));
+
+  const s2 =
+    (field: keyof ContractForm) => (e: { target: { value: string } }) =>
+      setForm2((f) => ({ ...f, [field]: e.target.value }));
+
+  const handleCvParsed = (result: CvParseResult) => {
+    setForm1((f) => ({
+      ...f,
+      firstName: result.personalInfo.firstName || f.firstName,
+      lastName: result.personalInfo.lastName || f.lastName,
+      middleName: result.personalInfo.middleName || f.middleName,
+      personalEmail: result.personalInfo.email || f.personalEmail,
+      phoneNumber: result.personalInfo.phoneNumber || f.phoneNumber,
+      dateOfBirth: result.personalInfo.dateOfBirth || f.dateOfBirth,
+      gender: (GENDERS as readonly string[]).includes(
+        result.personalInfo.gender,
+      )
+        ? result.personalInfo.gender
+        : f.gender,
+      nationality: result.personalInfo.nationality || f.nationality,
+      address: result.personalInfo.address || f.address,
+      nationalIdNumber:
+        result.personalInfo.nationalIdNumber || f.nationalIdNumber,
+    }));
+
+    if (result.qualifications.length > 0) {
+      setPendingCvQualifications(result.qualifications);
+    }
+    setParseLogId(result.parseLogId ?? null);
+  };
+
+  const handleStep1Next = async () => {
+    setWizardError("");
+    if (!form1.employeeCode.trim()) {
+      showError("Missing information", "Employee code is required.");
+      return;
+    }
+    if (!form1.firstName.trim()) {
+      showError("Missing information", "First name is required.");
+      return;
+    }
+    if (!form1.lastName.trim()) {
+      showError("Missing information", "Last name is required.");
+      return;
+    }
+    if (!form1.joinDate) {
+      showError("Missing information", "Join date is required.");
+      return;
+    }
+    if (!wizardLeaveTemplateId) {
+      showError("Missing information", "Leave template is required.");
+      return;
+    }
+    if (nicError) {
+      showError("Duplicate National ID", nicError);
+      return;
+    }
+    setWizardSaving(true);
+    try {
+      await api.post("/employees/save", {
+        action: "ADD",
+        employeeCode: form1.employeeCode.trim(),
+        firstName: form1.firstName.trim(),
+        lastName: form1.lastName.trim(),
+        middleName: form1.middleName.trim() || null,
+        email: form1.email.trim() || null,
+        personalEmail: form1.personalEmail.trim() || null,
+        phoneNumber: form1.phoneNumber.trim() || null,
+        nationalIdNumber: form1.nationalIdNumber.trim() || null,
+        tinNumber: form1.tinNumber?.trim() || null,
+        bankAccountNumber: form1.bankAccountNumber.trim() || null,
+        bankAccountHolderName: form1.bankAccountHolderName.trim() || null,
+        bankAccountType: form1.bankAccountType || null,
+        bankBranchId: form1.bankBranchId || null,
+        dateOfBirth: form1.dateOfBirth || null,
+        gender: form1.gender || null,
+        nationality: form1.nationality.trim() || null,
+        address: form1.address.trim() || null,
+        branchId: form1.branchId || null,
+        departmentId: form1.departmentId || null,
+        designationId: form1.designationId || null,
+        joinDate: form1.joinDate,
+        employmentType: form1.employmentType,
+        status: form1.status,
+        notes: form1.notes.trim() || null,
+        crewId: form1.crewId || null,
+        groupId: form1.groupId || null,
+        leaveTemplateId: wizardLeaveTemplateId,
+        userId: userId,
+      });
+      const res = await api.get<Employee[]>(
+        `/employees?employeeCode=${form1.employeeCode.trim()}`,
+      );
+      const created = res.data?.[0];
+      if (!created)
+        throw new Error("Employee saved but ID could not be retrieved.");
+      setCreatedId(String(created.id));
+
+      let calculatedEndDate = "";
+      if (form1.dateOfBirth) {
+        const dob = new Date(form1.dateOfBirth);
+        const retirementDate = new Date(dob);
+        retirementDate.setFullYear(dob.getFullYear() + retirementAge);
+        calculatedEndDate = retirementDate.toISOString().split("T")[0];
+      }
+
+      setForm2((f) => ({ ...f, startDate: form1.joinDate }));
+
+      // Bulk-save any qualifications extracted from the CV parse — best effort,
+      // does not block wizard progression if one entry fails.
+      if (pendingCvQualifications.length > 0) {
+        const results = await Promise.allSettled(
+          pendingCvQualifications.map((q) =>
+            api.post("employee-qualifications", {
+              action: "ADD",
+              employeeId: String(created.id),
+              category: q.category,
+              title: q.title || "Untitled",
+              institution: q.institution || null,
+              fromDate: q.fromDate || null,
+              toDate: q.toDate || null,
+              isCurrent: q.isCurrent,
+              grade: q.grade || null,
+              description: q.description || null,
+              userId: userId,
+            }),
+          ),
+        );
+        const failed = results.filter((r) => r.status === "rejected").length;
+        if (failed > 0) {
+          showError(
+            "Some qualifications not saved",
+            `${failed} of ${pendingCvQualifications.length} CV entries failed — add them manually in the Qualifications tab after saving.`,
+          );
+        }
+      }
+
+      if (parseLogId) {
+        try {
+          await consumeCvParse(parseLogId, created.id);
+        } catch {
+          // non-critical — log stays recallable if this fails
+        }
+      }
+
+      setWizardStep(2);
+    } catch (err: any) {
+      showError(
+        "Failed to save employee",
+        err?.response?.data?.message ?? err?.message ?? "Please try again.",
+      );
+    } finally {
+      setWizardSaving(false);
+    }
+  };
+
+  const handleStep2Save = async () => {
+    setWizardError("");
+    if (!form2.startDate) {
+      showError("Missing information", "Start date is required.");
+      return;
+    }
+    setWizardSaving(true);
+    try {
+      await api.post("/employees/contracts/save", {
+        action: "ADD",
+        employeeId: String(createdId),
+        designationId: form1.designationId || null,
+        contractType: form2.contractType,
+        payrollBasis: form2.payrollBasis,
+        basicSalary: parseFloat(form2.basicSalary) || 0,
+        hourlyRate: form2.hourlyRate ? parseFloat(form2.hourlyRate) : null,
+        dailyRate: form2.dailyRate ? parseFloat(form2.dailyRate) : null,
+        allowances: parseFloat(form2.allowances) || 0,
+        currency: form2.currency,
+        absentDeductionAfterDays: parseInt(form2.absentDeductionAfterDays) || 0,
+        lateDeductionPerMinute: parseFloat(form2.lateDeductionPerMinute) || 0,
+        overtimeRateMultiplier: parseFloat(form2.overtimeRateMultiplier) || 1.5,
+        startDate: form2.startDate,
+        endDate: form2.endDate || null,
+        isActive: true,
+        notes: form2.notes.trim() || null,
+        userId: userId,
+      });
+      showSuccess("Employee added", `${form1.firstName} ${form1.lastName}`);
+      closeWizard();
+      await load();
+    } catch (err: any) {
+      showError(
+        "Failed to save contract.",
+        err?.response?.data?.message ?? err?.message ?? "Please try again.",
+      );
+    } finally {
+      setWizardSaving(false);
+    }
+  };
+
+  /* ── edit ──────────────────────────────────────────────────────────────── */
+
+  const openEdit = async (item: Employee) => {
+    setEditing(item);
+    setEditTab("details");
+
+    setEditForm({
+      employeeCode: item.employeeCode ?? "",
+      firstName: item.firstName ?? "",
+      lastName: item.lastName ?? "",
+      middleName: item.middleName ?? "",
+      email: item.email ?? "",
+      personalEmail: item.personalEmail ?? "",
+      phoneNumber: item.phoneNumber ?? "",
+      nationalIdNumber: item.nationalIdNumber ?? "",
+      tinNumber: item.tinNumber ?? "",
+      bankAccountNumber: item.bankAccountNumber ?? "",
+      bankAccountHolderName: item.bankAccountHolderName ?? "",
+      bankAccountType: item.bankAccountType ?? "",
+      bankBranchId: item.bankBranchId ?? "",
+      dateOfBirth: item.dateOfBirth ?? "",
+      gender: item.gender ?? "",
+      nationality: item.nationality ?? "",
+      address: item.address ?? "",
+      branchId: item.branchId ?? "",
+      departmentId: item.departmentId ?? "",
+      designationId: item.designationId ?? "",
+      managerId: item.managerId ?? "",
+      joinDate: item.joinDate ?? "",
+      terminationDate: item.terminationDate ?? "",
+      employmentType: item.employmentType ?? "FullTime",
+      status: item.status ?? "Active",
+      notes: item.notes ?? "",
+      crewId: item.crewId ?? "",
+      groupId: item.groupId ?? "",
+    });
+    const [depRes, transRes, docRes, qualRes] = await Promise.allSettled([
+      api.get<EmployeeDependent[]>(`employee-dependents/${item.id}`),
+      api.get<EmployeeTransport>(`employee-transport/${item.id}`),
+      api.get<EmployeeDocument[]>(`employee-documents/${item.id}`),
+      api.get<EmployeeQualification[]>(`employee-qualifications/${item.id}`),
+    ]);
+    setDependents(depRes.status === "fulfilled" ? depRes.value.data : []);
+    setTransport(transRes.status === "fulfilled" ? transRes.value.data : null);
+    setDocuments(docRes.status === "fulfilled" ? docRes.value.data : []);
+    setQualifications(qualRes.status === "fulfilled" ? qualRes.value.data : []);
+    try {
+      const res = await api.get<EmployeeContract[]>(
+        `/employees/contracts?employeeId=${item.id}&isActive=true`,
+      );
+      const c = res.data?.[0] ?? null;
+      setContract(c);
+      setContractForm(
+        c
+          ? {
+              contractType: c.contractType,
+              payrollBasis: c.payrollBasis,
+              basicSalary: c.basicSalary.toString(),
+              hourlyRate: c.hourlyRate?.toString() ?? "",
+              dailyRate: c.dailyRate?.toString() ?? "",
+              allowances: c.allowances.toString(),
+              currency: c.currency,
+              absentDeductionAfterDays: c.absentDeductionAfterDays.toString(),
+              lateDeductionPerMinute: c.lateDeductionPerMinute.toString(),
+              overtimeRateMultiplier: c.overtimeRateMultiplier.toString(),
+              startDate: c.startDate,
+              endDate: c.endDate ?? "",
+              notes: c.notes ?? "",
+            }
+          : { ...EMPTY_CONTRACT, startDate: item.joinDate },
+      );
+    } catch {
+      setContract(null);
+      setContractForm({ ...EMPTY_CONTRACT, startDate: item.joinDate });
+    }
+    setEditOpen(true);
+  };
+
+  const ef =
+    (field: keyof EmployeeForm) => (e: { target: { value: string } }) =>
+      setEditForm((f) => ({ ...f, [field]: e.target.value }));
+
+  const cf =
+    (field: keyof ContractForm) => (e: { target: { value: string } }) =>
+      setContractForm((f) => ({ ...f, [field]: e.target.value }));
+
+  const handleEditSave = async () => {
+    if (!editForm.firstName.trim()) {
+      showError("Missing information", "First name is required.");
+      return;
+    }
+    if (!editForm.lastName.trim()) {
+      showError("Missing information", "Last name is required.");
+      return;
+    }
+    if (editNicError) {
+      showError("Duplicate National ID", editNicError);
+      return;
+    }
+    setEditSaving(true);
+    try {
+      await api.post("/employees/save", {
+        action: "UPDATE",
+        id: editing!.id,
+        employeeCode: editForm.employeeCode.trim() || null,
+        firstName: editForm.firstName.trim(),
+        lastName: editForm.lastName.trim(),
+        middleName: editForm.middleName.trim() || null,
+        email: editForm.email.trim() || null,
+        personalEmail: editForm.personalEmail.trim() || null,
+        phoneNumber: editForm.phoneNumber.trim() || null,
+        nationalIdNumber: editForm.nationalIdNumber.trim() || null,
+        tinNumber: editForm.tinNumber?.trim() || null,
+        bankAccountNumber: editForm.bankAccountNumber.trim() || null,
+        bankAccountHolderName: editForm.bankAccountHolderName.trim() || null,
+        bankAccountType: editForm.bankAccountType || null,
+        bankBranchId: editForm.bankBranchId || null,
+        dateOfBirth: editForm.dateOfBirth || null,
+        gender: editForm.gender || null,
+        nationality: editForm.nationality.trim() || null,
+        address: editForm.address.trim() || null,
+        branchId: editForm.branchId || null,
+        departmentId: editForm.departmentId || null,
+        designationId: editForm.designationId || null,
+        joinDate: editForm.joinDate || null,
+        terminationDate: editForm.terminationDate || null,
+        employmentType: editForm.employmentType,
+        status: editForm.status,
+        notes: editForm.notes.trim() || null,
+        crewId: editForm.crewId || null,
+        groupId: editForm.groupId || null,
+        userId: userId,
+      });
+      setEditOpen(false);
+      await load();
+      showSuccess(
+        "Employee updated",
+        `${editForm.firstName} ${editForm.lastName}`,
+      );
+    } catch (err: any) {
+      setEditError(
+        err?.response?.data?.message ?? "Failed to update employee.",
+      );
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
+  const handleContractSave = async () => {
+    if (!contractForm.startDate) {
+      showError("Missing information", "Start date is required.");
+      return;
+    }
+    setContractSaving(true);
+    try {
+      await api.post("/employees/contracts/save", {
+        action: contract ? "UPDATE" : "ADD",
+        id: contract?.id ?? null,
+        employeeId: editing!.id,
+        designationId: editForm.designationId || null,
+        contractType: contractForm.contractType,
+        payrollBasis: contractForm.payrollBasis,
+        basicSalary: parseFloat(contractForm.basicSalary) || 0,
+        hourlyRate: contractForm.hourlyRate
+          ? parseFloat(contractForm.hourlyRate)
+          : null,
+        dailyRate: contractForm.dailyRate
+          ? parseFloat(contractForm.dailyRate)
+          : null,
+        allowances: parseFloat(contractForm.allowances) || 0,
+        currency: contractForm.currency,
+        absentDeductionAfterDays:
+          parseInt(contractForm.absentDeductionAfterDays) || 0,
+        lateDeductionPerMinute:
+          parseFloat(contractForm.lateDeductionPerMinute) || 0,
+        overtimeRateMultiplier:
+          parseFloat(contractForm.overtimeRateMultiplier) || 1.5,
+        startDate: contractForm.startDate,
+        endDate: contractForm.endDate || null,
+        isActive: true,
+        notes: contractForm.notes.trim() || null,
+        userId: userId,
+      });
+      setEditOpen(false);
+      await load();
+      showSuccess(
+        "Contract updated",
+        `${editForm.firstName} ${editForm.lastName}`,
+      );
+    } catch (err: any) {
+      setContractError(
+        err?.response?.data?.message ?? "Failed to update contract.",
+      );
+    } finally {
+      setContractSaving(false);
+    }
+  };
+
+  /* ── render ────────────────────────────────────────────────────────────── */
+
+  return (
+    <div>
+      {/* ── Page header ─────────────────────────────────────────────────── */}
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h3 className="h3">Employees</h3>
+          <p className="text-gray-500 dark:text-gray-400 mt-1">
+            Manage employee records and contracts.
+          </p>
+        </div>
+        {canAdd && (
+          <Button
+            variant="solid"
+            icon={<PlusIcon size={16} />}
+            onClick={openWizard}
+          >
+            Add Employee
+          </Button>
+        )}
+      </div>
+
+      {/* ── KPI cards ───────────────────────────────────────────────────── */}
+      <div className="grid grid-cols-4 gap-4 mb-6">
+        <KpiCard
+          icon={<Users size={18} className="text-white" />}
+          label="Total Employees"
+          value={stats.total}
+          color="bg-blue-500"
+        />
+        <KpiCard
+          icon={<UserCheck size={18} className="text-white" />}
+          label="Active"
+          value={stats.active}
+          color="bg-emerald-500"
+        />
+        <KpiCard
+          icon={<UserX size={18} className="text-white" />}
+          label="Inactive / Other"
+          value={stats.inactive}
+          color="bg-rose-500"
+        />
+        <KpiCard
+          icon={<Briefcase size={18} className="text-white" />}
+          label="Full-Time"
+          value={stats.fullTime}
+          color="bg-violet-500"
+        />
+      </div>
+
+      {/* ── Filters ─────────────────────────────────────────────────────── */}
+      <div className="flex items-center gap-3 mb-4 flex-wrap">
+        <div className="relative flex-1 min-w-[200px]">
+          <Search
+            size={15}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+          />
+          <input
+            className="input pl-9 w-full"
+            placeholder="Search by name, code, department…"
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              resetPage();
+            }}
+          />
+        </div>
+        <select
+          className="input w-40"
+          value={statusFilter}
+          onChange={(e) => {
+            setStatusFilter(e.target.value);
+            resetPage();
+          }}
+        >
+          <option value="">All Statuses</option>
+          {EMPLOYEE_STATUSES.map((s) => (
+            <option key={s} value={s}>
+              {s}
+            </option>
+          ))}
+        </select>
+        <select
+          className="input w-44"
+          value={typeFilter}
+          onChange={(e) => {
+            setTypeFilter(e.target.value);
+            resetPage();
+          }}
+        >
+          <option value="">All Types</option>
+          {EMPLOYMENT_TYPES.map((t) => (
+            <option key={t} value={t}>
+              {t}
+            </option>
+          ))}
+        </select>
+        <select
+          className="input w-44"
+          value={branchFilter}
+          onChange={(e) => {
+            setBranchFilter(e.target.value);
+            resetPage();
+          }}
+        >
+          <option value="">All Branches</option>
+          {branches.map((b) => (
+            <option key={b.id} value={b.id}>
+              {b.name}
+            </option>
+          ))}
+        </select>
+        <span className="text-sm text-gray-400 whitespace-nowrap">
+          {filtered.length} result{filtered.length !== 1 ? "s" : ""}
+        </span>
+      </div>
+
+      {/* ── Table ───────────────────────────────────────────────────────── */}
+      <div className="card">
+        <div className="card-body">
+          {loading ? (
+            <div className="flex justify-center py-12">
+              <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full" />
+            </div>
+          ) : (
+            <>
+              <div className="overflow-x-auto">
+                <table className="table-default table-hover w-full">
+                  <thead>
+                    <tr>
+                      <th>Employee</th>
+                      <th>Department</th>
+                      <th>Designation</th>
+                      <th>Type</th>
+                      <th>Status</th>
+                      <th>Join Date</th>
+                      <th className="text-right">
+                        {canUnmaskSalary ? (
+                          "Basic Salary"
+                        ) : (
+                          <span className="inline-flex items-center justify-end gap-1 text-gray-400">
+                            <EyeOff size={12} /> Basic Salary
+                          </span>
+                        )}
+                      </th>
+                      <th className="w-24 text-center">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paginated.length === 0 ? (
+                      <tr>
+                        <td
+                          colSpan={8}
+                          className="text-center py-10 text-gray-400"
+                        >
+                          No employees found
+                        </td>
+                      </tr>
+                    ) : (
+                      paginated.map((item) => (
+                        <tr key={item.id}>
+                          <td>
+                            <div className="flex items-center gap-3">
+                              {item.profilePictureUrl ? (
+                                <img
+                                  src={`/api/proxy/images/profile/${item.profilePictureUrl?.split("/").pop()}`}
+                                  alt={`${item.firstName} ${item.lastName}`}
+                                  className="w-9 h-9 rounded-lg object-cover shrink-0"
+                                  onError={(e) => {
+                                    e.currentTarget.style.display = "none";
+                                    (
+                                      e.currentTarget
+                                        .nextElementSibling as HTMLElement | null
+                                    )?.removeAttribute("style");
+                                  }}
+                                />
+                              ) : null}
+                              <div
+                                className={`w-9 h-9 rounded-lg flex items-center justify-center text-xs font-bold shrink-0 ${avatarColor(`${item.firstName} ${item.lastName}`)}`}
+                                style={
+                                  item.profilePictureUrl
+                                    ? { display: "none" }
+                                    : undefined
+                                }
+                              >
+                                {initials(item.firstName, item.lastName)}
+                              </div>
+                              <div>
+                                <div className="font-semibold heading-text">
+                                  {item.firstName} {item.lastName}
+                                </div>
+                                <div className="text-xs text-gray-400 font-mono">
+                                  {item.employeeCode}
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="text-gray-500">
+                            {item.departmentName ?? "—"}
+                          </td>
+                          <td className="text-gray-500">
+                            {item.designationName ?? "—"}
+                          </td>
+                          <td className="text-gray-500 text-sm">
+                            {item.employmentType}
+                          </td>
+                          <td>
+                            <span
+                              className={`xp-badge ${STATUS_COLORS[item.status] ?? "xp-badge-neutral"}`}
+                            >
+                              {item.status}
+                            </span>
+                          </td>
+                          <td className="text-gray-500 text-sm">
+                            {item.joinDate}
+                          </td>
+                          <td className="text-right font-semibold heading-text">
+                            {canUnmaskSalary ? (
+                              item.basicSalary.toLocaleString("en-LK", {
+                                minimumFractionDigits: 2,
+                              })
+                            ) : (
+                              <span className="inline-flex items-center gap-1.5 text-gray-400 text-sm font-normal select-none">
+                                <EyeOff size={13} />
+                                <span className="tracking-widest">••••••</span>
+                              </span>
+                            )}
+                          </td>
+                          <td>
+                            <div className="flex items-center justify-center gap-1">
+                              <button
+                                onClick={() =>
+                                  router.push(`/employees/${item.id}/overview`)
+                                }
+                                className="p-1.5 rounded-lg text-gray-400 hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-blue-900/20 dark:hover:text-blue-400 transition-colors"
+                                title="View Profile"
+                              >
+                                <ExternalLink size={15} />
+                              </button>
+                              {canEdit && (
+                                <button
+                                  onClick={() => openEdit(item)}
+                                  className="p-1.5 rounded-lg text-gray-400 hover:bg-violet-50 hover:text-violet-600 dark:hover:bg-violet-900/20 dark:hover:text-violet-400 transition-colors"
+                                  title="Edit"
+                                >
+                                  <Pencil size={15} />
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              <Pagination
+                page={page}
+                total={filtered.length}
+                pageSize={PAGE_SIZE}
+                onChange={setPage}
+              />
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* ── Add Wizard ──────────────────────────────────────────────────── */}
+      <WizardModal open={wizardOpen} onClose={closeWizard}>
+        {/* Step indicator */}
+        <div className="flex items-center gap-5 px-8 pt-7 pb-0 shrink-0">
+          <div
+            className={`flex items-center justify-center w-9 h-9 rounded-full text-sm font-bold shrink-0 ${wizardStep === 1 ? "bg-primary text-white" : "bg-emerald-500 text-white"}`}
+          >
+            {wizardStep > 1 ? "✓" : "1"}
+          </div>
+          <div className="flex-1 h-0.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+            <div
+              className={`h-full bg-primary transition-all duration-500 ${wizardStep > 1 ? "w-full" : "w-0"}`}
+            />
+          </div>
+          <div
+            className={`flex items-center justify-center w-9 h-9 rounded-full text-sm font-bold shrink-0 ${wizardStep === 2 ? "bg-primary text-white" : "bg-gray-200 text-gray-500 dark:bg-gray-700 dark:text-gray-400"}`}
+          >
+            2
+          </div>
+          <button
+            onClick={closeWizard}
+            className="ml-4 p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors shrink-0"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Step 1 — Employee Details */}
+        {wizardStep === 1 && (
+          <>
+            <div className="px-8 pt-6 pb-2 shrink-0 flex items-center justify-between">
+              <h5 className="h5">Employee Details</h5>
+              <div className="flex items-center gap-2">
+                {canParseCv && (
+                  <Button
+                    variant="plain"
+                    size="sm"
+                    onClick={async () => {
+                      const parses = await getRecentCvParses(1);
+                      setRecentParses(parses);
+                      setRecallOpen(true);
+                    }}
+                  >
+                    Recall recent parse
+                  </Button>
+                )}
+                {canParseCv && <CvUploadButton onParsed={handleCvParsed} />}
+              </div>
+            </div>
+
+            {recallOpen && (
+              <div className="mx-8 mb-2 p-3 border border-gray-200 dark:border-gray-700 rounded-lg">
+                {recentParses.length === 0 ? (
+                  <p className="text-xs text-gray-400">
+                    No recent unsaved parses in the last 24 hours.
+                  </p>
+                ) : (
+                  recentParses.map((p) => (
+                    <button
+                      key={p.id}
+                      className="w-full text-left text-sm px-2 py-1.5 rounded hover:bg-gray-50 dark:hover:bg-gray-800 flex justify-between"
+                      onClick={async () => {
+                        const result = await getCvParseById(p.id);
+                        handleCvParsed(result);
+                        setRecallOpen(false);
+                      }}
+                    >
+                      <span>
+                        {p.firstName} {p.lastName} — {p.fileName}
+                      </span>
+                      <span className="text-gray-400">
+                        {new Date(p.createdAt).toLocaleTimeString()}
+                      </span>
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
+            {pendingCvQualifications.length > 0 && (
+              <div className="mx-8 mb-2 px-4 py-2 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 rounded-lg text-xs">
+                {pendingCvQualifications.length} qualification(s) detected from
+                CV — will be added automatically after this step. Review fields
+                below before continuing.
+              </div>
+            )}
+            <div className="flex-1 overflow-y-auto px-8 py-4">
+              <Section title="Personal Information" />
+              <div className="grid grid-cols-3 gap-x-6 gap-y-5">
+                <Field label="First Name" required>
+                  <Input
+                    placeholder="First name"
+                    value={form1.firstName}
+                    onChange={s1("firstName")}
+                  />
+                </Field>
+                <Field label="Middle Name">
+                  <Input
+                    placeholder="Middle name"
+                    value={form1.middleName}
+                    onChange={s1("middleName")}
+                  />
+                </Field>
+                <Field label="Last Name" required>
+                  <Input
+                    placeholder="Last name"
+                    value={form1.lastName}
+                    onChange={s1("lastName")}
+                  />
+                </Field>
+                <Field label="Date of Birth">
+                  <Input
+                    type="date"
+                    value={form1.dateOfBirth}
+                    onChange={s1("dateOfBirth")}
+                  />
+                </Field>
+                <Field label="Gender">
+                  <select
+                    className="input w-full"
+                    value={form1.gender}
+                    onChange={s1("gender")}
+                  >
+                    <option value="">Select...</option>
+                    {GENDERS.map((g) => (
+                      <option key={g} value={g}>
+                        {g}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="Nationality">
+                  <Input
+                    placeholder="Sri Lankan"
+                    value={form1.nationality}
+                    onChange={s1("nationality")}
+                  />
+                </Field>
+                <Field label="National ID">
+                  <Input
+                    placeholder="987654321V"
+                    value={form1.nationalIdNumber}
+                    onChange={s1("nationalIdNumber")}
+                  />
+                </Field>
+                <Field label="Phone">
+                  <Input
+                    placeholder="+94 77 123 4567"
+                    value={form1.phoneNumber}
+                    onChange={s1("phoneNumber")}
+                  />
+                </Field>
+                <Field label="Personal Email">
+                  <Input
+                    type="email"
+                    placeholder="personal@gmail.com"
+                    value={form1.personalEmail}
+                    onChange={s1("personalEmail")}
+                  />
+                </Field>
+                <div className="col-span-3">
+                  <Field label="Address">
+                    <textarea
+                      className="input w-full"
+                      rows={2}
+                      placeholder="No. 12, Galle Road, Colombo 03"
+                      value={form1.address}
+                      onChange={s1("address")}
+                    />
+                  </Field>
+                </div>
+              </div>
+              <Section title="Employment" />
+              <EmploymentFields
+                f={form1}
+                onChange={s1}
+                branches={branches}
+                departments={departments}
+                designations={designations}
+                deptsByBranch={deptsByBranch}
+                crews={crews}
+                groups={groups}
+              />
+
+              {/* Leave Template — mandatory, assigned once at onboarding */}
+              <div className="mt-5">
+                <Field label="Leave Template" required>
+                  <select
+                    style={{
+                      height: "40px",
+                      width: "100%",
+                      borderRadius: "10px",
+                      border: wizardLeaveTemplateId
+                        ? "1px solid #e5e7eb"
+                        : "1px solid #fca5a5",
+                      backgroundColor: "#f3f4f6",
+                      padding: "0 12px",
+                      fontSize: "14px",
+                      color: wizardLeaveTemplateId ? "#1f2937" : "#6b7280",
+                      outline: "none",
+                      appearance: "auto",
+                    }}
+                    value={wizardLeaveTemplateId}
+                    onChange={(e) => setWizardLeaveTemplateId(e.target.value)}
+                  >
+                    <option value="">— Select leave template —</option>
+                    {leaveTemplates.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name} ({t.code})
+                      </option>
+                    ))}
+                  </select>
+                  {wizardLeaveTemplateId && (
+                    <p className="text-xs text-amber-600 mt-1">
+                      ⚠ This template seeds leave balances and cannot be changed
+                      after saving.
+                    </p>
+                  )}
+                  {leaveTemplates.length === 0 && (
+                    <p className="text-xs text-red-500 mt-1">
+                      No active leave templates found. Please create one in
+                      Master Data first.
+                    </p>
+                  )}
+                </Field>
+              </div>
+
+              <Section title="Bank Details" />
+              <div className="grid grid-cols-3 gap-x-6 gap-y-5">
+                <div className="col-span-3">
+                  <Field label="Bank Branch">
+                    <select
+                      className="input w-full"
+                      value={form1.bankBranchId}
+                      onChange={s1("bankBranchId")}
+                    >
+                      <option value="">— Select Bank Branch —</option>
+                      {bankBranches.map((b) => (
+                        <option key={b.id} value={b.id}>
+                          {b.bankName} — {b.branchName}
+                          {b.branchCode ? ` (${b.branchCode})` : ""}
+                          {b.city ? ` · ${b.city}` : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                </div>
+                <Field label="Account Holder Name">
+                  <Input
+                    placeholder="As per bank records"
+                    value={form1.bankAccountHolderName}
+                    onChange={s1("bankAccountHolderName")}
+                  />
+                </Field>
+                <Field label="Account Number">
+                  <Input
+                    placeholder="0012345678"
+                    value={form1.bankAccountNumber}
+                    onChange={s1("bankAccountNumber")}
+                  />
+                </Field>
+                <Field label="Account Type">
+                  <select
+                    className="input w-full"
+                    value={form1.bankAccountType}
+                    onChange={s1("bankAccountType")}
+                  >
+                    <option value="">Select…</option>
+                    <option value="Savings">Savings</option>
+                    <option value="Current">Current</option>
+                  </select>
+                </Field>
+              </div>
+              <div className="mt-5">
+                <Field label="Notes">
+                  <textarea
+                    className="input w-full"
+                    rows={2}
+                    value={form1.notes}
+                    onChange={s1("notes")}
+                  />
+                </Field>
+              </div>
+            </div>
+            <div className="px-8 py-5 border-t border-gray-100 dark:border-gray-700 shrink-0">
+              <div className="flex justify-end gap-3">
+                <Button variant="plain" onClick={closeWizard}>
+                  Cancel
+                </Button>
+                <Button
+                  variant="solid"
+                  loading={wizardSaving}
+                  onClick={handleStep1Next}
+                >
+                  Next — Contract Details
+                </Button>
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* Step 2 — Contract Details */}
+        {wizardStep === 2 && (
+          <>
+            <div className="px-8 pt-6 pb-2 shrink-0">
+              <h5 className="h5">Contract Details</h5>
+            </div>
+            <div className="flex-1 overflow-y-auto px-8 py-4">
+              <Section title="Contract" />
+              <div className="grid grid-cols-3 gap-x-6 gap-y-5">
+                <Field label="Contract Type">
+                  <select
+                    className="input w-full"
+                    value={form2.contractType}
+                    onChange={s2("contractType")}
+                  >
+                    {CONTRACT_TYPES.map((t) => (
+                      <option key={t} value={t}>
+                        {t}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="Payroll Basis">
+                  <select
+                    className="input w-full"
+                    value={form2.payrollBasis}
+                    onChange={s2("payrollBasis")}
+                  >
+                    {PAYROLL_BASES.map((b) => (
+                      <option key={b} value={b}>
+                        {b}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="Currency">
+                  <select
+                    className="input w-full"
+                    value={form2.currency}
+                    onChange={s2("currency")}
+                  >
+                    {CURRENCIES.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="Start Date" required>
+                  <Input
+                    type="date"
+                    value={form2.startDate}
+                    onChange={s2("startDate")}
+                  />
+                </Field>
+                <Field label="End Date">
+                  <Input
+                    type="date"
+                    value={form2.endDate}
+                    onChange={s2("endDate")}
+                  />
+                </Field>
+              </div>
+              <Section title="Salary" />
+              <div className="grid grid-cols-3 gap-x-6 gap-y-5">
+                <Field label="Basic Salary">
+                  {canUnmaskSalary ? (
+                    <Input
+                      type="number"
+                      placeholder="75000"
+                      value={form2.basicSalary}
+                      onChange={s2("basicSalary")}
+                    />
+                  ) : (
+                    <div className="input w-full flex items-center gap-2 text-gray-400 cursor-not-allowed select-none">
+                      <EyeOff size={14} />
+                      <span className="tracking-widest text-sm">••••••</span>
+                      <span className="text-xs ml-auto">(no permission)</span>
+                    </div>
+                  )}
+                </Field>
+                <div>
+                  <Field label="Total Allowances">
+                    <Input
+                      type="number"
+                      placeholder="0"
+                      value={form2.allowances}
+                      onChange={s2("allowances")}
+                    />
+                  </Field>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Fixed allowance total. Individual line items managed in
+                    Benefits tab.
+                  </p>
+                </div>
+                {form2.payrollBasis === "Hourly" && (
+                  <Field label="Hourly Rate">
+                    <Input
+                      type="number"
+                      placeholder="500"
+                      value={form2.hourlyRate}
+                      onChange={s2("hourlyRate")}
+                    />
+                  </Field>
+                )}
+                {form2.payrollBasis === "Daily" && (
+                  <Field label="Daily Rate">
+                    <Input
+                      type="number"
+                      placeholder="3000"
+                      value={form2.dailyRate}
+                      onChange={s2("dailyRate")}
+                    />
+                  </Field>
+                )}
+              </div>
+              <Section title="Deduction Rules" />
+              <div className="grid grid-cols-3 gap-x-6 gap-y-5">
+                <Field label="Absent Deduct After (days)">
+                  <Input
+                    type="number"
+                    value={form2.absentDeductionAfterDays}
+                    onChange={s2("absentDeductionAfterDays")}
+                  />
+                </Field>
+                <Field label="Late Deduct / Minute">
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={form2.lateDeductionPerMinute}
+                    onChange={s2("lateDeductionPerMinute")}
+                  />
+                </Field>
+                <Field label="OT Rate Multiplier">
+                  <Input
+                    type="number"
+                    step="0.1"
+                    value={form2.overtimeRateMultiplier}
+                    onChange={s2("overtimeRateMultiplier")}
+                  />
+                </Field>
+              </div>
+              <div className="mt-5">
+                <Field label="Notes">
+                  <textarea
+                    className="input w-full"
+                    rows={2}
+                    value={form2.notes}
+                    onChange={s2("notes")}
+                  />
+                </Field>
+              </div>
+            </div>
+            <div className="px-8 py-5 border-t border-gray-100 dark:border-gray-700 shrink-0">
+              {wizardError && (
+                <p className="text-error text-sm mb-3">{wizardError}</p>
+              )}
+              <div className="flex justify-between">
+                <Button
+                  variant="plain"
+                  onClick={() => {
+                    setWizardStep(1);
+                    setWizardError("");
+                  }}
+                >
+                  ← Back
+                </Button>
+                <div className="flex gap-3">
+                  <Button variant="plain" onClick={closeWizard}>
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="solid"
+                    loading={wizardSaving}
+                    onClick={handleStep2Save}
+                  >
+                    Save Employee
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+      </WizardModal>
+
+      {/* ── Edit Modal ──────────────────────────────────────────────────── */}
+      {editing && (
+        <WizardModal open={editOpen} onClose={() => setEditOpen(false)}>
+          <div className="flex items-center justify-between px-8 pt-7 pb-0 shrink-0">
+            <div>
+              <h5 className="h5">
+                {editing.firstName} {editing.lastName}
+              </h5>
+              <p className="text-xs text-gray-400 mt-0.5">
+                {editing.employeeCode}
+              </p>
+            </div>
+            <button
+              onClick={() => setEditOpen(false)}
+              className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            >
+              <X size={18} />
+            </button>
+          </div>
+
+          {editTab === "details" && (
+            <div className="px-8 pt-3">
+              <ProfileCompletion
+                employee={editing}
+                dependents={dependents}
+                transport={transport}
+                documents={documents}
+                qualifications={qualifications}
+              />
+            </div>
+          )}
+
+          {/* Tabs */}
+          <div className="flex gap-1 px-8 pt-4 pb-0 shrink-0 border-b border-gray-100 dark:border-gray-700 overflow-x-auto">
+            {(
+              [
+                ["details", "Employee Details"],
+                ["contract", "Contract"],
+                ["dependents", "Dependents"],
+                ["transport", "Transport"],
+                ["qualifications", "Qualifications"],
+                ["documents", "Documents"],
+              ] as [EditTab, string][]
+            ).map(([tab, label]) => (
+              <button
+                key={tab}
+                onClick={() => setEditTab(tab)}
+                className={`px-4 py-2 text-sm font-semibold rounded-t-lg border-b-2 transition-colors whitespace-nowrap ${
+                  editTab === tab
+                    ? "border-primary text-primary"
+                    : "border-transparent text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {/* Details tab */}
+          {editTab === "details" && (
+            <>
+              <div className="flex-1 overflow-y-auto px-8 py-4">
+                <Section title="Personal Information" />
+                <div className="grid grid-cols-3 gap-x-6 gap-y-5">
+                  <Field label="First Name" required>
+                    <Input
+                      value={editForm.firstName}
+                      onChange={ef("firstName")}
+                    />
+                  </Field>
+                  <Field label="Middle Name">
+                    <Input
+                      value={editForm.middleName}
+                      onChange={ef("middleName")}
+                    />
+                  </Field>
+                  <Field label="Last Name" required>
+                    <Input
+                      value={editForm.lastName}
+                      onChange={ef("lastName")}
+                    />
+                  </Field>
+                  <Field label="Date of Birth">
+                    <Input
+                      type="date"
+                      value={editForm.dateOfBirth}
+                      onChange={ef("dateOfBirth")}
+                    />
+                  </Field>
+                  <Field label="Gender">
+                    <select
+                      className="input w-full"
+                      value={editForm.gender}
+                      onChange={ef("gender")}
+                    >
+                      <option value="">Select...</option>
+                      {GENDERS.map((g) => (
+                        <option key={g} value={g}>
+                          {g}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                  <Field label="Nationality">
+                    <Input
+                      value={editForm.nationality}
+                      onChange={ef("nationality")}
+                    />
+                  </Field>
+                  <Field label="National ID">
+                    <Input
+                      value={editForm.nationalIdNumber}
+                      onChange={ef("nationalIdNumber")}
+                    />
+                  </Field>
+                  <Field label="Phone">
+                    <Input
+                      value={editForm.phoneNumber}
+                      onChange={ef("phoneNumber")}
+                    />
+                  </Field>
+                  <Field label="Personal Email">
+                    <Input
+                      type="email"
+                      value={editForm.personalEmail}
+                      onChange={ef("personalEmail")}
+                    />
+                  </Field>
+                  <div className="col-span-3">
+                    <Field label="Address">
+                      <textarea
+                        className="input w-full"
+                        rows={2}
+                        value={editForm.address}
+                        onChange={ef("address")}
+                      />
+                    </Field>
+                  </div>
+                </div>
+                <Section title="Employment" />
+                <EmploymentFields
+                  f={editForm}
+                  onChange={ef}
+                  isEdit
+                  branches={branches}
+                  departments={departments}
+                  designations={designations}
+                  deptsByBranch={deptsByBranch}
+                  crews={crews}
+                  groups={groups}
+                />
+                <Section title="Bank Details" />
+                <div className="grid grid-cols-3 gap-x-6 gap-y-5">
+                  <div className="col-span-3">
+                    <Field label="Bank Branch">
+                      <select
+                        className="input w-full"
+                        value={editForm.bankBranchId}
+                        onChange={ef("bankBranchId")}
+                      >
+                        <option value="">— Select Bank Branch —</option>
+                        {bankBranches.map((b) => (
+                          <option key={b.id} value={b.id}>
+                            {b.bankName} — {b.branchName}
+                            {b.branchCode ? ` (${b.branchCode})` : ""}
+                            {b.city ? ` · ${b.city}` : ""}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+                  </div>
+                  <Field label="Account Holder Name">
+                    <Input
+                      value={editForm.bankAccountHolderName}
+                      onChange={ef("bankAccountHolderName")}
+                      placeholder="As per bank records"
+                    />
+                  </Field>
+                  <Field label="Account Number">
+                    <Input
+                      value={editForm.bankAccountNumber}
+                      onChange={ef("bankAccountNumber")}
+                    />
+                  </Field>
+                  <Field label="Account Type">
+                    <select
+                      className="input w-full"
+                      value={editForm.bankAccountType}
+                      onChange={ef("bankAccountType")}
+                    >
+                      <option value="">Select…</option>
+                      <option value="Savings">Savings</option>
+                      <option value="Current">Current</option>
+                    </select>
+                  </Field>
+                </div>
+                <div className="mt-5">
+                  <Field label="Notes">
+                    <textarea
+                      className="input w-full"
+                      rows={2}
+                      value={editForm.notes}
+                      onChange={ef("notes")}
+                    />
+                  </Field>
+                </div>
+              </div>
+              <div className="px-8 py-5 border-t border-gray-100 dark:border-gray-700 shrink-0">
+                <div className="flex justify-end gap-3">
+                  <Button variant="plain" onClick={() => setEditOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="solid"
+                    loading={editSaving}
+                    onClick={handleEditSave}
+                  >
+                    Update
+                  </Button>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Contract tab */}
+          {editTab === "contract" && (
+            <>
+              <div className="flex-1 overflow-y-auto px-8 py-4">
+                {!contract && (
+                  <div className="mb-4 px-4 py-3 bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400 rounded-lg text-sm">
+                    No active contract found. A new contract will be created.
+                  </div>
+                )}
+                <Section title="Contract" />
+                <div className="grid grid-cols-3 gap-x-6 gap-y-5">
+                  <Field label="Contract Type">
+                    <select
+                      className="input w-full"
+                      value={contractForm.contractType}
+                      onChange={cf("contractType")}
+                    >
+                      {CONTRACT_TYPES.map((t) => (
+                        <option key={t} value={t}>
+                          {t}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                  <Field label="Payroll Basis">
+                    <select
+                      className="input w-full"
+                      value={contractForm.payrollBasis}
+                      onChange={cf("payrollBasis")}
+                    >
+                      {PAYROLL_BASES.map((b) => (
+                        <option key={b} value={b}>
+                          {b}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                  <Field label="Currency">
+                    <select
+                      className="input w-full"
+                      value={contractForm.currency}
+                      onChange={cf("currency")}
+                    >
+                      {CURRENCIES.map((c) => (
+                        <option key={c} value={c}>
+                          {c}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                  <Field label="Start Date" required>
+                    <Input
+                      type="date"
+                      value={contractForm.startDate}
+                      onChange={cf("startDate")}
+                    />
+                  </Field>
+                  <Field label="End Date">
+                    <Input
+                      type="date"
+                      value={contractForm.endDate}
+                      onChange={cf("endDate")}
+                    />
+                  </Field>
+                </div>
+                <Section title="Salary" />
+                <div className="grid grid-cols-3 gap-x-6 gap-y-5">
+                  <Field label="Basic Salary">
+                    {canUnmaskSalary ? (
+                      <Input
+                        type="number"
+                        value={contractForm.basicSalary}
+                        onChange={cf("basicSalary")}
+                      />
+                    ) : (
+                      <div className="input w-full flex items-center gap-2 text-gray-400 cursor-not-allowed select-none">
+                        <EyeOff size={14} />
+                        <span className="tracking-widest text-sm">••••••</span>
+                        <span className="text-xs ml-auto">(no permission)</span>
+                      </div>
+                    )}
+                  </Field>
+                  <div>
+                    <Field label="Total Allowances">
+                      <Input
+                        type="number"
+                        value={contractForm.allowances}
+                        onChange={cf("allowances")}
+                      />
+                    </Field>
+                    <p className="text-xs text-gray-400 mt-1">
+                      Fixed total. Individual line items in Benefits tab.
+                    </p>
+                  </div>
+                  {contractForm.payrollBasis === "Hourly" && (
+                    <Field label="Hourly Rate">
+                      <Input
+                        type="number"
+                        value={contractForm.hourlyRate}
+                        onChange={cf("hourlyRate")}
+                      />
+                    </Field>
+                  )}
+                  {contractForm.payrollBasis === "Daily" && (
+                    <Field label="Daily Rate">
+                      <Input
+                        type="number"
+                        value={contractForm.dailyRate}
+                        onChange={cf("dailyRate")}
+                      />
+                    </Field>
+                  )}
+                </div>
+                <Section title="Deduction Rules" />
+                <div className="grid grid-cols-3 gap-x-6 gap-y-5">
+                  <Field label="Absent Deduct After (days)">
+                    <Input
+                      type="number"
+                      value={contractForm.absentDeductionAfterDays}
+                      onChange={cf("absentDeductionAfterDays")}
+                    />
+                  </Field>
+                  <Field label="Late Deduct / Minute">
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={contractForm.lateDeductionPerMinute}
+                      onChange={cf("lateDeductionPerMinute")}
+                    />
+                  </Field>
+                  <Field label="OT Rate Multiplier">
+                    <Input
+                      type="number"
+                      step="0.1"
+                      value={contractForm.overtimeRateMultiplier}
+                      onChange={cf("overtimeRateMultiplier")}
+                    />
+                  </Field>
+                </div>
+                <div className="mt-5">
+                  <Field label="Notes">
+                    <textarea
+                      className="input w-full"
+                      rows={2}
+                      value={contractForm.notes}
+                      onChange={cf("notes")}
+                    />
+                  </Field>
+                </div>
+              </div>
+              <div className="px-8 py-5 border-t border-gray-100 dark:border-gray-700 shrink-0">
+                <div className="flex justify-end gap-3">
+                  <Button variant="plain" onClick={() => setEditOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="solid"
+                    loading={contractSaving}
+                    onClick={handleContractSave}
+                  >
+                    {contract ? "Update Contract" : "Create Contract"}
+                  </Button>
+                </div>
+              </div>
+            </>
+          )}
+
+          {editTab === "dependents" && (
+            <div className="flex-1 overflow-y-auto px-8 py-4">
+              <DependentsTab employeeId={editing!.id} />
+            </div>
+          )}
+          {editTab === "transport" && (
+            <div className="flex-1 overflow-y-auto px-8 py-4">
+              <TransportTab employeeId={editing!.id} />
+            </div>
+          )}
+          {editTab === "qualifications" && (
+            <div className="flex-1 overflow-y-auto px-8 py-4">
+              <QualificationsTab employeeId={editing!.id} />
+            </div>
+          )}
+          {editTab === "documents" && (
+            <div className="flex-1 px-8 py-4">
+              <DocumentsTab employeeId={editing!.id} />
+            </div>
+          )}
+        </WizardModal>
+      )}
+    </div>
+  );
+}

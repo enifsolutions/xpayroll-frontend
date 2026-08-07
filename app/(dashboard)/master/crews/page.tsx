@@ -19,6 +19,7 @@ import { showSuccess, showError } from '@/lib/toast'
 import api from '@/lib/axios'
 import { usePermission } from '@/hooks/usePermission'
 import { Permissions } from '@/lib/permissions'
+import { useAuthStore } from "@/store/authStore";
 
 interface Crew {
   id: string; name: string; code: string; description?: string | null;
@@ -45,6 +46,7 @@ const EMPTY: CrewForm = {
 const PAGE_SIZE = 10;
 
 export default function CrewsPage() {
+  const userId = useAuthStore((s) => s.user?.userId);
   useRequirePermission(Permissions.MasterData.Crews.View);
   const canManage = usePermission(Permissions.MasterData.Crews.Manage);
   const initialized = useRef(false);
@@ -201,7 +203,7 @@ export default function CrewsPage() {
         leadId: form.leadId || null,
         departmentId: form.departmentId || null,
         isActive: form.isActive,
-        userId: 1,
+        userId: userId,
       });
       setDialogOpen(false);
       await load();
@@ -224,7 +226,7 @@ export default function CrewsPage() {
       await api.post("crews/save", {
         action: "DELETE",
         id: deleteTarget.id,
-        userId: 1,
+        userId: userId,
       });
       setConfirmOpen(false);
       setDeleteTarget(null);

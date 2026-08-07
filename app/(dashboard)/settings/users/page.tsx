@@ -43,7 +43,7 @@ const EMPTY_FORM: SaveUserPayload = {
   lastName: "",
   systemRole: null,
   isActive: true,
-  userId: "1",
+  userId: "",
   action: "ADD",
 };
 
@@ -89,7 +89,7 @@ function formatTimeAgo(date: string | null): string {
 export default function UsersPage() {
   useRequirePermission("Settings.Users.View");
 
-  const userId = useAuthStore((s) => s.user?.userId ?? "1");
+  const userId = useAuthStore((s) => s.user?.userId);
   const canCreate = usePermission("Settings.Users.Create");
   const canEdit = usePermission("Settings.Users.Edit");
   const canDelete = usePermission("Settings.Users.Delete");
@@ -229,6 +229,10 @@ export default function UsersPage() {
   const handleSave = async () => {
     setError("");
     if (!validate()) return;
+    if (!userId) {
+      setError("Session not fully loaded yet — please refresh and try again.");
+      return;
+    }
     try {
       await axios.post("/users/save", { ...form, userId });
       setDialogOpen(false);
@@ -251,6 +255,10 @@ export default function UsersPage() {
   };
   const handleDelete = async () => {
     if (!deleteTarget) return;
+    if (!userId) {
+      showError("Session Error", "Please refresh and try again.");
+      return;
+    }
     try {
       await axios.post("/users/save", {
         id: deleteTarget.id,
@@ -276,6 +284,10 @@ export default function UsersPage() {
   };
   const handleReset = async () => {
     if (!resetTarget) return;
+    if (!userId) {
+      showError("Session Error", "Please refresh and try again.");
+      return;
+    }
     try {
       await axios.post(`/users/${resetTarget.id}/reset-password`, {
         email: resetTarget.email,

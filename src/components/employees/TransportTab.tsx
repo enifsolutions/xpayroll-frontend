@@ -6,6 +6,7 @@ import { showSuccess, showError } from '@/lib/toast';
 import api from '@/lib/axios';
 import { usePermission } from '@/hooks/usePermission';
 import { Permissions } from '@/lib/permissions';
+import { useAuthStore } from "@/store/authStore";
 import {
   EmployeeTransport, TransportForm, EMPTY_TRANSPORT,
   TRAVEL_TYPES, VEHICLE_TYPES,
@@ -27,6 +28,7 @@ function Section({ title }: { title: string }) {
 }
 
 export default function TransportTab({ employeeId }: { employeeId: string }) {
+  const userId = useAuthStore((s) => s.user?.userId);
   const canManage   = usePermission(Permissions.HR.Transport.Manage);
   const initialized = useRef(false);
 
@@ -74,18 +76,20 @@ export default function TransportTab({ employeeId }: { employeeId: string }) {
     setError('');
     setSaving(true);
     try {
-      await api.post('employee-transport', {
+      await api.post("employee-transport", {
         employeeId,
-        residentialAddress:    form.residentialAddress.trim() || null,
-        city:                  form.city.trim()               || null,
-        distanceKm:            form.distanceKm ? parseFloat(form.distanceKm) : null,
-        travelType:            form.travelType                || null,
-        vehicleType:           form.vehicleType               || null,
-        vehicleNumber:         form.vehicleNumber.trim()      || null,
+        residentialAddress: form.residentialAddress.trim() || null,
+        city: form.city.trim() || null,
+        distanceKm: form.distanceKm ? parseFloat(form.distanceKm) : null,
+        travelType: form.travelType || null,
+        vehicleType: form.vehicleType || null,
+        vehicleNumber: form.vehicleNumber.trim() || null,
         fuelAllowanceEligible: form.fuelAllowanceEligible,
-        transportAllowance:    form.transportAllowance ? parseFloat(form.transportAllowance) : null,
-        notes:                 form.notes.trim()              || null,
-        userId: 1,
+        transportAllowance: form.transportAllowance
+          ? parseFloat(form.transportAllowance)
+          : null,
+        notes: form.notes.trim() || null,
+        userId: userId,
       });
       await load();
       setEditMode(false);

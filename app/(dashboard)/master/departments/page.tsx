@@ -25,8 +25,6 @@ import { showSuccess, showError } from "@/lib/toast";
 import api from "@/lib/axios";
 import { useAuthStore } from "@/store/authStore";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
 interface Department {
   id: string;
   branchId: string | null;
@@ -35,6 +33,9 @@ interface Department {
   code: string;
   description: string | null;
   isActive: boolean;
+  absentDeductionAfterDays: number | null;
+  lateDeductionPerMinute: number | null;
+  overtimeRateMultiplier: number | null;
   createdAt: string;
   updatedAt: string | null;
 }
@@ -57,9 +58,21 @@ interface DepartmentForm {
   branchId: string;
   description: string;
   isActive: boolean;
+  absentDeductionAfterDays: string;
+  lateDeductionPerMinute: string;
+  overtimeRateMultiplier: string;
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+const EMPTY_DEPT_FORM: DepartmentForm = {
+  name: "",
+  code: "",
+  branchId: "",
+  description: "",
+  isActive: true,
+  absentDeductionAfterDays: "",
+  lateDeductionPerMinute: "",
+  overtimeRateMultiplier: "",
+};
 
 const PAGE_SIZE = 10;
 
@@ -86,8 +99,6 @@ function initials(name: string) {
     ? (parts[0][0] + parts[1][0]).toUpperCase()
     : name.slice(0, 2).toUpperCase();
 }
-
-// ─── KPI Card ─────────────────────────────────────────────────────────────────
 
 function KpiCard({
   label,
@@ -128,22 +139,17 @@ function KpiCard({
   );
 }
 
-// ─── Hierarchy Tree ───────────────────────────────────────────────────────────
-
 interface TreeNode extends Department {
   children: TreeNode[];
 }
 
 function buildTree(departments: Department[]): TreeNode[] {
-  // Since parent_id isn't in the DTO yet, group by branch as top-level nodes
   const byBranch: Record<string, TreeNode[]> = {};
   for (const d of departments) {
     const key = d.branchName ?? "Unassigned";
     if (!byBranch[key]) byBranch[key] = [];
     byBranch[key].push({ ...d, children: [] });
   }
-
-  // Return as flat branch-grouped array for visualization
   return departments.map((d) => ({ ...d, children: [] }));
 }
 
@@ -162,7 +168,6 @@ function HierarchyTree({ departments }: { departments: Department[] }) {
     <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
       {Object.entries(byBranch).map(([branch, depts]) => (
         <div key={branch}>
-          {/* Branch header */}
           <div className="flex items-center gap-2 mb-2">
             <div className="w-7 h-7 rounded-lg bg-violet-100 dark:bg-violet-900/40 flex items-center justify-center">
               <GitBranch
@@ -176,7 +181,6 @@ function HierarchyTree({ departments }: { departments: Department[] }) {
             <span className="text-xs text-gray-400">({depts.length})</span>
           </div>
 
-          {/* Departments under branch */}
           <div className="ml-5 border-l-2 border-gray-100 dark:border-gray-700 pl-4 space-y-2">
             {depts.map((d) => (
               <div
@@ -212,8 +216,6 @@ function HierarchyTree({ departments }: { departments: Department[] }) {
   );
 }
 
-// ─── Main Page ────────────────────────────────────────────────────────────────
-
 export default function DepartmentsPage() {
   const userId = useAuthStore((s) => s.user?.userId);
   const initialized = useRef(false);
@@ -224,30 +226,20 @@ export default function DepartmentsPage() {
   const [loading, setLoading] = useState(false);
   const [statsLoading, setStatsLoading] = useState(false);
 
-  // Filters & pagination
   const [branchFilter, setBranchFilter] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [search, setSearch] = useState<string>("");
   const [page, setPage] = useState(1);
 
-  // Dialogs
   const [dialogOpen, setDialogOpen] = useState(false);
   const [hierarchyOpen, setHierarchyOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
 
-  const [form, setForm] = useState<DepartmentForm>({
-    name: "",
-    code: "",
-    branchId: "",
-    description: "",
-    isActive: true,
-  });
+  const [form, setForm] = useState<DepartmentForm>(EMPTY_DEPT_FORM);
   const [formError, setFormError] = useState("");
   const [saving, setSaving] = useState(false);
   const [exporting, setExporting] = useState(false);
-
-  // ─── Load data ──────────────────────────────────────────────────────────────
 
   const load = async () => {
     setLoading(true);
@@ -271,7 +263,6 @@ export default function DepartmentsPage() {
       const res = await api.get("/departments/stats");
       setStats(res.data);
     } catch {
-      // stats are non-critical
     } finally {
       setStatsLoading(false);
     }
@@ -283,8 +274,6 @@ export default function DepartmentsPage() {
     load();
     loadStats();
   }, []);
-
-  // ─── Filtered & paginated data ───────────────────────────────────────────────
 
   const filtered = useMemo(() => {
     return departments.filter((d) => {
@@ -306,22 +295,13 @@ export default function DepartmentsPage() {
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  // Reset page when filters change
   useEffect(() => {
     setPage(1);
   }, [branchFilter, statusFilter, search]);
 
-  // ─── Form helpers ────────────────────────────────────────────────────────────
-
   const openAdd = () => {
     setEditingId(null);
-    setForm({
-      name: "",
-      code: "",
-      branchId: "",
-      description: "",
-      isActive: true,
-    });
+    setForm(EMPTY_DEPT_FORM);
     setFormError("");
     setDialogOpen(true);
   };
@@ -334,6 +314,9 @@ export default function DepartmentsPage() {
       branchId: d.branchId ?? "",
       description: d.description ?? "",
       isActive: d.isActive,
+      absentDeductionAfterDays: d.absentDeductionAfterDays?.toString() ?? "",
+      lateDeductionPerMinute: d.lateDeductionPerMinute?.toString() ?? "",
+      overtimeRateMultiplier: d.overtimeRateMultiplier?.toString() ?? "",
     });
     setFormError("");
     setDialogOpen(true);
@@ -359,6 +342,15 @@ export default function DepartmentsPage() {
         branchId: form.branchId || null,
         description: form.description.trim() || null,
         isActive: form.isActive,
+        absentDeductionAfterDays: form.absentDeductionAfterDays
+          ? parseInt(form.absentDeductionAfterDays)
+          : null,
+        lateDeductionPerMinute: form.lateDeductionPerMinute
+          ? parseFloat(form.lateDeductionPerMinute)
+          : null,
+        overtimeRateMultiplier: form.overtimeRateMultiplier
+          ? parseFloat(form.overtimeRateMultiplier)
+          : null,
         userId,
       });
       setDialogOpen(false);
@@ -411,11 +403,8 @@ export default function DepartmentsPage() {
     }
   };
 
-  // ─── Render ──────────────────────────────────────────────────────────────────
-
   return (
     <div className="space-y-6">
-      {/* ── Page header ── */}
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <div>
           <h3 className="text-xl font-bold text-gray-900 dark:text-white">
@@ -454,7 +443,6 @@ export default function DepartmentsPage() {
         </div>
       </div>
 
-      {/* ── KPI Cards ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <KpiCard
           label="Total Departments"
@@ -486,12 +474,9 @@ export default function DepartmentsPage() {
         />
       </div>
 
-      {/* ── Table card ── */}
       <div className="card">
         <div className="card-body">
-          {/* Toolbar */}
           <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-5">
-            {/* Search */}
             <div className="relative flex-1 max-w-xs">
               <Input
                 placeholder="Search by name or code…"
@@ -513,7 +498,6 @@ export default function DepartmentsPage() {
               </svg>
             </div>
 
-            {/* Branch filter */}
             <select
               className="input"
               value={branchFilter}
@@ -528,7 +512,6 @@ export default function DepartmentsPage() {
               ))}
             </select>
 
-            {/* Status filter */}
             <select
               className="input"
               value={statusFilter}
@@ -540,7 +523,6 @@ export default function DepartmentsPage() {
               <option value="inactive">Inactive</option>
             </select>
 
-            {/* Refresh */}
             <button
               onClick={() => {
                 load();
@@ -557,7 +539,6 @@ export default function DepartmentsPage() {
             </span>
           </div>
 
-          {/* Table */}
           {loading ? (
             <div className="flex items-center justify-center py-16">
               <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
@@ -595,7 +576,6 @@ export default function DepartmentsPage() {
                 <tbody>
                   {paginated.map((d) => (
                     <tr key={d.id}>
-                      {/* Department with avatar */}
                       <td>
                         <div className="flex items-center gap-3">
                           <div
@@ -622,14 +602,12 @@ export default function DepartmentsPage() {
                         </div>
                       </td>
 
-                      {/* Code */}
                       <td>
                         <span className="font-mono text-xs bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 px-2 py-1 rounded-md">
                           {d.code}
                         </span>
                       </td>
 
-                      {/* Branch */}
                       <td>
                         {d.branchName ? (
                           <span className="inline-flex items-center gap-1.5 text-xs font-medium bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 px-2.5 py-1 rounded-full">
@@ -641,7 +619,6 @@ export default function DepartmentsPage() {
                         )}
                       </td>
 
-                      {/* Description */}
                       <td>
                         <span
                           className="text-sm text-gray-500 dark:text-gray-400 line-clamp-1 max-w-[220px]"
@@ -651,7 +628,6 @@ export default function DepartmentsPage() {
                         </span>
                       </td>
 
-                      {/* Status */}
                       <td>
                         <span
                           className={`xp-badge ${d.isActive ? "xp-badge-success" : "xp-badge-neutral"}`}
@@ -660,7 +636,6 @@ export default function DepartmentsPage() {
                         </span>
                       </td>
 
-                      {/* Actions */}
                       <td>
                         <div className="flex items-center justify-end gap-1">
                           <button
@@ -686,7 +661,6 @@ export default function DepartmentsPage() {
             </div>
           )}
 
-          {/* ── Pagination ── */}
           {totalPages > 1 && (
             <div className="flex items-center justify-between mt-5 pt-4 border-t border-gray-100 dark:border-gray-800">
               <p className="text-sm text-gray-500 dark:text-gray-400">
@@ -749,11 +723,10 @@ export default function DepartmentsPage() {
         </div>
       </div>
 
-      {/* ── Add / Edit Dialog ── */}
       <Dialog
         isOpen={dialogOpen}
         onClose={() => setDialogOpen(false)}
-        width={480}
+        width={640}
       >
         <div className="mb-5">
           <h5 className="font-semibold text-gray-900 dark:text-white">
@@ -817,6 +790,62 @@ export default function DepartmentsPage() {
             />
           </div>
 
+          <div>
+            <p className="text-xs font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-3">
+              Deduction Rule Overrides
+            </p>
+            <p className="text-xs text-gray-400 mb-3">
+              Optional. Leave blank to use the Company default (or whichever
+              hierarchy channel is configured in Company Settings).
+            </p>
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <label className="form-label">Absent Deduct After (days)</label>
+                <Input
+                  type="number"
+                  placeholder="Company default"
+                  value={form.absentDeductionAfterDays}
+                  onChange={(e) =>
+                    setForm((f) => ({
+                      ...f,
+                      absentDeductionAfterDays: e.target.value,
+                    }))
+                  }
+                />
+              </div>
+              <div>
+                <label className="form-label">Late Deduct / Minute</label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  placeholder="Company default"
+                  value={form.lateDeductionPerMinute}
+                  onChange={(e) =>
+                    setForm((f) => ({
+                      ...f,
+                      lateDeductionPerMinute: e.target.value,
+                    }))
+                  }
+                />
+              </div>
+              <div>
+                <label className="form-label">OT Rate Multiplier</label>
+                <Input
+                  type="number"
+                  step="0.1"
+                  placeholder="Company default"
+                  value={form.overtimeRateMultiplier}
+                  onChange={(e) =>
+                    setForm((f) => ({
+                      ...f,
+                      overtimeRateMultiplier: e.target.value,
+                    }))
+                  }
+                />
+              </div>
+            </div>
+          </div>
+
           <div className="flex items-center justify-between py-1">
             <span className="form-label mb-0">Active</span>
             <Switcher
@@ -842,7 +871,6 @@ export default function DepartmentsPage() {
         </div>
       </Dialog>
 
-      {/* ── Delete Confirmation Dialog ── */}
       <Dialog isOpen={!!deleteId} onClose={() => setDeleteId(null)} width={400}>
         <div className="text-center space-y-4">
           <div className="w-14 h-14 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto">
@@ -871,15 +899,12 @@ export default function DepartmentsPage() {
         </div>
       </Dialog>
 
-      {/* ── Hierarchy Dialog ── */}
       {hierarchyOpen && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4"
           onClick={() => setHierarchyOpen(false)}
         >
-          {/* Backdrop */}
           <div className="absolute inset-0 bg-black/50 dark:bg-black/70" />
-          {/* Panel */}
           <div
             className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-xl w-full max-w-[560px] p-6"
             onClick={(e) => e.stopPropagation()}

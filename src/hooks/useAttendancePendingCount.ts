@@ -10,7 +10,7 @@ export interface AttendancePendingCount {
 
 export function useAttendancePendingCount() {
   const [counts, setCounts] = useState<AttendancePendingCount>({ forReview: 0, myPending: 0 })
-  const userId      = useAuthStore(s => s.user?.userId ?? '')
+  const userId = useAuthStore((s) => s.user?.userId);
   const canView     = usePermission('Attendance.Adjustment.View')
 
   useEffect(() => {

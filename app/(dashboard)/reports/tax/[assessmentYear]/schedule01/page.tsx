@@ -7,6 +7,7 @@ import api from '@/lib/axios';
 import { showError, showSuccess } from '@/lib/toast';
 import { useRequirePermission } from '@/hooks/useRequirePermission';
 import type { ApitSchedule01Row } from '@/types/apit-reports.types';
+import { usePermission } from "@/hooks/usePermission";
 
 const fmt = (n: number) => new Intl.NumberFormat('en-LK', { minimumFractionDigits: 2 }).format(n);
 const fmtDate = (d: string | null) => d ? new Date(d).toLocaleDateString('en-LK', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';

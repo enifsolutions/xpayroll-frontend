@@ -1,20 +1,24 @@
-'use client'
+"use client";
 
 import { useState, useEffect } from "react";
-import Dialog from '@/components/ui/Dialog'
-import Button from '@/components/ui/Button'
-import Input from '@/components/ui/Input'
-import { showError, showSuccess } from '@/lib/toast'
-import api from '@/lib/axios'
+import Dialog from "@/components/ui/Dialog";
+import Button from "@/components/ui/Button";
+import Input from "@/components/ui/Input";
+import { showError, showSuccess } from "@/lib/toast";
+import api from "@/lib/axios";
 import {
-  EMPLOYMENT_TYPES, EMPLOYEE_STATUSES, GENDERS,
-  PAYROLL_BASES, CONTRACT_TYPES, CURRENCIES,
-} from './employee.types'
+  EMPLOYMENT_TYPES,
+  EMPLOYEE_STATUSES,
+  GENDERS,
+  PAYROLL_BASES,
+  CONTRACT_TYPES,
+  CURRENCIES,
+} from "./employee.types";
 
 interface Props {
-  open: boolean
-  onClose: () => void
-  onSaved: () => void
+  open: boolean;
+  onClose: () => void;
+  onSaved: () => void;
 }
 
 interface LeaveTemplateOption {
@@ -53,19 +57,19 @@ interface Step1Form {
 }
 
 interface Step2Form {
-  contractType: string
-  payrollBasis: string
-  basicSalary: string
-  hourlyRate: string
-  dailyRate: string
-  allowances: string
-  currency: string
-  absentDeductionAfterDays: string
-  lateDeductionPerMinute: string
-  overtimeRateMultiplier: string
-  startDate: string
-  endDate: string
-  contractNotes: string
+  contractType: string;
+  payrollBasis: string;
+  basicSalary: string;
+  hourlyRate: string;
+  dailyRate: string;
+  allowances: string;
+  currency: string;
+  absentDeductionAfterDays: string;
+  lateDeductionPerMinute: string;
+  overtimeRateMultiplier: string;
+  startDate: string;
+  endDate: string;
+  contractNotes: string;
 }
 
 const defaultStep1: Step1Form = {
@@ -98,14 +102,20 @@ const defaultStep1: Step1Form = {
 };
 
 const defaultStep2: Step2Form = {
-  contractType: 'Permanent', payrollBasis: 'Fixed',
-  basicSalary: '', hourlyRate: '', dailyRate: '',
-  allowances: '0', currency: 'LKR',
-  absentDeductionAfterDays: '0', lateDeductionPerMinute: '0',
-  overtimeRateMultiplier: '1.5',
-  startDate: new Date().toISOString().split('T')[0],
-  endDate: '', contractNotes: '',
-}
+  contractType: "Permanent",
+  payrollBasis: "Fixed",
+  basicSalary: "",
+  hourlyRate: "",
+  dailyRate: "",
+  allowances: "0",
+  currency: "LKR",
+  absentDeductionAfterDays: "0",
+  lateDeductionPerMinute: "0",
+  overtimeRateMultiplier: "1.5",
+  startDate: new Date().toISOString().split("T")[0],
+  endDate: "",
+  contractNotes: "",
+};
 
 export default function AddEmployeeWizard({ open, onClose, onSaved }: Props) {
   const [step, setStep] = useState(1);

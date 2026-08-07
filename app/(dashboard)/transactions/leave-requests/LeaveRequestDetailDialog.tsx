@@ -5,6 +5,7 @@ import api from "@/lib/axios";
 import Dialog from "@/components/ui/Dialog";
 import Button from "@/components/ui/Button";
 import { useAuthStore } from "@/store/authStore";
+import { showError } from "@/lib/toast";
 import { statusBadgeClass, statusLabel } from "@/utils/leaveRequestUtils";
 import type { LeaveRequest } from "@/types/leaveRequest.types";
 
@@ -55,7 +56,7 @@ export default function LeaveRequestDetailDialog({
   onClose,
   onActionDone,
 }: Props) {
-  const actionBy = useAuthStore((s) => s.user?.userId ?? "1");
+  const actionBy = useAuthStore((s) => s.user?.userId);
 
   const [balances, setBalances] = useState<LeaveBalance[]>([]);
   const [audit, setAudit] = useState<AuditEntry[]>([]);
@@ -117,6 +118,10 @@ export default function LeaveRequestDetailDialog({
     if (!item || !actionMode) return;
     if ((actionMode === "REJECT" || actionMode === "REVOKE") && !reason.trim())
       return;
+    if (!actionBy) {
+      showError("Session Error", "Please refresh and try again.");
+      return;
+    }
     setSaving(true);
     try {
       if (actionMode === "REVOKE") {
@@ -135,7 +140,11 @@ export default function LeaveRequestDetailDialog({
       }
       onClose();
       onActionDone();
-    } catch {
+    } catch (e: any) {
+      showError(
+        "Action Failed",
+        e?.response?.data?.message ?? e?.response?.data?.error ?? "Could not process this request. Please try again.",
+      );
     } finally {
       setSaving(false);
     }

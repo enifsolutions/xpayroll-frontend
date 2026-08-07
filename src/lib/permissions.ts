@@ -111,6 +111,10 @@ export const Permissions = {
       View: "HR.Qualifications.View",
       Manage: "HR.Qualifications.Manage",
     },
+    EmployeeContract: {
+      Request: "HR.EmployeeContract.Request",
+      Approve: "HR.EmployeeContract.Approve",
+    },
   },
   Payroll: {
     PayrollRun: {
@@ -136,6 +140,7 @@ export const Permissions = {
     Company: {
       View: "Settings.Company.View",
       Manage: "Settings.Company.Manage",
+      Create: "Settings.Company.Create",
     },
   },
   Attendance: {
@@ -167,5 +172,94 @@ export const Permissions = {
     ExportBankLetter: "Payroll.PayslipExport.ExportBankLetter",
     EmailPayslip: "Payroll.PayslipExport.EmailPayslip",
     BulkEmail: "Payroll.PayslipExport.BulkEmail",
+  },
+  Recruitment: {
+    Requisition: {
+      View: "Recruitment.Requisition.View",
+      Create: "Recruitment.Requisition.Create",
+      Edit: "Recruitment.Requisition.Edit",
+      Delete: "Recruitment.Requisition.Delete",
+      ApproveL1: "Recruitment.Requisition.ApproveL1",
+      ApproveL2: "Recruitment.Requisition.ApproveL2",
+    },
+    Posting: {
+      View: "Recruitment.Posting.View",
+      Create: "Recruitment.Posting.Create",
+      Edit: "Recruitment.Posting.Edit",
+      Delete: "Recruitment.Posting.Delete",
+      Publish: "Recruitment.Posting.Publish",
+      Unpublish: "Recruitment.Posting.Unpublish",
+    },
+    Candidate: {
+      View: "Recruitment.Candidate.View",
+      Create: "Recruitment.Candidate.Create",
+      Edit: "Recruitment.Candidate.Edit",
+      Delete: "Recruitment.Candidate.Delete",
+      ViewCv: "Recruitment.Candidate.ViewCv",
+      Blacklist: "Recruitment.Candidate.Blacklist",
+      Export: "Recruitment.Candidate.Export",
+    },
+    Application: {
+      View: "Recruitment.Application.View",
+      Create: "Recruitment.Application.Create",
+      ChangeStage: "Recruitment.Application.ChangeStage",
+      Reject: "Recruitment.Application.Reject",
+      ViewAll: "Recruitment.Application.ViewAll",
+    },
+    ScorecardTemplate: {
+      View: "Recruitment.ScorecardTemplate.View",
+      Create: "Recruitment.ScorecardTemplate.Create",
+      Update: "Recruitment.ScorecardTemplate.Update",
+      Delete: "Recruitment.ScorecardTemplate.Delete",
+    },
+    SalaryBand: {
+      View: "Recruitment.SalaryBand.View",
+      Create: "Recruitment.SalaryBand.Create",
+      Edit: "Recruitment.SalaryBand.Edit",
+      Delete: "Recruitment.SalaryBand.Delete",
+    },
+    Ai: {
+      ParseCv: "Recruitment.Ai.ParseCv",
+      MatchScore: "Recruitment.Ai.MatchScore",
+      OverrideScoreLimit: "Recruitment.Ai.OverrideScoreLimit",
+      TalentRediscovery: "Recruitment.Ai.TalentRediscovery",
+      SalaryIntelligence: "Recruitment.Ai.SalaryIntelligence",
+      InterviewSummary: "Recruitment.Ai.InterviewSummary",
+      OverrideInterviewSummary: "Recruitment.Ai.OverrideInterviewSummary",
+      OverrideTalentRediscovery: "Recruitment.Ai.OverrideTalentRediscovery",
+      OverrideSalaryNarrative: "Recruitment.Ai.OverrideSalaryNarrative",
+    },
+    Onboarding: {
+      ConvertToEmployee: "Recruitment.Onboarding.ConvertToEmployee",
+    },
+    Reports: {
+      View: "Recruitment.Reports.View",
+      Export: "Recruitment.Reports.Export",
+      Funnel: { View: "Recruitment.Reports.Funnel.View" },
+      TimeToHire: { View: "Recruitment.Reports.TimeToHire.View" },
+      SourceEffectiveness: {
+        View: "Recruitment.Reports.SourceEffectiveness.View",
+      },
+      RequisitionAging: { View: "Recruitment.Reports.RequisitionAging.View" },
+      DiversitySnapshot: { View: "Recruitment.Reports.DiversitySnapshot.View" },
+    },
+    Interview: {
+      View: "Recruitment.Interview.View",
+      Create: "Recruitment.Interview.Create",
+      Edit: "Recruitment.Interview.Edit",
+      Delete: "Recruitment.Interview.Delete",
+      ManagePanel: "Recruitment.Interview.ManagePanel",
+    },
+    Offer: {
+      View: "Recruitment.Offer.View",
+      Create: "Recruitment.Offer.Create",
+      Edit: "Recruitment.Offer.Edit",
+      Delete: "Recruitment.Offer.Delete",
+      Submit: "Recruitment.Offer.Submit",
+      Approve: "Recruitment.Offer.Approve",
+      Send: "Recruitment.Offer.Send",
+      RecordResponse: "Recruitment.Offer.RecordResponse",
+      Withdraw: "Recruitment.Offer.Withdraw",
+    },
   },
 } as const;

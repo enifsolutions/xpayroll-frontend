@@ -15,8 +15,7 @@ import {
 import { useRequirePermission } from '@/hooks/useRequirePermission';
 import { usePermission } from '@/hooks/usePermission';
 import { Permissions } from '@/lib/permissions';
-
-// ─── Types ───────────────────────────────────────────────────────────────────
+import { useAuthStore } from "@/store/authStore";
 
 interface Designation {
   id: string;
@@ -25,6 +24,9 @@ interface Designation {
   grade: string | null;
   isActive: boolean;
   employeeCount: number;
+  absentDeductionAfterDays: number | null;
+  lateDeductionPerMinute: number | null;
+  overtimeRateMultiplier: number | null;
   createdAt: string;
 }
 
@@ -40,12 +42,21 @@ interface DesignationForm {
   level: string;
   grade: string;
   isActive: boolean;
+  absentDeductionAfterDays: string;
+  lateDeductionPerMinute: string;
+  overtimeRateMultiplier: string;
 }
 
-const EMPTY: DesignationForm = { title: '', level: '', grade: '', isActive: true };
+const EMPTY: DesignationForm = {
+  title: '',
+  level: '',
+  grade: '',
+  isActive: true,
+  absentDeductionAfterDays: '',
+  lateDeductionPerMinute: '',
+  overtimeRateMultiplier: '',
+};
 const PAGE_SIZE = 10;
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function initials(title: string) {
   return title
@@ -77,8 +88,6 @@ function fmtDate(iso: string) {
     day: '2-digit', month: 'short', year: 'numeric',
   });
 }
-
-// ─── Stat Card ───────────────────────────────────────────────────────────────
 
 interface StatCardProps {
   icon: React.ReactNode;
@@ -112,11 +121,10 @@ function StatCard({ icon, iconBg, label, value, sub, loading }: StatCardProps) {
   );
 }
 
-// ─── Page ────────────────────────────────────────────────────────────────────
-
 export default function DesignationsPage() {
   useRequirePermission(Permissions.MasterData.Designations.View);
   const canManage = usePermission(Permissions.MasterData.Designations.Manage);
+  const userId = useAuthStore((s) => s.user?.userId);
 
   const [items, setItems] = useState<Designation[]>([]);
   const [stats, setStats] = useState<DesignationStats | null>(null);
@@ -133,15 +141,12 @@ export default function DesignationsPage() {
   const [saving, setSaving] = useState(false);
   const initialized = useRef(false);
 
-  // ── Load ──────────────────────────────────────────────────────────────────
-
   const loadStats = useCallback(async () => {
     try {
       setStatsLoading(true);
       const res = await api.get<DesignationStats>("/designations/stats");
       setStats(res.data);
     } catch {
-      /* non-critical */
     } finally {
       setStatsLoading(false);
     }
@@ -170,8 +175,6 @@ export default function DesignationsPage() {
     loadStats();
   }, []);
 
-  // ── Client-side filter ────────────────────────────────────────────────────
-
   const filtered = useMemo(() => {
     let list = items;
     if (search.trim()) {
@@ -191,12 +194,9 @@ export default function DesignationsPage() {
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  // Reset page when filter changes
   useEffect(() => {
     setPage(1);
   }, [search, statusFilter]);
-
-  // ── CRUD ──────────────────────────────────────────────────────────────────
 
   const openAdd = () => {
     setEditing(null);
@@ -210,6 +210,9 @@ export default function DesignationsPage() {
       level: d.level ?? "",
       grade: d.grade ?? "",
       isActive: d.isActive,
+      absentDeductionAfterDays: d.absentDeductionAfterDays?.toString() ?? "",
+      lateDeductionPerMinute: d.lateDeductionPerMinute?.toString() ?? "",
+      overtimeRateMultiplier: d.overtimeRateMultiplier?.toString() ?? "",
     });
     setDialogOpen(true);
   };
@@ -225,7 +228,16 @@ export default function DesignationsPage() {
         level: form.level.trim() || null,
         grade: form.grade.trim() || null,
         isActive: form.isActive,
-        userId: null,
+        absentDeductionAfterDays: form.absentDeductionAfterDays
+          ? parseInt(form.absentDeductionAfterDays)
+          : null,
+        lateDeductionPerMinute: form.lateDeductionPerMinute
+          ? parseFloat(form.lateDeductionPerMinute)
+          : null,
+        overtimeRateMultiplier: form.overtimeRateMultiplier
+          ? parseFloat(form.overtimeRateMultiplier)
+          : null,
+        userId,
       });
       setDialogOpen(false);
       await Promise.all([load(), loadStats()]);
@@ -257,8 +269,6 @@ export default function DesignationsPage() {
     }
   };
 
-  // ── Export ────────────────────────────────────────────────────────────────
-
   const handleExport = () => {
     const csv = [
       ["Title", "Level", "Grade", "Employees", "Status"].join(","),
@@ -282,17 +292,12 @@ export default function DesignationsPage() {
   const set = <K extends keyof DesignationForm>(k: K, v: DesignationForm[K]) =>
     setForm((f) => ({ ...f, [k]: v }));
 
-  // ── Stats derived ─────────────────────────────────────────────────────────
-
   const activeCount = items.filter((d) => d.isActive).length;
   const inactiveCount = items.filter((d) => !d.isActive).length;
   const branchCount = stats?.assignedCount ?? 0;
 
-  // ─────────────────────────────────────────────────────────────────────────
-
   return (
     <div>
-      {/* ── Header ── */}
       <div className="flex items-center justify-between mb-5">
         <div>
           <h3 className="h3">Designations</h3>
@@ -320,7 +325,6 @@ export default function DesignationsPage() {
         </div>
       </div>
 
-      {/* ── Stat Cards ── */}
       <div className="flex gap-4 mb-5">
         <StatCard
           icon={<Briefcase size={18} className="text-violet-600" />}
@@ -356,12 +360,9 @@ export default function DesignationsPage() {
         />
       </div>
 
-      {/* ── Table Card ── */}
       <div className="card">
         <div className="card-body">
-          {/* ── Filter row ── */}
           <div className="flex items-center gap-3 mb-4">
-            {/* Search */}
             <div className="relative flex-1 max-w-sm">
               <Search
                 size={15}
@@ -376,7 +377,6 @@ export default function DesignationsPage() {
               />
             </div>
 
-            {/* Status dropdown */}
             <select
               value={statusFilter}
               onChange={(e) =>
@@ -389,13 +389,11 @@ export default function DesignationsPage() {
               <option value="inactive">Inactive</option>
             </select>
 
-            {/* Result count */}
             <span className="ml-auto text-sm text-gray-400 whitespace-nowrap">
               {filtered.length} designation{filtered.length !== 1 ? "s" : ""}
             </span>
           </div>
 
-          {/* ── Table ── */}
           {loading ? (
             <div className="flex justify-center py-14">
               <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full" />
@@ -426,7 +424,6 @@ export default function DesignationsPage() {
                   ) : (
                     paged.map((d) => (
                       <tr key={d.id}>
-                        {/* Title with avatar */}
                         <td>
                           <div className="flex items-center gap-3">
                             <div
@@ -444,7 +441,6 @@ export default function DesignationsPage() {
                             </div>
                           </div>
                         </td>
-                        {/* Level pill */}
                         <td>
                           {d.level ? (
                             <span className="inline-flex items-center justify-center min-w-[28px] h-7 px-2 rounded-full bg-gray-100 dark:bg-gray-700 text-xs font-bold text-gray-700 dark:text-gray-200">
@@ -454,11 +450,9 @@ export default function DesignationsPage() {
                             <span className="text-gray-300">—</span>
                           )}
                         </td>
-                        {/* Grade */}
                         <td className="text-sm text-gray-600 dark:text-gray-400">
                           {d.grade ?? <span className="text-gray-300">—</span>}
                         </td>
-                        {/* Employee count */}
                         <td className="text-sm font-medium heading-text">
                           {d.employeeCount > 0 ? (
                             d.employeeCount
@@ -466,7 +460,6 @@ export default function DesignationsPage() {
                             <span className="text-gray-300">—</span>
                           )}
                         </td>
-                        {/* Status */}
                         <td>
                           <span
                             className={`xp-badge ${d.isActive ? "xp-badge-success" : "xp-badge-neutral"}`}
@@ -474,7 +467,6 @@ export default function DesignationsPage() {
                             {d.isActive ? "Active" : "Inactive"}
                           </span>
                         </td>
-                        {/* Actions */}
                         {canManage && (
                           <td className="text-right">
                             <div className="flex items-center justify-end gap-1">
@@ -501,7 +493,6 @@ export default function DesignationsPage() {
                 </tbody>
               </table>
 
-              {/* ── Pagination ── */}
               {filtered.length > PAGE_SIZE && (
                 <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
                   <p className="text-sm text-gray-500">
@@ -549,11 +540,11 @@ export default function DesignationsPage() {
         </div>
       </div>
 
-      {/* ── Save Dialog ── */}
       <Dialog
         isOpen={dialogOpen}
         onClose={() => setDialogOpen(false)}
         onRequestClose={() => setDialogOpen(false)}
+        width={640}
       >
         <h5 className="h5 mb-4">
           {editing ? "Edit Designation" : "Add Designation"}
@@ -587,6 +578,48 @@ export default function DesignationsPage() {
               />
             </div>
           </div>
+
+          <div>
+            <p className="text-xs font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-3">
+              Deduction Rule Overrides
+            </p>
+            <p className="text-xs text-gray-400 mb-3">
+              Optional. Leave blank to use the Company default (or whichever
+              hierarchy channel is configured in Company Settings).
+            </p>
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <label className="form-label">Absent Deduct After (days)</label>
+                <Input
+                  type="number"
+                  placeholder="Company default"
+                  value={form.absentDeductionAfterDays}
+                  onChange={(e) => set("absentDeductionAfterDays", e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="form-label">Late Deduct / Minute</label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  placeholder="Company default"
+                  value={form.lateDeductionPerMinute}
+                  onChange={(e) => set("lateDeductionPerMinute", e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="form-label">OT Rate Multiplier</label>
+                <Input
+                  type="number"
+                  step="0.1"
+                  placeholder="Company default"
+                  value={form.overtimeRateMultiplier}
+                  onChange={(e) => set("overtimeRateMultiplier", e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+
           <div className="flex items-center gap-3">
             <span className="text-sm font-medium">Active</span>
             <Switcher

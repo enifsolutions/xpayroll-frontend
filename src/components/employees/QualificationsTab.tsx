@@ -9,6 +9,7 @@ import { showSuccess, showError } from '@/lib/toast';
 import api from '@/lib/axios';
 import { usePermission } from '@/hooks/usePermission';
 import { Permissions } from '@/lib/permissions';
+import { useAuthStore } from "@/store/authStore";
 import {
   EmployeeQualification, QualificationForm, EMPTY_QUALIFICATION,
   QUALIFICATION_CATEGORIES,
@@ -34,6 +35,7 @@ const CATEGORY_COLORS: Record<string, string> = {
 };
 
 export default function QualificationsTab({ employeeId }: { employeeId: string }) {
+  const userId = useAuthStore((s) => s.user?.userId);
   const canManage   = usePermission(Permissions.HR.Qualifications.Manage);
   const initialized = useRef(false);
 
@@ -90,19 +92,19 @@ export default function QualificationsTab({ employeeId }: { employeeId: string }
     if (!form.title.trim()) { setError('Title is required.'); return; }
     setSaving(true);
     try {
-      await api.post('employee-qualifications', {
-        action:      editing ? 'UPDATE' : 'ADD',
-        id:          editing?.id ?? null,
+      await api.post("employee-qualifications", {
+        action: editing ? "UPDATE" : "ADD",
+        id: editing?.id ?? null,
         employeeId,
-        category:    form.category,
-        title:       form.title.trim(),
+        category: form.category,
+        title: form.title.trim(),
         institution: form.institution.trim() || null,
-        fromDate:    form.fromDate  || null,
-        toDate:      form.isCurrent ? null : (form.toDate || null),
-        isCurrent:   form.isCurrent,
-        grade:       form.grade.trim()       || null,
+        fromDate: form.fromDate || null,
+        toDate: form.isCurrent ? null : form.toDate || null,
+        isCurrent: form.isCurrent,
+        grade: form.grade.trim() || null,
         description: form.description.trim() || null,
-        userId: 1,
+        userId: userId,
       });
       setDialogOpen(false);
       await load();
@@ -118,7 +120,12 @@ export default function QualificationsTab({ employeeId }: { employeeId: string }
     if (!deleteTarget) return;
     setDeleting(true);
     try {
-      await api.post('employee-qualifications', { action: 'DELETE', id: deleteTarget.id, employeeId, userId: 1 });
+      await api.post("employee-qualifications", {
+        action: "DELETE",
+        id: deleteTarget.id,
+        employeeId,
+        userId: userId,
+      });
       setConfirmOpen(false); setDeleteTarget(null);
       await load();
       showSuccess('Qualification Removed', deleteTarget.title);

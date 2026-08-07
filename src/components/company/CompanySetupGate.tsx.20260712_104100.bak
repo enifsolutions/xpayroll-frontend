@@ -1,0 +1,334 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { ShieldAlert, Rocket } from 'lucide-react';
+import Button from '@/components/ui/Button';
+import Input from '@/components/ui/Input';
+import { usePermission } from '@/hooks/usePermission';
+import { Permissions } from '@/lib/permissions';
+import { showSuccess, showError } from '@/lib/toast';
+import axios from '@/lib/axios';
+import { useAuthStore } from '@/store/authStore';
+
+// ── Module-level cache ───────────────────────────────────────────────────────
+// Company setup is a one-time event — once confirmed "ready" in this browser
+// tab/session, there's no need to re-check on every route change. A fresh page
+// load resets this, which is fine (one extra cheap GET on reload).
+let cachedStatus: 'ready' | 'needs-setup' | null = null;
+
+type CreateCompanyForm = {
+  name: string;
+  legalName: string;
+  registrationNumber: string;
+  taxIdentificationNumber: string;
+  currency: string;
+  countryCode: string;
+  timezone: string;
+  payrollCycleType: string;
+  address: string;
+  phone: string;
+  email: string;
+  website: string;
+  financialYearStart: string;
+};
+
+const EMPTY_FORM: CreateCompanyForm = {
+  name: '',
+  legalName: '',
+  registrationNumber: '',
+  taxIdentificationNumber: '',
+  currency: 'LKR',
+  countryCode: 'LK',
+  timezone: 'Asia/Colombo',
+  payrollCycleType: 'Monthly',
+  address: '',
+  phone: '',
+  email: '',
+  website: '',
+  financialYearStart: '01-01',
+};
+
+const CURRENCIES = ['LKR', 'USD', 'EUR', 'GBP', 'AUD', 'SGD', 'INR', 'AED'];
+const TIMEZONES = [
+  'Asia/Colombo',
+  'Asia/Kolkata',
+  'Asia/Dubai',
+  'Asia/Singapore',
+  'Europe/London',
+  'America/New_York',
+  'America/Los_Angeles',
+  'UTC',
+];
+const CYCLES = ['Monthly', 'BiMonthly', 'Weekly'];
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <label className="form-label">{label}</label>
+      {children}
+    </div>
+  );
+}
+
+function SelectField({
+  label,
+  value,
+  onChange,
+  options,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  options: string[];
+}) {
+  return (
+    <Field label={label}>
+      <select value={value} onChange={(e) => onChange(e.target.value)} className="select w-full">
+        {options.map((o) => (
+          <option key={o} value={o}>
+            {o}
+          </option>
+        ))}
+      </select>
+    </Field>
+  );
+}
+
+export default function CompanySetupGate({ children }: { children: React.ReactNode }) {
+  const canCreate = usePermission(Permissions.Settings.Company.Create);
+  const userId = useAuthStore((s) => s.user?.userId);
+
+  const [status, setStatus] = useState<'loading' | 'ready' | 'needs-setup'>(
+    cachedStatus ?? 'loading',
+  );
+  const [form, setForm] = useState<CreateCompanyForm>(EMPTY_FORM);
+  const [creating, setCreating] = useState(false);
+
+  useEffect(() => {
+    if (cachedStatus) {
+      setStatus(cachedStatus);
+      return;
+    }
+    checkCompany();
+  }, []);
+
+  async function checkCompany() {
+    try {
+      const res = await axios.get('/company');
+      const ok = !!res.data?.id;
+      cachedStatus = ok ? 'ready' : 'needs-setup';
+      setStatus(cachedStatus);
+    } catch {
+      // Fail-open — don't lock the whole app out if this one check errors
+      // (e.g. transient network issue). Individual pages still enforce their
+      // own permission/data checks independently.
+      cachedStatus = 'ready';
+      setStatus('ready');
+    }
+  }
+
+  function setField<K extends keyof CreateCompanyForm>(key: K, value: CreateCompanyForm[K]) {
+    setForm((prev) => ({ ...prev, [key]: value }));
+  }
+
+  async function handleCreate() {
+    if (!form.name.trim()) {
+      showError('Missing information', 'Company name is required.');
+      return;
+    }
+    setCreating(true);
+    try {
+      await axios.post('/company/create', {
+        name: form.name.trim(),
+        legalName: form.legalName.trim() || null,
+        registrationNumber: form.registrationNumber.trim() || null,
+        taxIdentificationNumber: form.taxIdentificationNumber.trim() || null,
+        currency: form.currency,
+        countryCode: form.countryCode,
+        timezone: form.timezone,
+        payrollCycleType: form.payrollCycleType,
+        address: form.address.trim() || null,
+        phone: form.phone.trim() || null,
+        email: form.email.trim() || null,
+        website: form.website.trim() || null,
+        financialYearStart: form.financialYearStart,
+        userId: userId,
+      });
+      showSuccess('Company created', 'Welcome to XpayRoll Pro.');
+      cachedStatus = 'ready';
+      setStatus('ready');
+    } catch (err: any) {
+      showError('Failed to create company', err?.response?.data?.error ?? 'Please try again.');
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  // ── Loading ─────────────────────────────────────────────────────────────
+  if (status === 'loading') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[var(--xp-bg)]">
+        <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full" />
+      </div>
+    );
+  }
+
+  // ── Blocked — no permission to fix it ──────────────────────────────────
+  if (status === 'needs-setup' && !canCreate) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[var(--xp-bg)] px-6">
+        <div className="max-w-lg text-center">
+          <div className="w-14 h-14 rounded-2xl bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center mx-auto mb-4">
+            <ShieldAlert size={26} className="text-amber-600" />
+          </div>
+          <h3 className="heading-text mb-2">Company Not Set Up Yet</h3>
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            This XpayRoll Pro instance hasn't been initialised yet. Please contact your service
+            provider to complete the initial company setup before continuing.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Blocking setup form — service provider only ────────────────────────
+  if (status === 'needs-setup' && canCreate) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[var(--xp-bg)] px-6 py-10">
+        <div className="max-w-2xl w-full">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center shrink-0">
+              <Rocket size={22} className="text-primary" />
+            </div>
+            <div>
+              <h3 className="heading-text">Set Up Your Company</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+                This runs once, before you can access anything else. Additional settings can be
+                configured afterwards.
+              </p>
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="card-body space-y-6">
+              <div className="grid grid-cols-2 gap-4">
+                <Field label="Company Display Name">
+                  <Input
+                    value={form.name}
+                    onChange={(e) => setField('name', e.target.value)}
+                    placeholder="e.g. Miracle IT Solutions"
+                  />
+                </Field>
+                <Field label="Legal Entity Name">
+                  <Input
+                    value={form.legalName}
+                    onChange={(e) => setField('legalName', e.target.value)}
+                    placeholder="Registered legal name"
+                  />
+                </Field>
+                <Field label="Registration Number">
+                  <Input
+                    value={form.registrationNumber}
+                    onChange={(e) => setField('registrationNumber', e.target.value)}
+                    placeholder="e.g. PV00231556"
+                  />
+                </Field>
+                <Field label="Tax ID (TIN)">
+                  <Input
+                    value={form.taxIdentificationNumber}
+                    onChange={(e) => setField('taxIdentificationNumber', e.target.value)}
+                    placeholder="Tax identification number"
+                  />
+                </Field>
+              </div>
+
+              <div className="grid grid-cols-3 gap-4">
+                <SelectField
+                  label="Operating Currency"
+                  value={form.currency}
+                  onChange={(v) => setField('currency', v)}
+                  options={CURRENCIES}
+                />
+                <Field label="Country Code">
+                  <Input
+                    value={form.countryCode}
+                    onChange={(e) => setField('countryCode', e.target.value.toUpperCase())}
+                    maxLength={5}
+                    placeholder="e.g. LK"
+                  />
+                </Field>
+                <SelectField
+                  label="Timezone"
+                  value={form.timezone}
+                  onChange={(v) => setField('timezone', v)}
+                  options={TIMEZONES}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <SelectField
+                  label="Payroll Cycle"
+                  value={form.payrollCycleType}
+                  onChange={(v) => setField('payrollCycleType', v)}
+                  options={CYCLES}
+                />
+                <Field label="Financial Year Start (MM-DD)">
+                  <Input
+                    value={form.financialYearStart}
+                    onChange={(e) => setField('financialYearStart', e.target.value)}
+                    placeholder="01-01"
+                    maxLength={5}
+                  />
+                </Field>
+              </div>
+
+              <div className="space-y-4">
+                <Field label="Headquarters Address">
+                  <textarea
+                    value={form.address}
+                    onChange={(e) => setField('address', e.target.value)}
+                    rows={3}
+                    placeholder="Full address"
+                    className="input w-full resize-none"
+                  />
+                </Field>
+                <div className="grid grid-cols-2 gap-4">
+                  <Field label="Contact Phone">
+                    <Input
+                      value={form.phone}
+                      onChange={(e) => setField('phone', e.target.value)}
+                      placeholder="+94 11 000 0000"
+                    />
+                  </Field>
+                  <Field label="Corporate Email">
+                    <Input
+                      value={form.email}
+                      onChange={(e) => setField('email', e.target.value)}
+                      placeholder="info@company.lk"
+                    />
+                  </Field>
+                  <Field label="Website">
+                    <Input
+                      value={form.website}
+                      onChange={(e) => setField('website', e.target.value)}
+                      placeholder="https://company.lk"
+                    />
+                  </Field>
+                </div>
+              </div>
+
+              <div className="flex justify-end pt-2 border-t border-gray-100 dark:border-gray-700">
+                <Button variant="solid" icon={<Rocket size={15} />} loading={creating} onClick={handleCreate}>
+                  Create Company & Continue
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Ready — render the actual app ──────────────────────────────────────
+  return <>{children}</>;
+}

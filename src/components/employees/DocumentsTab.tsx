@@ -9,6 +9,7 @@ import { showSuccess, showError } from "@/lib/toast";
 import api from "@/lib/axios";
 import { usePermission } from "@/hooks/usePermission";
 import { Permissions } from "@/lib/permissions";
+import { useAuthStore } from "@/store/authStore";
 import {
   EmployeeDocument,
   DocumentForm,
@@ -36,6 +37,7 @@ function Field({
 }
 
 export default function DocumentsTab({ employeeId }: { employeeId: string }) {
+  const userId = useAuthStore((s) => s.user?.userId);
   const canManage = usePermission(Permissions.HR.Documents.Manage);
   const initialized = useRef(false);
 
@@ -140,7 +142,7 @@ export default function DocumentsTab({ employeeId }: { employeeId: string }) {
         fileSizeKb,
         expiryDate: form.expiryDate || null,
         notes: form.notes.trim() || null,
-        userId: 1,
+        userId: userId,
       });
       setDialogOpen(false);
       await load();
@@ -168,7 +170,7 @@ export default function DocumentsTab({ employeeId }: { employeeId: string }) {
         action: "DELETE",
         id: deleteTarget.id,
         employeeId,
-        userId: 1,
+        userId: userId,
       });
       setConfirmOpen(false);
       setDeleteTarget(null);

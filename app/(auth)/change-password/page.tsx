@@ -115,12 +115,15 @@ function PasswordField({
           boxSizing: "border-box" as const,
         }}
         onClick={(e) => {
-          const inp = (e.currentTarget as HTMLDivElement).querySelector("input");
+          const inp = (e.currentTarget as HTMLDivElement).querySelector(
+            "input",
+          );
           inp?.focus();
         }}
       >
         <input
           type={showPassword ? "text" : "password"}
+          className="xp-pwd-input"
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder ?? "••••••••"}
@@ -233,9 +236,9 @@ export default function ChangePasswordPage() {
     }
 
     setLoading(true);
+
     try {
-      await api.post("/auth/change-password", {
-        userId: user?.userId,
+      await api.post("/users/change-password", {
         currentPassword: form.currentPassword,
         newPassword: form.newPassword,
       });
@@ -254,36 +257,60 @@ export default function ChangePasswordPage() {
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
-        .xp-orb{position:absolute;border-radius:50%;pointer-events:none;will-change:transform}
-        .xp-orb-1{width:500px;height:500px;top:-160px;right:-160px;background:radial-gradient(circle,rgba(59,130,246,.22) 0%,transparent 65%);animation:xpf1 9s ease-in-out infinite}
-        .xp-orb-2{width:380px;height:380px;bottom:-100px;left:-100px;background:radial-gradient(circle,rgba(99,102,241,.18) 0%,transparent 65%);animation:xpf2 12s ease-in-out infinite}
-        .xp-orb-3{width:220px;height:220px;top:42%;left:30%;background:radial-gradient(circle,rgba(139,92,246,.12) 0%,transparent 65%);animation:xpf3 7s ease-in-out infinite}
-        .xp-grid{position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.03) 1px,transparent 1px);background-size:48px 48px;animation:xpgd 20s linear infinite}
-        .xp-particles{position:absolute;inset:0;overflow:hidden}
-        .xp-p{position:absolute;width:2px;height:2px;border-radius:50%;background:rgba(148,197,252,.55);animation:xppr linear infinite}
-        .xp-p:nth-child(1){left:12%;animation-duration:14s;animation-delay:0s}
-        .xp-p:nth-child(2){left:24%;animation-duration:18s;animation-delay:3s;width:3px;height:3px;opacity:.5}
-        .xp-p:nth-child(3){left:38%;animation-duration:11s;animation-delay:6s}
-        .xp-p:nth-child(4){left:55%;animation-duration:16s;animation-delay:1.5s;width:3px;height:3px}
-        .xp-p:nth-child(5){left:70%;animation-duration:13s;animation-delay:4s;opacity:.4}
-        .xp-p:nth-child(6){left:82%;animation-duration:20s;animation-delay:8s}
-        .xp-p:nth-child(7){left:90%;animation-duration:15s;animation-delay:2s;opacity:.6}
-        .xp-p:nth-child(8){left:6%;animation-duration:17s;animation-delay:10s;width:3px;height:3px}
-        @keyframes xpf1{0%,100%{transform:translate(0,0) scale(1)}33%{transform:translate(-30px,20px) scale(1.05)}66%{transform:translate(20px,-15px) scale(.97)}}
-        @keyframes xpf2{0%,100%{transform:translate(0,0) scale(1)}40%{transform:translate(25px,-20px) scale(1.08)}70%{transform:translate(-15px,10px) scale(.95)}}
-        @keyframes xpf3{0%,100%{transform:translate(0,0);opacity:.8}50%{transform:translate(-20px,-30px);opacity:.4}}
-        @keyframes xpgd{0%{background-position:0 0}100%{background-position:48px 48px}}
-        @keyframes xppr{0%{transform:translateY(100vh) scale(0);opacity:0}10%{opacity:1}90%{opacity:.6}100%{transform:translateY(-60px) scale(1);opacity:0}}
-        @keyframes xp-spin{to{transform:rotate(360deg)}}
-        .xp-spinner{width:16px;height:16px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:xp-spin .7s linear infinite;flex-shrink:0}
-        .xp-badge{display:flex;align-items:center;gap:14px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:13px 16px;transition:background .2s,border-color .2s}
-        .xp-badge:hover{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.14)}
-        .xp-step{display:flex;align-items:flex-start;gap:12px;padding:10px 0}
-        .xp-step-num{width:22px;height:22px;border-radius:50%;background:rgba(59,130,246,.2);border:1px solid rgba(59,130,246,.35);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:11px;font-weight:600;color:#60a5fa;margin-top:1px}
-        @media(max-width:768px){.xp-left-panel{display:none!important}.xp-right-panel{padding:32px 24px!important}}
-      `}</style>
+  .xp-pwd-input.xp-pwd-input,
+  .xp-pwd-input.xp-pwd-input:hover,
+  .xp-pwd-input.xp-pwd-input:focus,
+  .xp-pwd-input.xp-pwd-input:active,
+  .xp-pwd-input.xp-pwd-input:-webkit-autofill,
+  .xp-pwd-input.xp-pwd-input:-webkit-autofill:hover,
+  .xp-pwd-input.xp-pwd-input:-webkit-autofill:focus,
+  .xp-pwd-input.xp-pwd-input:-webkit-autofill:active {
+    background: transparent !important;
+    background-color: transparent !important;
+    background-image: none !important;
+    color: #111827 !important;
+    -webkit-text-fill-color: #111827 !important;
+    -webkit-box-shadow: 0 0 0 1000px transparent inset !important;
+    box-shadow: none !important;
+    caret-color: #3b82f6 !important;
+    color-scheme: light !important;
+  }
+  .xp-pwd-input.xp-pwd-input::placeholder {
+    color: #9ca3af !important;
+    opacity: 1 !important;
+  }
+
+  .xp-orb{position:absolute;border-radius:50%;pointer-events:none;will-change:transform}
+  .xp-orb-1{width:500px;height:500px;top:-160px;right:-160px;background:radial-gradient(circle,rgba(59,130,246,.22) 0%,transparent 65%);animation:xpf1 9s ease-in-out infinite}
+  .xp-orb-2{width:380px;height:380px;bottom:-100px;left:-100px;background:radial-gradient(circle,rgba(99,102,241,.18) 0%,transparent 65%);animation:xpf2 12s ease-in-out infinite}
+  .xp-orb-3{width:220px;height:220px;top:42%;left:30%;background:radial-gradient(circle,rgba(139,92,246,.12) 0%,transparent 65%);animation:xpf3 7s ease-in-out infinite}
+  .xp-grid{position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.03) 1px,transparent 1px);background-size:48px 48px;animation:xpgd 20s linear infinite}
+  .xp-particles{position:absolute;inset:0;overflow:hidden}
+  .xp-p{position:absolute;width:2px;height:2px;border-radius:50%;background:rgba(148,197,252,.55);animation:xppr linear infinite}
+  .xp-p:nth-child(1){left:12%;animation-duration:14s;animation-delay:0s}
+  .xp-p:nth-child(2){left:24%;animation-duration:18s;animation-delay:3s;width:3px;height:3px;opacity:.5}
+  .xp-p:nth-child(3){left:38%;animation-duration:11s;animation-delay:6s}
+  .xp-p:nth-child(4){left:55%;animation-duration:16s;animation-delay:1.5s;width:3px;height:3px}
+  .xp-p:nth-child(5){left:70%;animation-duration:13s;animation-delay:4s;opacity:.4}
+  .xp-p:nth-child(6){left:82%;animation-duration:20s;animation-delay:8s}
+  .xp-p:nth-child(7){left:90%;animation-duration:15s;animation-delay:2s;opacity:.6}
+  .xp-p:nth-child(8){left:6%;animation-duration:17s;animation-delay:10s;width:3px;height:3px}
+  @keyframes xpf1{0%,100%{transform:translate(0,0) scale(1)}33%{transform:translate(-30px,20px) scale(1.05)}66%{transform:translate(20px,-15px) scale(.97)}}
+  @keyframes xpf2{0%,100%{transform:translate(0,0) scale(1)}40%{transform:translate(25px,-20px) scale(1.08)}70%{transform:translate(-15px,10px) scale(.95)}}
+  @keyframes xpf3{0%,100%{transform:translate(0,0);opacity:.8}50%{transform:translate(-20px,-30px);opacity:.4}}
+  @keyframes xpgd{0%{background-position:0 0}100%{background-position:48px 48px}}
+  @keyframes xppr{0%{transform:translateY(100vh) scale(0);opacity:0}10%{opacity:1}90%{opacity:.6}100%{transform:translateY(-60px) scale(1);opacity:0}}
+  @keyframes xp-spin{to{transform:rotate(360deg)}}
+  .xp-spinner{width:16px;height:16px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:xp-spin .7s linear infinite;flex-shrink:0}
+  .xp-badge{display:flex;align-items:center;gap:14px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:13px 16px;transition:background .2s,border-color .2s}
+  .xp-badge:hover{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.14)}
+  .xp-step{display:flex;align-items:flex-start;gap:12px;padding:10px 0}
+  .xp-step-num{width:22px;height:22px;border-radius:50%;background:rgba(59,130,246,.2);border:1px solid rgba(59,130,246,.35);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:11px;font-weight:600;color:#60a5fa;margin-top:1px}
+  .xp-heading.xp-heading {color: #111827 !important;-webkit-text-fill-color: #111827 !important;}
+  @media(max-width:768px){.xp-left-panel{display:none!important}.xp-right-panel{padding:32px 24px!important}}
+`}</style>
 
       <div
         style={{
@@ -532,6 +559,7 @@ export default function ChangePasswordPage() {
                 </svg>
               </div>
               <h2
+                className="xp-heading"
                 style={{
                   fontSize: 26,
                   fontWeight: 700,

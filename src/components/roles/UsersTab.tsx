@@ -21,7 +21,7 @@ export default function UsersTab({
   permissions,
   onRefresh,
 }: Props) {
-  const actingUserId = useAuthStore((s) => s.user?.userId ?? "1");
+  const actingUserId = useAuthStore((s) => s.user?.userId);
 
   const [search, setSearch] = useState("");
   const [filterRole, setFilterRole] = useState("");
@@ -37,6 +37,10 @@ export default function UsersTab({
   });
 
   const handleAssign = async (userId: string, roleId: string | null) => {
+    if (!actingUserId) {
+      showError("Session Error", "Please refresh and try again.");
+      return;
+    }
     try {
       await api.post("/roles/users/assign", {
         userId,

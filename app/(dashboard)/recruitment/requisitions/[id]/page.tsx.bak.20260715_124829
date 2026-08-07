@@ -1,0 +1,576 @@
+'use client';
+
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import {
+  ArrowLeft,
+  Plus,
+  X,
+  Star,
+  GraduationCap,
+  Award,
+  Users,
+  Sparkles,
+} from 'lucide-react';
+
+import Button from '@/components/ui/Button';
+import api from '@/lib/axios';
+import { showSuccess, showError } from '@/lib/toast';
+import { useRequirePermission } from '@/hooks/useRequirePermission';
+import { usePermission } from '@/hooks/usePermission';
+import { Permissions } from '@/lib/permissions';
+
+interface Skill {
+  id: string;
+  name: string;
+  category: string | null;
+}
+interface Certification {
+  id: string;
+  name: string;
+}
+interface EducationLevel {
+  id: string;
+  name: string;
+  rank: number;
+}
+interface FieldOfStudy {
+  id: string;
+  name: string;
+}
+
+interface ReqSkill {
+  id: string;
+  skillId: string;
+  skillName: string;
+  category: string | null;
+  isMandatory: boolean;
+  minYears: number | null;
+  weight: number;
+  isAiSuggested: boolean;
+}
+interface ReqCert {
+  id: string;
+  certificationId: string;
+  certificationName: string;
+  isMandatory: boolean;
+}
+interface Requirements {
+  requisitionId: string;
+  minEducationLevelId: string | null;
+  minEducationLevelName: string | null;
+  fieldOfStudyId: string | null;
+  fieldOfStudyName: string | null;
+  educationIsMandatory: boolean;
+  skills: ReqSkill[];
+  certifications: ReqCert[];
+}
+interface Requisition {
+  id: string;
+  requisitionCode: string;
+  title: string;
+  status: string;
+  departmentName: string | null;
+  designationTitle: string | null;
+  headcount: number;
+}
+
+const STATUS_BADGE: Record<string, string> = {
+  Draft: 'xp-badge-neutral',
+  PendingApproval: 'xp-badge-warning',
+  Approved: 'xp-badge-info',
+  Rejected: 'xp-badge-danger',
+  Open: 'xp-badge-success',
+  OnHold: 'xp-badge-warning',
+  Closed: 'xp-badge-neutral',
+  Cancelled: 'xp-badge-danger',
+};
+
+export default function RequisitionDetailPage() {
+  useRequirePermission('Recruitment.Requisition.View');
+  const canManage = usePermission(Permissions.Recruitment.Requisition.Create);
+
+  const params = useParams();
+  const router = useRouter();
+  const id = params?.id as string;
+  const initialized = useRef(false);
+
+  const [req, setReq] = useState<Requisition | null>(null);
+  const [reqs, setReqs] = useState<Requirements | null>(null);
+  const [skills, setSkills] = useState<Skill[]>([]);
+  const [certs, setCerts] = useState<Certification[]>([]);
+  const [eduLevels, setEduLevels] = useState<EducationLevel[]>([]);
+  const [fields, setFields] = useState<FieldOfStudy[]>([]);
+  const [aiSuggestEnabled, setAiSuggestEnabled] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  const [skillSearch, setSkillSearch] = useState('');
+  const [certSearch, setCertSearch] = useState('');
+
+  const editable = req?.status === 'Draft' || req?.status === 'Rejected';
+
+  const load = async () => {
+    try {
+      setLoading(true);
+      const [rq, rr, sk, ct, el, fs, ai] = await Promise.all([
+        api.get(`/requisitions?`),
+        api.get(`/requisitions/${id}/requirements`),
+        api.get('/skills?isActive=true'),
+        api.get('/certifications?isActive=true'),
+        api.get('/education-levels?isActive=true'),
+        api.get('/fields-of-study?isActive=true'),
+        api.get('/company/ai-settings'),
+      ]);
+      // requisition list is filtered client-side to this id
+      setReq((rq.data as Requisition[]).find((x) => x.id === id) ?? null);
+      setReqs(rr.data);
+      setSkills(sk.data ?? []);
+      setCerts(ct.data ?? []);
+      setEduLevels((el.data ?? []).sort((a: EducationLevel, b: EducationLevel) => a.rank - b.rank));
+      setFields(fs.data ?? []);
+      setAiSuggestEnabled(!!ai.data?.requirementSuggestionsEnabled);
+    } catch (e: any) {
+      showError('Load failed', e?.response?.data?.error ?? 'Could not load requisition.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!id || initialized.current) return;
+    initialized.current = true;
+    load();
+  }, [id]);
+
+  const post = async (body: any, successMsg: string) => {
+    try {
+      await api.post(`/requisitions/${id}/requirements`, body);
+      const rr = await api.get(`/requisitions/${id}/requirements`);
+      setReqs(rr.data);
+      if (successMsg) showSuccess(successMsg);
+    } catch (e: any) {
+      showError('Failed', e?.response?.data?.message ?? e?.response?.data?.error ?? 'Action failed.');
+    }
+  };
+
+  const addSkill = (skillId: string) => {
+    if (reqs?.skills.some((s) => s.skillId === skillId)) return;
+    setSkillSearch('');
+    post({ action: 'ADD_SKILL', skillId, isMandatory: false, weight: 1 }, '');
+  };
+  const toggleMandatory = (s: ReqSkill) =>
+    post(
+      { action: 'UPDATE_SKILL', requisitionSkillId: s.id, isMandatory: !s.isMandatory, weight: s.weight },
+      '',
+    );
+  const setMinYears = (s: ReqSkill, years: string) =>
+    post(
+      {
+        action: 'UPDATE_SKILL',
+        requisitionSkillId: s.id,
+        isMandatory: s.isMandatory,
+        minYears: years === '' ? null : Number(years),
+        weight: s.weight,
+      },
+      '',
+    );
+  const removeSkill = (s: ReqSkill) =>
+    post({ action: 'REMOVE_SKILL', requisitionSkillId: s.id }, '');
+
+  const addCert = (certificationId: string) => {
+    if (reqs?.certifications.some((c) => c.certificationId === certificationId)) return;
+    setCertSearch('');
+    post({ action: 'ADD_CERT', certificationId, isMandatory: false }, '');
+  };
+  const removeCert = (c: ReqCert) =>
+    post({ action: 'REMOVE_CERT', requisitionCertificationId: c.id }, '');
+
+  const setEducation = (patch: Partial<{ eduId: string; fieldId: string; mandatory: boolean }>) => {
+    const eduId = patch.eduId !== undefined ? patch.eduId : reqs?.minEducationLevelId ?? '';
+    const fieldId = patch.fieldId !== undefined ? patch.fieldId : reqs?.fieldOfStudyId ?? '';
+    const mandatory =
+      patch.mandatory !== undefined ? patch.mandatory : reqs?.educationIsMandatory ?? false;
+    post(
+      {
+        action: 'SET_EDUCATION',
+        minEducationLevelId: eduId || null,
+        fieldOfStudyId: fieldId || null,
+        educationIsMandatory: mandatory,
+      },
+      'Education requirement updated',
+    );
+  };
+
+  const availableSkills = useMemo(() => {
+    const taken = new Set(reqs?.skills.map((s) => s.skillId));
+    const q = skillSearch.toLowerCase();
+    return skills
+      .filter((s) => !taken.has(s.id) && (!q || s.name.toLowerCase().includes(q)))
+      .slice(0, 8);
+  }, [skills, reqs, skillSearch]);
+
+  const availableCerts = useMemo(() => {
+    const taken = new Set(reqs?.certifications.map((c) => c.certificationId));
+    const q = certSearch.toLowerCase();
+    return certs
+      .filter((c) => !taken.has(c.id) && (!q || c.name.toLowerCase().includes(q)))
+      .slice(0, 8);
+  }, [certs, reqs, certSearch]);
+
+  const mustHaves = reqs?.skills.filter((s) => s.isMandatory) ?? [];
+  const niceToHaves = reqs?.skills.filter((s) => !s.isMandatory) ?? [];
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-24">
+        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!req) {
+    return (
+      <div className="text-center py-24 text-gray-400">
+        <p>Requisition not found.</p>
+        <button
+          onClick={() => router.push('/recruitment/requisitions')}
+          className="text-violet-500 hover:underline text-sm mt-2"
+        >
+          Back to requisitions
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <button
+          onClick={() => router.push('/recruitment/requisitions')}
+          className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-violet-500 mb-3"
+        >
+          <ArrowLeft size={15} />
+          All requisitions
+        </button>
+
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-3">
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white">{req.title}</h3>
+              <span className={`xp-badge ${STATUS_BADGE[req.status] ?? 'xp-badge-neutral'}`}>
+                {req.status}
+              </span>
+            </div>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+              {req.requisitionCode}
+              {req.departmentName ? ` · ${req.departmentName}` : ''} · {req.headcount} position
+              {req.headcount !== 1 ? 's' : ''}
+            </p>
+          </div>
+          {req.status === 'Open' && (
+            <Button
+              variant="default"
+              size="sm"
+              icon={<Users size={15} />}
+              onClick={() => router.push(`/recruitment/pipeline?requisitionId=${id}`)}
+            >
+              View Pipeline
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {!editable && (
+        <div className="rounded-lg px-4 py-3 text-sm bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400">
+          Requirements are locked once a requisition leaves Draft. This is a read-only view of
+          what was set.
+        </div>
+      )}
+
+      {/* SKILLS */}
+      <div className="card">
+        <div className="card-body">
+          <div className="flex items-center justify-between mb-1">
+            <h5 className="font-semibold text-gray-900 dark:text-white">Required Skills</h5>
+            {canManage && editable && aiSuggestEnabled && (
+              <Button
+                variant="default"
+                size="sm"
+                icon={<Sparkles size={14} />}
+                onClick={() =>
+                  showError(
+                    'Not yet available',
+                    'AI suggestions arrive with the CV-parsing phase.',
+                  )
+                }
+              >
+                Suggest with AI
+              </Button>
+            )}
+          </div>
+          <p className="text-xs text-gray-400 mb-4">
+            Mark the ones a candidate must have. Must-haves drive match scoring; a missing
+            must-have flags the candidate regardless of overall score.
+          </p>
+
+          {/* Must-haves */}
+          <div className="mb-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">
+              Must have ({mustHaves.length})
+            </p>
+            {mustHaves.length === 0 ? (
+              <p className="text-sm text-gray-400">None yet.</p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {mustHaves.map((s) => (
+                  <SkillTag
+                    key={s.id}
+                    s={s}
+                    editable={!!canManage && editable}
+                    onToggle={() => toggleMandatory(s)}
+                    onYears={(y) => setMinYears(s, y)}
+                    onRemove={() => removeSkill(s)}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Nice-to-haves */}
+          <div className="mb-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">
+              Nice to have ({niceToHaves.length})
+            </p>
+            {niceToHaves.length === 0 ? (
+              <p className="text-sm text-gray-400">None yet.</p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {niceToHaves.map((s) => (
+                  <SkillTag
+                    key={s.id}
+                    s={s}
+                    editable={!!canManage && editable}
+                    onToggle={() => toggleMandatory(s)}
+                    onYears={(y) => setMinYears(s, y)}
+                    onRemove={() => removeSkill(s)}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Add skill */}
+          {canManage && editable && (
+            <div className="relative max-w-md">
+              <input
+                className="input w-full"
+                placeholder="Search skills to add…"
+                value={skillSearch}
+                onChange={(e) => setSkillSearch(e.target.value)}
+              />
+              {skillSearch && availableSkills.length > 0 && (
+                <div className="absolute z-10 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                  {availableSkills.map((s) => (
+                    <button
+                      key={s.id}
+                      onClick={() => addSkill(s.id)}
+                      className="flex items-center justify-between w-full px-3 py-2 text-left text-sm hover:bg-violet-50 dark:hover:bg-violet-900/20"
+                    >
+                      <span>{s.name}</span>
+                      {s.category && (
+                        <span className="text-xs text-gray-400">{s.category}</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* EDUCATION */}
+      <div className="card">
+        <div className="card-body">
+          <div className="flex items-center gap-2 mb-4">
+            <GraduationCap size={17} className="text-violet-500" />
+            <h5 className="font-semibold text-gray-900 dark:text-white">Education</h5>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <label className="form-label">Minimum level</label>
+              <select
+                className="input w-full"
+                value={reqs?.minEducationLevelId ?? ''}
+                disabled={!canManage || !editable}
+                onChange={(e) => setEducation({ eduId: e.target.value })}
+              >
+                <option value="">No requirement</option>
+                {eduLevels.map((el) => (
+                  <option key={el.id} value={el.id}>
+                    {el.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="form-label">Field of study</label>
+              <select
+                className="input w-full"
+                value={reqs?.fieldOfStudyId ?? ''}
+                disabled={!canManage || !editable}
+                onChange={(e) => setEducation({ fieldId: e.target.value })}
+              >
+                <option value="">Any</option>
+                {fields.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex items-end pb-1">
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={reqs?.educationIsMandatory ?? false}
+                  disabled={!canManage || !editable || !reqs?.minEducationLevelId}
+                  onChange={(e) => setEducation({ mandatory: e.target.checked })}
+                />
+                Mandatory
+              </label>
+            </div>
+          </div>
+          <p className="text-xs text-gray-400 mt-2">
+            A higher qualification satisfies a lower requirement — a Master's meets a Diploma
+            minimum.
+          </p>
+        </div>
+      </div>
+
+      {/* CERTIFICATIONS */}
+      <div className="card">
+        <div className="card-body">
+          <div className="flex items-center gap-2 mb-4">
+            <Award size={17} className="text-violet-500" />
+            <h5 className="font-semibold text-gray-900 dark:text-white">Certifications</h5>
+          </div>
+
+          {(reqs?.certifications.length ?? 0) === 0 ? (
+            <p className="text-sm text-gray-400 mb-3">None required.</p>
+          ) : (
+            <div className="flex flex-wrap gap-2 mb-3">
+              {reqs!.certifications.map((c) => (
+                <span
+                  key={c.id}
+                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400"
+                >
+                  {c.certificationName}
+                  {c.isMandatory && <span className="text-[11px] opacity-75">required</span>}
+                  {canManage && editable && (
+                    <button onClick={() => removeCert(c)} className="hover:opacity-70">
+                      <X size={13} />
+                    </button>
+                  )}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {canManage && editable && (
+            <div className="relative max-w-md">
+              <input
+                className="input w-full"
+                placeholder="Search certifications to add…"
+                value={certSearch}
+                onChange={(e) => setCertSearch(e.target.value)}
+              />
+              {certSearch && availableCerts.length > 0 && (
+                <div className="absolute z-10 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                  {availableCerts.map((c) => (
+                    <button
+                      key={c.id}
+                      onClick={() => addCert(c.id)}
+                      className="block w-full px-3 py-2 text-left text-sm hover:bg-violet-50 dark:hover:bg-violet-900/20"
+                    >
+                      {c.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SkillTag({
+  s,
+  editable,
+  onToggle,
+  onYears,
+  onRemove,
+}: {
+  s: ReqSkill;
+  editable: boolean;
+  onToggle: () => void;
+  onYears: (y: string) => void;
+  onRemove: () => void;
+}) {
+  const base = s.isMandatory
+    ? 'bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300'
+    : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300';
+
+  return (
+    <span
+      className={`inline-flex items-center gap-2 pl-3 pr-2 py-1.5 rounded-lg text-sm ${base}`}
+    >
+      {editable ? (
+        <button
+          onClick={onToggle}
+          title={s.isMandatory ? 'Mark as nice-to-have' : 'Mark as must-have'}
+          className="hover:opacity-70"
+        >
+          <Star size={13} fill={s.isMandatory ? 'currentColor' : 'none'} />
+        </button>
+      ) : (
+        <Star size={13} fill={s.isMandatory ? 'currentColor' : 'none'} />
+      )}
+
+      <span>{s.skillName}</span>
+
+      {editable ? (
+        <span className="inline-flex items-center gap-1">
+          <input
+            type="number"
+            min={0}
+            step={0.5}
+            defaultValue={s.minYears ?? ''}
+            onBlur={(e) => {
+              const v = e.target.value;
+              if (String(s.minYears ?? '') !== v) onYears(v);
+            }}
+            placeholder="yrs"
+            className="w-14 text-xs px-1.5 py-0.5 rounded border border-gray-300 dark:border-gray-600 bg-transparent"
+            style={{ appearance: 'textfield' }}
+          />
+        </span>
+      ) : (
+        s.minYears != null && <span className="text-xs opacity-75">{s.minYears}+ yrs</span>
+      )}
+
+      {s.isAiSuggested && (
+        <Sparkles size={11} className="opacity-60" aria-label="AI-suggested" />
+      )}
+
+      {editable && (
+        <button onClick={onRemove} className="hover:opacity-70">
+          <X size={13} />
+        </button>
+      )}
+    </span>
+  );
+}

@@ -118,7 +118,7 @@ function StatCard({ label, value, icon, iconBg, sub }: StatCardProps) {
 export default function AttendanceAdjustmentsPage() {
   useRequirePermission("Attendance.Adjustment.View");
   const canApprove = usePermission("Attendance.Adjustment.Approve");
-  const userId = useAuthStore((s) => s.user?.userId ?? "1");
+  const userId = useAuthStore((s) => s.user?.userId);
 
   const initialized = useRef(false);
   const [items, setItems] = useState<AttendanceAdjustmentRequest[]>([]);
@@ -199,6 +199,12 @@ export default function AttendanceAdjustmentsPage() {
       return;
     }
     if (!selected) return;
+    if (!userId) {
+      setReviewError(
+        "Session not fully loaded yet — please refresh and try again.",
+      );
+      return;
+    }
     setSaving(true);
     try {
       await api.post("/attendance-adjustments/review", {

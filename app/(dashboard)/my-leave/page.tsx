@@ -40,7 +40,7 @@ const DEFAULT_FORM: LeaveRequestForm & { coveringEmployeeId: string } = {
 export default function MyLeavePage() {
   useRequirePermission("Leave.Request.Apply");
 
-  const userId = useAuthStore((s) => s.user?.userId ?? "1");
+  const userId = useAuthStore((s) => s.user?.userId);
   const initialized = useRef(false);
 
   const [items, setItems] = useState<LeaveRequest[]>([]);
@@ -156,6 +156,10 @@ export default function MyLeavePage() {
       );
       return;
     }
+    if (!userId) {
+      showError("Session Error", "Please refresh and try again.");
+      return;
+    }
     setSaving(true);
     try {
       await api.post("/leave-requests/save", {
@@ -184,6 +188,10 @@ export default function MyLeavePage() {
 
   async function handleCancel() {
     if (!cancelTarget) return;
+    if (!userId) {
+      showError("Session Error", "Please refresh and try again.");
+      return;
+    }
     setCancelling(true);
     try {
       await api.post("/leave-requests/cancel", {

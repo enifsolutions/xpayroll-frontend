@@ -11,6 +11,8 @@ import {
   Upload,
   X,
   ChevronRight,
+  ShieldAlert,
+  Rocket,
 } from "lucide-react";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
@@ -45,6 +47,14 @@ interface CompanySettings {
   attendanceDeductionEnabled: boolean;
   dsrLimitPercent: number;
   tempPasswordExpiryHours: number;
+  retirementAge: number;
+  // Deduction Rule Defaults & Hierarchy
+  defaultAbsentDeductionAfterDays: number;
+  defaultLateDeductionPerMinute: number;
+  defaultOvertimeRateMultiplier: number;
+  absentDeductionSource: string;
+  lateDeductionSource: string;
+  overtimeMultiplierSource: string;
   // Leave Policy
   leaveYearStartMonth: number;
   leaveCarryForwardEnabled: boolean;
@@ -55,10 +65,45 @@ interface CompanySettings {
   notifyLeaveDecision: boolean;
   notifyAttendanceAlert: boolean;
   notifyLoanApproval: boolean;
+  // Recruitment
+  offerApprovalEnabled: boolean;
+  offerApprovalSalaryThreshold: number | null;
   // Audit
   createdAt: string;
   updatedAt: string | null;
 }
+
+interface CreateCompanyForm {
+  name: string;
+  legalName: string;
+  registrationNumber: string;
+  taxIdentificationNumber: string;
+  currency: string;
+  countryCode: string;
+  timezone: string;
+  payrollCycleType: string;
+  address: string;
+  phone: string;
+  email: string;
+  website: string;
+  financialYearStart: string;
+}
+
+const EMPTY_CREATE_FORM: CreateCompanyForm = {
+  name: "",
+  legalName: "",
+  registrationNumber: "",
+  taxIdentificationNumber: "",
+  currency: "LKR",
+  countryCode: "LK",
+  timezone: "Asia/Colombo",
+  payrollCycleType: "Monthly",
+  address: "",
+  phone: "",
+  email: "",
+  website: "",
+  financialYearStart: "01-01",
+};
 
 type TabKey = "profile" | "payroll" | "leave" | "notifications" | "system";
 
@@ -98,20 +143,28 @@ const TIMEZONES = [
 
 const CURRENCIES = ["LKR", "USD", "EUR", "GBP", "AUD", "SGD", "INR", "AED"];
 const CYCLES = ["Monthly", "BiMonthly", "Weekly"];
+const DEDUCTION_SOURCES = ["Company", "Branch", "Department", "Designation"];
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function CompanySettingsPage() {
   useRequirePermission(Permissions.Settings.Company.View);
   const canManage = usePermission(Permissions.Settings.Company.Manage);
+  const canCreate = usePermission(Permissions.Settings.Company.Create);
   const userId = useAuthStore((s) => s.user?.userId);
   const initialized = useRef(false);
 
   const [activeTab, setActiveTab] = useState<TabKey>("profile");
   const [data, setData] = useState<CompanySettings | null>(null);
+  const [needsSetup, setNeedsSetup] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
+
+  // First-time setup form
+  const [createForm, setCreateForm] =
+    useState<CreateCompanyForm>(EMPTY_CREATE_FORM);
+  const [creating, setCreating] = useState(false);
 
   // ── Load ───────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -124,6 +177,15 @@ export default function CompanySettingsPage() {
     try {
       const res = await axios.get("/company");
       const d = res.data;
+
+      // No company_settings row exists yet — id will be missing/undefined
+      if (!d || !d.id) {
+        setNeedsSetup(true);
+        setData(null);
+        return;
+      }
+
+      setNeedsSetup(false);
       setData({
         id: String(d.id),
         name: d.name ?? "",
@@ -144,6 +206,13 @@ export default function CompanySettingsPage() {
         attendanceDeductionEnabled: d.attendanceDeductionEnabled ?? true,
         dsrLimitPercent: d.dsrLimitPercent ?? 40,
         tempPasswordExpiryHours: d.tempPasswordExpiryHours ?? 24,
+        retirementAge: d.retirementAge ?? 60,
+        defaultAbsentDeductionAfterDays: d.defaultAbsentDeductionAfterDays ?? 0,
+        defaultLateDeductionPerMinute: d.defaultLateDeductionPerMinute ?? 0,
+        defaultOvertimeRateMultiplier: d.defaultOvertimeRateMultiplier ?? 1.5,
+        absentDeductionSource: d.absentDeductionSource ?? "Company",
+        lateDeductionSource: d.lateDeductionSource ?? "Company",
+        overtimeMultiplierSource: d.overtimeMultiplierSource ?? "Company",
         leaveYearStartMonth: d.leaveYearStartMonth ?? 1,
         leaveCarryForwardEnabled: d.leaveCarryForwardEnabled ?? true,
         leaveCarryForwardMaxDays: d.leaveCarryForwardMaxDays ?? 0,
@@ -152,6 +221,8 @@ export default function CompanySettingsPage() {
         notifyLeaveDecision: d.notifyLeaveDecision ?? true,
         notifyAttendanceAlert: d.notifyAttendanceAlert ?? false,
         notifyLoanApproval: d.notifyLoanApproval ?? true,
+        offerApprovalEnabled: d.offerApprovalEnabled ?? false,
+        offerApprovalSalaryThreshold: d.offerApprovalSalaryThreshold ?? null,
         createdAt: d.createdAt ?? "",
         updatedAt: d.updatedAt ?? null,
       });
@@ -167,6 +238,54 @@ export default function CompanySettingsPage() {
     value: CompanySettings[K],
   ) {
     setData((prev) => (prev ? { ...prev, [key]: value } : prev));
+  }
+
+  function setCreateField<K extends keyof CreateCompanyForm>(
+    key: K,
+    value: CreateCompanyForm[K],
+  ) {
+    setCreateForm((prev) => ({ ...prev, [key]: value }));
+  }
+
+  // ── First-time setup ──────────────────────────────────────────────────────
+  async function handleCreate() {
+    if (!createForm.name.trim()) {
+      showError("Missing information", "Company name is required.");
+      return;
+    }
+    setCreating(true);
+    try {
+      await axios.post("/company/create", {
+        name: createForm.name.trim(),
+        legalName: createForm.legalName.trim() || null,
+        registrationNumber: createForm.registrationNumber.trim() || null,
+        taxIdentificationNumber:
+          createForm.taxIdentificationNumber.trim() || null,
+        currency: createForm.currency,
+        countryCode: createForm.countryCode,
+        timezone: createForm.timezone,
+        payrollCycleType: createForm.payrollCycleType,
+        address: createForm.address.trim() || null,
+        phone: createForm.phone.trim() || null,
+        email: createForm.email.trim() || null,
+        website: createForm.website.trim() || null,
+        financialYearStart: createForm.financialYearStart,
+        userId: userId,
+      });
+      showSuccess(
+        "Company created",
+        "You can now configure the rest of your settings.",
+      );
+      setLoading(true);
+      await fetchSettings();
+    } catch (err: any) {
+      showError(
+        "Failed to create company",
+        err?.response?.data?.error ?? "Please try again.",
+      );
+    } finally {
+      setCreating(false);
+    }
   }
 
   // ── Logo handling ──────────────────────────────────────────────────────────
@@ -218,6 +337,13 @@ export default function CompanySettingsPage() {
         attendanceDeductionEnabled: data.attendanceDeductionEnabled,
         dsrLimitPercent: data.dsrLimitPercent,
         tempPasswordExpiryHours: data.tempPasswordExpiryHours,
+        retirementAge: data.retirementAge,
+        defaultAbsentDeductionAfterDays: data.defaultAbsentDeductionAfterDays,
+        defaultLateDeductionPerMinute: data.defaultLateDeductionPerMinute,
+        defaultOvertimeRateMultiplier: data.defaultOvertimeRateMultiplier,
+        absentDeductionSource: data.absentDeductionSource,
+        lateDeductionSource: data.lateDeductionSource,
+        overtimeMultiplierSource: data.overtimeMultiplierSource,
         leaveYearStartMonth: data.leaveYearStartMonth,
         leaveCarryForwardEnabled: data.leaveCarryForwardEnabled,
         leaveCarryForwardMaxDays: data.leaveCarryForwardMaxDays,
@@ -226,6 +352,8 @@ export default function CompanySettingsPage() {
         notifyLeaveDecision: data.notifyLeaveDecision,
         notifyAttendanceAlert: data.notifyAttendanceAlert,
         notifyLoanApproval: data.notifyLoanApproval,
+        offerApprovalEnabled: data.offerApprovalEnabled,
+        offerApprovalSalaryThreshold: data.offerApprovalSalaryThreshold,
         updatedBy: userId,
       });
       showSuccess("Settings saved successfully.");
@@ -257,6 +385,173 @@ export default function CompanySettingsPage() {
               className="h-10 rounded bg-gray-200 dark:bg-gray-700"
             />
           ))}
+        </div>
+      </div>
+    );
+  }
+
+  // ── First-time setup screen ──────────────────────────────────────────────
+  if (needsSetup) {
+    if (!canCreate) {
+      return (
+        <div className="max-w-lg mx-auto mt-16 text-center">
+          <div className="w-14 h-14 rounded-2xl bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center mx-auto mb-4">
+            <ShieldAlert size={26} className="text-amber-600" />
+          </div>
+          <h3 className="heading-text mb-2">Company Not Set Up Yet</h3>
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            This XpayRoll Pro instance hasn't been initialised yet. Please
+            contact your service provider to complete the initial company setup
+            before configuring settings here.
+          </p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="max-w-2xl mx-auto">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center shrink-0">
+            <Rocket size={22} className="text-primary" />
+          </div>
+          <div>
+            <h3 className="heading-text">Set Up Your Company</h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+              This runs once. Everything else can be configured afterwards.
+            </p>
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="card-body space-y-6">
+            <div className="grid grid-cols-2 gap-4">
+              <Field label="Company Display Name">
+                <Input
+                  value={createForm.name}
+                  onChange={(e) => setCreateField("name", e.target.value)}
+                  placeholder="e.g. Miracle IT Solutions"
+                />
+              </Field>
+              <Field label="Legal Entity Name">
+                <Input
+                  value={createForm.legalName}
+                  onChange={(e) => setCreateField("legalName", e.target.value)}
+                  placeholder="Registered legal name"
+                />
+              </Field>
+              <Field label="Registration Number">
+                <Input
+                  value={createForm.registrationNumber}
+                  onChange={(e) =>
+                    setCreateField("registrationNumber", e.target.value)
+                  }
+                  placeholder="e.g. PV00231556"
+                />
+              </Field>
+              <Field label="Tax ID (TIN)">
+                <Input
+                  value={createForm.taxIdentificationNumber}
+                  onChange={(e) =>
+                    setCreateField("taxIdentificationNumber", e.target.value)
+                  }
+                  placeholder="Tax identification number"
+                />
+              </Field>
+            </div>
+
+            <SectionTitle>Regional Settings</SectionTitle>
+            <div className="grid grid-cols-3 gap-4">
+              <SelectField
+                label="Operating Currency"
+                value={createForm.currency}
+                onChange={(v) => setCreateField("currency", v)}
+                options={CURRENCIES.map((c) => ({ value: c, label: c }))}
+              />
+              <Field label="Country Code">
+                <Input
+                  value={createForm.countryCode}
+                  onChange={(e) =>
+                    setCreateField("countryCode", e.target.value.toUpperCase())
+                  }
+                  maxLength={5}
+                  placeholder="e.g. LK"
+                />
+              </Field>
+              <SelectField
+                label="Timezone"
+                value={createForm.timezone}
+                onChange={(v) => setCreateField("timezone", v)}
+                options={TIMEZONES.map((t) => ({ value: t, label: t }))}
+              />
+            </div>
+
+            <SectionTitle>Payroll Configuration</SectionTitle>
+            <div className="grid grid-cols-2 gap-4">
+              <SelectField
+                label="Payroll Cycle"
+                value={createForm.payrollCycleType}
+                onChange={(v) => setCreateField("payrollCycleType", v)}
+                options={CYCLES.map((c) => ({ value: c, label: c }))}
+              />
+              <Field label="Financial Year Start (MM-DD)">
+                <Input
+                  value={createForm.financialYearStart}
+                  onChange={(e) =>
+                    setCreateField("financialYearStart", e.target.value)
+                  }
+                  placeholder="01-01"
+                  maxLength={5}
+                />
+              </Field>
+            </div>
+
+            <SectionTitle>Contact & Location</SectionTitle>
+            <div className="space-y-4">
+              <Field label="Headquarters Address">
+                <textarea
+                  value={createForm.address}
+                  onChange={(e) => setCreateField("address", e.target.value)}
+                  rows={3}
+                  placeholder="Full address"
+                  className="input w-full resize-none"
+                />
+              </Field>
+              <div className="grid grid-cols-2 gap-4">
+                <Field label="Contact Phone">
+                  <Input
+                    value={createForm.phone}
+                    onChange={(e) => setCreateField("phone", e.target.value)}
+                    placeholder="+94 11 000 0000"
+                  />
+                </Field>
+                <Field label="Corporate Email">
+                  <Input
+                    value={createForm.email}
+                    onChange={(e) => setCreateField("email", e.target.value)}
+                    placeholder="info@company.lk"
+                  />
+                </Field>
+                <Field label="Website">
+                  <Input
+                    value={createForm.website}
+                    onChange={(e) => setCreateField("website", e.target.value)}
+                    placeholder="https://company.lk"
+                  />
+                </Field>
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-2 border-t border-gray-100 dark:border-gray-700">
+              <Button
+                variant="solid"
+                icon={<Rocket size={15} />}
+                loading={creating}
+                onClick={handleCreate}
+              >
+                Create Company & Continue
+              </Button>
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -641,6 +936,24 @@ function PayrollTab({
             maxLength={5}
           />
         </Field>
+        <Field label="Retirement Age (years)">
+          <div className="flex items-center gap-3">
+            <Input
+              type="number"
+              value={String(data.retirementAge)}
+              onChange={(e) => set("retirementAge", Number(e.target.value))}
+              disabled={!canManage}
+              className="w-32"
+              min={18}
+              max={80}
+            />
+            <span className="text-sm text-gray-500">years</span>
+          </div>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+            Used to calculate a suggested contract end date from an employee's
+            date of birth during onboarding.
+          </p>
+        </Field>
       </div>
 
       <SectionTitle>Attendance & Deductions</SectionTitle>
@@ -675,6 +988,75 @@ function PayrollTab({
         </Field>
       </div>
 
+      <SectionTitle>Deduction Rule Defaults &amp; Hierarchy</SectionTitle>
+      <p className="text-xs text-gray-500 dark:text-gray-400 -mt-2 mb-2">
+        Set company-wide fallback values for the three contract deduction rules
+        below, and choose which organisational level each rule should follow
+        first when a new employee's contract is created. If the chosen level has
+        no override configured for a given Branch, Department, or Designation,
+        the rule falls back to the company-wide default here.
+      </p>
+      <div className="grid grid-cols-3 gap-4">
+        <Field label="Default Absent Deduct After (days)">
+          <Input
+            type="number"
+            value={String(data.defaultAbsentDeductionAfterDays)}
+            onChange={(e) =>
+              set("defaultAbsentDeductionAfterDays", Number(e.target.value))
+            }
+            disabled={!canManage}
+            min={0}
+          />
+        </Field>
+        <Field label="Default Late Deduct / Minute">
+          <Input
+            type="number"
+            step="0.01"
+            value={String(data.defaultLateDeductionPerMinute)}
+            onChange={(e) =>
+              set("defaultLateDeductionPerMinute", Number(e.target.value))
+            }
+            disabled={!canManage}
+            min={0}
+          />
+        </Field>
+        <Field label="Default OT Rate Multiplier">
+          <Input
+            type="number"
+            step="0.1"
+            value={String(data.defaultOvertimeRateMultiplier)}
+            onChange={(e) =>
+              set("defaultOvertimeRateMultiplier", Number(e.target.value))
+            }
+            disabled={!canManage}
+            min={1}
+          />
+        </Field>
+      </div>
+      <div className="grid grid-cols-3 gap-4 mt-4">
+        <SelectField
+          label="Absent Deduction Follows"
+          value={data.absentDeductionSource}
+          onChange={(v) => set("absentDeductionSource", v)}
+          options={DEDUCTION_SOURCES.map((s) => ({ value: s, label: s }))}
+          disabled={!canManage}
+        />
+        <SelectField
+          label="Late Deduction Follows"
+          value={data.lateDeductionSource}
+          onChange={(v) => set("lateDeductionSource", v)}
+          options={DEDUCTION_SOURCES.map((s) => ({ value: s, label: s }))}
+          disabled={!canManage}
+        />
+        <SelectField
+          label="OT Multiplier Follows"
+          value={data.overtimeMultiplierSource}
+          onChange={(v) => set("overtimeMultiplierSource", v)}
+          options={DEDUCTION_SOURCES.map((s) => ({ value: s, label: s }))}
+          disabled={!canManage}
+        />
+      </div>
+
       <SectionTitle>Security</SectionTitle>
       <Field label="Temporary Password Expiry (hours)">
         <div className="flex items-center gap-3">
@@ -698,6 +1080,45 @@ function PayrollTab({
           password reset.
         </p>
       </Field>
+
+      <SectionTitle>Recruitment</SectionTitle>
+      <ToggleRow
+        label="Require Offer Approval"
+        description="Offers above the salary threshold below must be approved before they can be sent to a candidate."
+        checked={data.offerApprovalEnabled}
+        onChange={(v) => set("offerApprovalEnabled", v)}
+        disabled={!canManage}
+      />
+      {data.offerApprovalEnabled && (
+        <Field label="Approval Required Above Salary">
+          <div className="flex items-center gap-3">
+            <Input
+              type="number"
+              value={
+                data.offerApprovalSalaryThreshold === null
+                  ? ""
+                  : String(data.offerApprovalSalaryThreshold)
+              }
+              onChange={(e) =>
+                set(
+                  "offerApprovalSalaryThreshold",
+                  e.target.value === "" ? null : Number(e.target.value),
+                )
+              }
+              disabled={!canManage}
+              className="w-48"
+              min={0}
+              placeholder="Leave blank to always require approval"
+            />
+            <span className="text-sm text-gray-500">{data.currency}</span>
+          </div>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+            Offers with a salary above this amount will need approval before
+            sending. Leave blank to require approval on every offer regardless
+            of salary.
+          </p>
+        </Field>
+      )}
     </div>
   );
 }

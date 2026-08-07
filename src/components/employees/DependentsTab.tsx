@@ -9,6 +9,7 @@ import { showSuccess, showError } from '@/lib/toast';
 import api from '@/lib/axios';
 import { usePermission } from '@/hooks/usePermission';
 import { Permissions } from '@/lib/permissions';
+import { useAuthStore } from "@/store/authStore";
 import {
   EmployeeDependent, DependentForm, EMPTY_DEPENDENT,
   RELATIONSHIPS, DEP_GENDERS,
@@ -26,6 +27,7 @@ function Field({ label, required, children }: { label: string; required?: boolea
 }
 
 export default function DependentsTab({ employeeId }: { employeeId: string }) {
+  const userId = useAuthStore((s) => s.user?.userId);
   const canManage   = usePermission(Permissions.HR.Dependents.Manage);
   const initialized = useRef(false);
 
@@ -82,19 +84,19 @@ export default function DependentsTab({ employeeId }: { employeeId: string }) {
     if (!form.relationship)      { setError('Relationship is required.'); return; }
     setSaving(true);
     try {
-      await api.post('employee-dependents', {
-        action:             editing ? 'UPDATE' : 'ADD',
-        id:                 editing?.id ?? null,
+      await api.post("employee-dependents", {
+        action: editing ? "UPDATE" : "ADD",
+        id: editing?.id ?? null,
         employeeId,
-        fullName:           form.fullName.trim(),
-        relationship:       form.relationship,
-        dateOfBirth:        form.dateOfBirth   || null,
-        gender:             form.gender        || null,
-        nicNumber:          form.nicNumber.trim()   || null,
-        phoneNumber:        form.phoneNumber.trim() || null,
+        fullName: form.fullName.trim(),
+        relationship: form.relationship,
+        dateOfBirth: form.dateOfBirth || null,
+        gender: form.gender || null,
+        nicNumber: form.nicNumber.trim() || null,
+        phoneNumber: form.phoneNumber.trim() || null,
         isEmergencyContact: form.isEmergencyContact,
-        notes:              form.notes.trim()  || null,
-        userId: 1,
+        notes: form.notes.trim() || null,
+        userId: userId,
       });
       setDialogOpen(false);
       await load();
@@ -110,7 +112,12 @@ export default function DependentsTab({ employeeId }: { employeeId: string }) {
     if (!deleteTarget) return;
     setDeleting(true);
     try {
-      await api.post('employee-dependents', { action: 'DELETE', id: deleteTarget.id, employeeId, userId: 1 });
+      await api.post("employee-dependents", {
+        action: "DELETE",
+        id: deleteTarget.id,
+        employeeId,
+        userId: userId,
+      });
       setConfirmOpen(false); setDeleteTarget(null);
       await load();
       showSuccess('Dependent Removed', deleteTarget.fullName);

@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { Download, ArrowLeft, FileSpreadsheet } from 'lucide-react';
 import api from '@/lib/axios';
 import { showError, showSuccess } from '@/lib/toast';
-import { useRequirePermission } from '@/hooks/useRequirePermission';
+import { usePermission } from "@/hooks/usePermission";
 import type { ApitSchedule02Row } from '@/types/apit-reports.types';
 
 const fmt = (n: number) => new Intl.NumberFormat('en-LK', { minimumFractionDigits: 2 }).format(n);

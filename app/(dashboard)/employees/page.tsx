@@ -63,6 +63,8 @@ import {
   getCvParseById,
   consumeCvParse,
 } from "@/lib/api/cvParser";
+import { useAuthStore } from "@/store/authStore";
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 
 interface LeaveTemplateOption {
   id: string;
@@ -73,6 +75,40 @@ interface LeaveTemplateOption {
 /* ─────────────────────────────── constants ─────────────────────────────── */
 
 const PAGE_SIZE = 10;
+
+const EMPLOYEE_WIZARD_DRAFT_KEY = "xp_employee_wizard_draft";
+
+interface EmployeeWizardDraft {
+  createdId: string;
+  form1: EmployeeForm;
+  wizardLeaveTemplateId: string;
+  savedAt: string;
+}
+
+function saveWizardDraft(draft: EmployeeWizardDraft) {
+  try {
+    localStorage.setItem(EMPLOYEE_WIZARD_DRAFT_KEY, JSON.stringify(draft));
+  } catch {
+    // localStorage unavailable — draft resume just won't work, non-critical
+  }
+}
+
+function loadWizardDraft(): EmployeeWizardDraft | null {
+  try {
+    const raw = localStorage.getItem(EMPLOYEE_WIZARD_DRAFT_KEY);
+    return raw ? (JSON.parse(raw) as EmployeeWizardDraft) : null;
+  } catch {
+    return null;
+  }
+}
+
+function clearWizardDraft() {
+  try {
+    localStorage.removeItem(EMPLOYEE_WIZARD_DRAFT_KEY);
+  } catch {
+    // ignore
+  }
+}
 
 const AVATAR_COLORS = [
   'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300',
@@ -390,6 +426,7 @@ function Pagination({ page, total, pageSize, onChange }: {
 /* ─────────────────────────────── Page ───────────────────────────────────── */
 
 export default function EmployeesPage() {
+  const userId = useAuthStore((s) => s.user?.userId);
   useRequirePermission(Permissions.HR.Employee.View);
   const canEdit = usePermission(Permissions.HR.Employee.Update);
   const canAdd = usePermission(Permissions.HR.Employee.Create);
@@ -422,7 +459,16 @@ export default function EmployeesPage() {
   const [wizardSaving, setWizardSaving] = useState(false);
   const [wizardError, setWizardError] = useState("");
   const [createdId, setCreatedId] = useState<string | null>(null);
-  const [leaveTemplates, setLeaveTemplates] = useState<LeaveTemplateOption[]>([]);
+
+  const [resumeDraftOpen, setResumeDraftOpen] = useState(false);
+  const [pendingDraft, setPendingDraft] = useState<EmployeeWizardDraft | null>(null);
+
+  const [nicChecking, setNicChecking] = useState(false);
+  const [nicError, setNicError] = useState("");
+
+  const [leaveTemplates, setLeaveTemplates] = useState<LeaveTemplateOption[]>(
+    [],
+  );
   const [wizardLeaveTemplateId, setWizardLeaveTemplateId] = useState("");
   const [form1, setForm1] = useState<EmployeeForm>(EMPTY_EMPLOYEE);
   const [form2, setForm2] = useState<ContractForm>(EMPTY_CONTRACT);
@@ -433,18 +479,36 @@ export default function EmployeesPage() {
   const [recentParses, setRecentParses] = useState<RecentCvParse[]>([]);
   const [recallOpen, setRecallOpen] = useState(false);
 
+  const [retirementAge, setRetirementAge] = useState<number>(60);
+
+  // company-wide deduction defaults — used to seed a brand-new contract
+  const [companyDefaults, setCompanyDefaults] = useState({
+    absentDeductionAfterDays: "0",
+    lateDeductionPerMinute: "0",
+    overtimeRateMultiplier: "1.5",
+  });
+
   // edit
   const [editOpen, setEditOpen] = useState(false);
   const [editing, setEditing] = useState<Employee | null>(null);
   const [editTab, setEditTab] = useState<EditTab>("details");
   const [editForm, setEditForm] = useState<EmployeeForm>(EMPTY_EMPLOYEE);
   const [editSaving, setEditSaving] = useState(false);
-  const [editError, setEditError] = useState("");
+
+  const [editNicChecking, setEditNicChecking] = useState(false);
+  const [editNicError, setEditNicError] = useState("");
+
   const [contract, setContract] = useState<EmployeeContract | null>(null);
   const [contractForm, setContractForm] =
     useState<ContractForm>(EMPTY_CONTRACT);
   const [contractSaving, setContractSaving] = useState(false);
-  const [contractError, setContractError] = useState("");
+
+  // pending two-level-approval change request on the CURRENT contract, if any
+  const [pendingContractChange, setPendingContractChange] = useState<{
+    id: string;
+    requestedAt: string;
+  } | null>(null);
+
   const [dependents, setDependents] = useState<EmployeeDependent[]>([]);
   const [transport, setTransport] = useState<EmployeeTransport | null>(null);
   const [documents, setDocuments] = useState<EmployeeDocument[]>([]);
@@ -508,18 +572,53 @@ export default function EmployeesPage() {
   const load = async () => {
     try {
       setLoading(true);
-      const [empRes, brRes, deptRes, desigRes, crewRes, groupRes, bankRes, ltRes] =
-        await Promise.all([
-          api.get<Employee[]>("/employees"),
-          api.get<Branch[]>("/branches"),
-          api.get<Department[]>("/departments"),
-          api.get<Designation[]>("/designations"),
-          api.get<CrewOption[]>("/crews?isActive=true"),
-          api.get<GroupOption[]>("/groups?isActive=true"),
-          api.get<BankBranchOption[]>("/bank-branches?isActive=true"),
-          api.get<LeaveTemplateOption[]>("/LeaveTemplate"),
-        ]);
-      setItems(empRes.data);
+      const [
+        empRes,
+        brRes,
+        deptRes,
+        desigRes,
+        crewRes,
+        groupRes,
+        bankRes,
+        ltRes,
+        companyRes,
+      ] = await Promise.all([
+        api.get<Employee[]>("/employees"),
+        api.get<Branch[]>("/branches"),
+        api.get<Department[]>("/departments"),
+        api.get<Designation[]>("/designations"),
+        api.get<CrewOption[]>("/crews?isActive=true"),
+        api.get<GroupOption[]>("/groups?isActive=true"),
+        api.get<BankBranchOption[]>("/bank-branches?isActive=true"),
+        api.get<LeaveTemplateOption[]>("/LeaveTemplate"),
+        api.get<{ retirementAge: number }>("/company"),
+      ]);
+
+      setItems(
+        empRes.data.map((e: any) => ({
+          ...e,
+          id: String(e.id),
+          bankBranchId: e.bankBranchId != null ? String(e.bankBranchId) : null,
+          crewId: e.crewId != null ? String(e.crewId) : null,
+          groupId: e.groupId != null ? String(e.groupId) : null,
+          branchId: e.branchId != null ? String(e.branchId) : null,
+          departmentId: e.departmentId != null ? String(e.departmentId) : null,
+          designationId: e.designationId != null ? String(e.designationId) : null,
+          managerId: e.managerId != null ? String(e.managerId) : null,
+        })),
+      );
+      setRetirementAge(companyRes.data?.retirementAge ?? 60);
+      setCompanyDefaults({
+        absentDeductionAfterDays: String(
+          (companyRes.data as any)?.defaultAbsentDeductionAfterDays ?? 0,
+        ),
+        lateDeductionPerMinute: String(
+          (companyRes.data as any)?.defaultLateDeductionPerMinute ?? 0,
+        ),
+        overtimeRateMultiplier: String(
+          (companyRes.data as any)?.defaultOvertimeRateMultiplier ?? 1.5,
+        ),
+      });
       setBranches(
         brRes.data
           .filter((b: any) => b.isActive)
@@ -545,7 +644,7 @@ export default function EmployeesPage() {
       setLeaveTemplates(
         (ltRes.data as any[])
           .filter((t: any) => t.isActive)
-          .map((t: any) => ({ id: String(t.id), name: t.name, code: t.code }))
+          .map((t: any) => ({ id: String(t.id), name: t.name, code: t.code })),
       );
     } catch (err: any) {
       showError(
@@ -563,18 +662,150 @@ export default function EmployeesPage() {
     load();
   }, []);
 
+  // Live NIC duplicate check — Add wizard
+  useEffect(() => {
+    const nic = form1.nationalIdNumber?.trim();
+    if (!nic) {
+      setNicError("");
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        setNicChecking(true);
+        const { data } = await api.get("/employees/check-nic", {
+          // Exclude the employee we're currently on (matters once a Step 1
+          // draft has already been saved/resumed — otherwise this NIC check
+          // finds the employee's own record and flags it as a duplicate).
+          params: { nic, excludeId: createdId },
+        });
+        const message = data.isDuplicate
+          ? "An employee with this National ID already exists."
+          : "";
+        setNicError(message);
+        if (message) {
+          showError("Duplicate National ID", message);
+        }
+      } catch {
+        // fail silent — the save-time server check still protects data integrity
+      } finally {
+        setNicChecking(false);
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [form1.nationalIdNumber, createdId]);
+
+  // Live NIC duplicate check — Edit modal
+  useEffect(() => {
+    if (!editOpen) return;
+    const nic = editForm.nationalIdNumber?.trim();
+    if (!nic) {
+      setEditNicError("");
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        setEditNicChecking(true);
+        const { data } = await api.get("/employees/check-nic", {
+          params: { nic, excludeId: editing?.id },
+        });
+        const message = data.isDuplicate
+          ? "An employee with this National ID already exists."
+          : "";
+        setEditNicError(message);
+        if (message) {
+          showError("Duplicate National ID", message);
+        }
+      } catch {
+        // fail silent
+      } finally {
+        setEditNicChecking(false);
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [editForm.nationalIdNumber, editOpen, editing?.id]);
+
+  // Live-resolve deduction defaults (Company -> Branch/Department/Designation)
+  // as the org fields are picked in Step 1 of the Add wizard — prefills Step 2.
+  useEffect(() => {
+    if (wizardStep !== 1) return;
+    const timer = setTimeout(async () => {
+      try {
+        const { data } = await api.get(
+          "/employees/resolve-deduction-defaults",
+          {
+            params: {
+              branchId: form1.branchId || undefined,
+              departmentId: form1.departmentId || undefined,
+              designationId: form1.designationId || undefined,
+            },
+          },
+        );
+        setForm2((f) => ({
+          ...f,
+          absentDeductionAfterDays: String(data.absentDeductionAfterDays),
+          lateDeductionPerMinute: String(data.lateDeductionPerMinute),
+          overtimeRateMultiplier: String(data.overtimeRateMultiplier),
+        }));
+      } catch {
+        // silent — Step 2 keeps its last-resolved or default values
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [form1.branchId, form1.departmentId, form1.designationId, wizardStep]);
+
   /* ── add wizard ────────────────────────────────────────────────────────── */
 
   const openWizard = () => {
-    setWizardStep(1);
     setWizardError("");
+    setPendingCvQualifications([]);
+    setParseLogId(null);
+    setRecallOpen(false);
+
+    const draft = loadWizardDraft();
+    if (draft) {
+      setPendingDraft(draft);
+      setResumeDraftOpen(true);
+      return;
+    }
+
+    setWizardStep(1);
     setCreatedId(null);
     setWizardLeaveTemplateId("");
     setForm1({ ...EMPTY_EMPLOYEE });
-    setForm2({ ...EMPTY_CONTRACT });
-    setPendingCvQualifications([]);
-    setParseLogId(null);
-    setRecallOpen(false); 
+    setForm2({ ...EMPTY_CONTRACT, ...companyDefaults });
+    setWizardOpen(true);
+  };
+
+  const handleResumeDraft = () => {
+    if (!pendingDraft) return;
+    setCreatedId(pendingDraft.createdId);
+    setForm1(pendingDraft.form1);
+    setWizardLeaveTemplateId(pendingDraft.wizardLeaveTemplateId);
+    setForm2({
+      ...EMPTY_CONTRACT,
+      ...companyDefaults,
+      startDate: pendingDraft.form1.joinDate,
+    });
+    setWizardStep(2);
+    setWizardOpen(true);
+    setResumeDraftOpen(false);
+    setPendingDraft(null);
+  };
+
+  const handleDiscardDraft = () => {
+    clearWizardDraft();
+    setResumeDraftOpen(false);
+    setPendingDraft(null);
+
+    setWizardStep(1);
+    setCreatedId(null);
+    setWizardLeaveTemplateId("");
+    setForm1({ ...EMPTY_EMPLOYEE });
+    setForm2({ ...EMPTY_CONTRACT, ...companyDefaults });
     setWizardOpen(true);
   };
   const closeWizard = () => setWizardOpen(false);
@@ -583,8 +814,9 @@ export default function EmployeesPage() {
     (field: keyof EmployeeForm) => (e: { target: { value: string } }) =>
       setForm1((f) => ({ ...f, [field]: e.target.value }));
 
-const s2 = (field: keyof ContractForm) => (e: { target: { value: string } }) =>
-  setForm2((f) => ({ ...f, [field]: e.target.value }));
+  const s2 =
+    (field: keyof ContractForm) => (e: { target: { value: string } }) =>
+      setForm2((f) => ({ ...f, [field]: e.target.value }));
 
   const handleCvParsed = (result: CvParseResult) => {
     setForm1((f) => ({
@@ -634,91 +866,169 @@ const s2 = (field: keyof ContractForm) => (e: { target: { value: string } }) =>
       showError("Missing information", "Leave template is required.");
       return;
     }
+    // Only block on the live NIC check before the employee exists yet.
+    // Once created, this check is excludeId-aware and self-corrects on any
+    // further edits — re-gating on it here risks a debounced check that
+    // resolved right around the moment of creation leaving a stale flag
+    // behind, incorrectly blocking a legitimate later Next/Update. The
+    // backend's own duplicate check still catches a genuine conflict.
+    if (!createdId && nicError) {
+      showError("Duplicate National ID", nicError);
+      return;
+    }
     setWizardSaving(true);
     try {
-      await api.post("/employees/save", {
-        action: "ADD",
-        employeeCode: form1.employeeCode.trim(),
-        firstName: form1.firstName.trim(),
-        lastName: form1.lastName.trim(),
-        middleName: form1.middleName.trim() || null,
-        email: form1.email.trim() || null,
-        personalEmail: form1.personalEmail.trim() || null,
-        phoneNumber: form1.phoneNumber.trim() || null,
-        nationalIdNumber: form1.nationalIdNumber.trim() || null,
-        tinNumber: form1.tinNumber?.trim() || null,
-        bankAccountNumber: form1.bankAccountNumber.trim() || null,
-        bankAccountHolderName: form1.bankAccountHolderName.trim() || null,
-        bankAccountType: form1.bankAccountType || null,
-        bankBranchId: form1.bankBranchId || null,
-        dateOfBirth: form1.dateOfBirth || null,
-        gender: form1.gender || null,
-        nationality: form1.nationality.trim() || null,
-        address: form1.address.trim() || null,
-        branchId: form1.branchId || null,
-        departmentId: form1.departmentId || null,
-        designationId: form1.designationId || null,
-        joinDate: form1.joinDate,
-        employmentType: form1.employmentType,
-        status: form1.status,
-        notes: form1.notes.trim() || null,
-        crewId: form1.crewId || null,
-        groupId: form1.groupId || null,
-        leaveTemplateId: wizardLeaveTemplateId,
-        userId: 1,
-      });
-      const res = await api.get<Employee[]>(
-        `/employees?employeeCode=${form1.employeeCode.trim()}`,
-      );
-      const created = res.data?.[0];
-      if (!created)
-        throw new Error("Employee saved but ID could not be retrieved.");
-      setCreatedId(String(created.id));
-      setForm2((f) => ({ ...f, startDate: form1.joinDate }));
+      // If we've already created this employee earlier in this wizard session
+      // (e.g. user went Back to Step 1 then hit Next again), UPDATE instead of
+      // re-running ADD — otherwise this collides with the duplicate-code check
+      // and blocks progression, or worse, could create a second record.
+      const isFirstSave = !createdId;
+      let employeeId = createdId;
 
-      // Bulk-save any qualifications extracted from the CV parse — best effort,
-      // does not block wizard progression if one entry fails.
-      if (pendingCvQualifications.length > 0) {
-        const results = await Promise.allSettled(
-          pendingCvQualifications.map((q) =>
-            api.post("employee-qualifications/save", {
-              action: "ADD",
-              employeeId: String(created.id),
-              category: q.category,
-              title: q.title || "Untitled",
-              institution: q.institution || null,
-              fromDate: q.fromDate || null,
-              toDate: q.toDate || null,
-              isCurrent: q.isCurrent,
-              grade: q.grade || null,
-              description: q.description || null,
-              userId: 1,
-            }),
-          ),
+      if (isFirstSave) {
+        await api.post("/employees/save", {
+          action: "ADD",
+          employeeCode: form1.employeeCode.trim(),
+          firstName: form1.firstName.trim(),
+          lastName: form1.lastName.trim(),
+          middleName: form1.middleName.trim() || null,
+          email: form1.email.trim() || null,
+          personalEmail: form1.personalEmail.trim() || null,
+          phoneNumber: form1.phoneNumber.trim() || null,
+          nationalIdNumber: form1.nationalIdNumber.trim() || null,
+          tinNumber: form1.tinNumber?.trim() || null,
+          bankAccountNumber: form1.bankAccountNumber.trim() || null,
+          bankAccountHolderName: form1.bankAccountHolderName.trim() || null,
+          bankAccountType: form1.bankAccountType || null,
+          bankBranchId: form1.bankBranchId || null,
+          dateOfBirth: form1.dateOfBirth || null,
+          gender: form1.gender || null,
+          nationality: form1.nationality.trim() || null,
+          address: form1.address.trim() || null,
+          branchId: form1.branchId || null,
+          departmentId: form1.departmentId || null,
+          designationId: form1.designationId || null,
+          joinDate: form1.joinDate,
+          employmentType: form1.employmentType,
+          status: form1.status,
+          notes: form1.notes.trim() || null,
+          crewId: form1.crewId || null,
+          groupId: form1.groupId || null,
+          leaveTemplateId: wizardLeaveTemplateId,
+          userId: userId,
+        });
+        const res = await api.get<Employee[]>(
+          `/employees?employeeCode=${form1.employeeCode.trim()}`,
         );
-        const failed = results.filter((r) => r.status === "rejected").length;
-        if (failed > 0) {
-          showError(
-            "Some qualifications not saved",
-            `${failed} of ${pendingCvQualifications.length} CV entries failed — add them manually in the Qualifications tab after saving.`,
+        const created = res.data?.[0];
+        if (!created)
+          throw new Error("Employee saved but ID could not be retrieved.");
+        employeeId = String(created.id);
+        setCreatedId(employeeId);
+
+        // Bulk-save any qualifications extracted from the CV parse — best effort,
+        // does not block wizard progression if one entry fails. Only runs on the
+        // very first save — cleared afterward so a later Next (Update path)
+        // never re-inserts the same qualifications a second time.
+        if (pendingCvQualifications.length > 0) {
+          const results = await Promise.allSettled(
+            pendingCvQualifications.map((q) =>
+              api.post("employee-qualifications", {
+                action: "ADD",
+                employeeId,
+                category: q.category,
+                title: q.title || "Untitled",
+                institution: q.institution || null,
+                fromDate: q.fromDate || null,
+                toDate: q.toDate || null,
+                isCurrent: q.isCurrent,
+                grade: q.grade || null,
+                description: q.description || null,
+                userId: userId,
+              }),
+            ),
           );
+          const failed = results.filter((r) => r.status === "rejected").length;
+          if (failed > 0) {
+            showError(
+              "Some qualifications not saved",
+              `${failed} of ${pendingCvQualifications.length} CV entries failed — add them manually in the Qualifications tab after saving.`,
+            );
+          }
+          setPendingCvQualifications([]);
         }
+
+        if (parseLogId) {
+          try {
+            await consumeCvParse(parseLogId, Number(employeeId));
+          } catch {
+            // non-critical — log stays recallable if this fails
+          }
+          setParseLogId(null);
+        }
+      } else {
+        // Employee already exists — persist any edits made after coming back
+        // to this step. Leave template intentionally omitted: it's set once
+        // at creation and cannot be changed afterward.
+        await api.post("/employees/save", {
+          action: "UPDATE",
+          id: employeeId,
+          employeeCode: form1.employeeCode.trim(),
+          firstName: form1.firstName.trim(),
+          lastName: form1.lastName.trim(),
+          middleName: form1.middleName.trim() || null,
+          email: form1.email.trim() || null,
+          personalEmail: form1.personalEmail.trim() || null,
+          phoneNumber: form1.phoneNumber.trim() || null,
+          nationalIdNumber: form1.nationalIdNumber.trim() || null,
+          tinNumber: form1.tinNumber?.trim() || null,
+          bankAccountNumber: form1.bankAccountNumber.trim() || null,
+          bankAccountHolderName: form1.bankAccountHolderName.trim() || null,
+          bankAccountType: form1.bankAccountType || null,
+          bankBranchId: form1.bankBranchId || null,
+          dateOfBirth: form1.dateOfBirth || null,
+          gender: form1.gender || null,
+          nationality: form1.nationality.trim() || null,
+          address: form1.address.trim() || null,
+          branchId: form1.branchId || null,
+          departmentId: form1.departmentId || null,
+          designationId: form1.designationId || null,
+          joinDate: form1.joinDate,
+          employmentType: form1.employmentType,
+          status: form1.status,
+          notes: form1.notes.trim() || null,
+          crewId: form1.crewId || null,
+          groupId: form1.groupId || null,
+          userId: userId,
+        });
       }
 
-      if (parseLogId) {
-        try {
-          await consumeCvParse(parseLogId, created.id);
-        } catch {
-          // non-critical — log stays recallable if this fails
-        }
-      }
+      saveWizardDraft({
+        createdId: employeeId!,
+        form1,
+        wizardLeaveTemplateId,
+        savedAt: new Date().toISOString(),
+      });
 
+      setForm2((f) => ({ ...f, startDate: form1.joinDate }));
       setWizardStep(2);
     } catch (err: any) {
-      showError(
-        "Failed to save employee",
-        err?.response?.data?.message ?? err?.message ?? "Please try again.",
-      );
+      if (err?.response?.status === 404 && createdId) {
+        // The resumed draft points at a record that no longer exists
+        // (e.g. deleted elsewhere) — clear it so the next click starts a
+        // fresh ADD instead of repeatedly failing against a gone record.
+        clearWizardDraft();
+        setCreatedId(null);
+        showError(
+          "Draft no longer exists",
+          "That employee record could not be found — it may have been deleted. Click Next again to create a new one.",
+        );
+      } else {
+        showError(
+          "Failed to save employee",
+          err?.response?.data?.message ?? err?.message ?? "Please try again.",
+        );
+      }
     } finally {
       setWizardSaving(false);
     }
@@ -750,8 +1060,9 @@ const s2 = (field: keyof ContractForm) => (e: { target: { value: string } }) =>
         endDate: form2.endDate || null,
         isActive: true,
         notes: form2.notes.trim() || null,
-        userId: 1,
+        userId: userId,
       });
+      clearWizardDraft();
       showSuccess("Employee added", `${form1.firstName} ${form1.lastName}`);
       closeWizard();
       await load();
@@ -760,7 +1071,6 @@ const s2 = (field: keyof ContractForm) => (e: { target: { value: string } }) =>
         "Failed to save contract.",
         err?.response?.data?.message ?? err?.message ?? "Please try again.",
       );
-
     } finally {
       setWizardSaving(false);
     }
@@ -771,8 +1081,7 @@ const s2 = (field: keyof ContractForm) => (e: { target: { value: string } }) =>
   const openEdit = async (item: Employee) => {
     setEditing(item);
     setEditTab("details");
-    setEditError("");
-    setContractError("");
+
     setEditForm({
       employeeCode: item.employeeCode ?? "",
       firstName: item.firstName ?? "",
@@ -813,33 +1122,73 @@ const s2 = (field: keyof ContractForm) => (e: { target: { value: string } }) =>
     setTransport(transRes.status === "fulfilled" ? transRes.value.data : null);
     setDocuments(docRes.status === "fulfilled" ? docRes.value.data : []);
     setQualifications(qualRes.status === "fulfilled" ? qualRes.value.data : []);
+
     try {
       const res = await api.get<EmployeeContract[]>(
         `/employees/contracts?employeeId=${item.id}&isActive=true`,
       );
       const c = res.data?.[0] ?? null;
       setContract(c);
-      setContractForm(
-        c
-          ? {
-              contractType: c.contractType,
-              payrollBasis: c.payrollBasis,
-              basicSalary: c.basicSalary.toString(),
-              hourlyRate: c.hourlyRate?.toString() ?? "",
-              dailyRate: c.dailyRate?.toString() ?? "",
-              allowances: c.allowances.toString(),
-              currency: c.currency,
-              absentDeductionAfterDays: c.absentDeductionAfterDays.toString(),
-              lateDeductionPerMinute: c.lateDeductionPerMinute.toString(),
-              overtimeRateMultiplier: c.overtimeRateMultiplier.toString(),
-              startDate: c.startDate,
-              endDate: c.endDate ?? "",
-              notes: c.notes ?? "",
-            }
-          : { ...EMPTY_CONTRACT, startDate: item.joinDate },
-      );
+
+      if (c) {
+        setContractForm({
+          contractType: c.contractType,
+          payrollBasis: c.payrollBasis,
+          basicSalary: c.basicSalary.toString(),
+          hourlyRate: c.hourlyRate?.toString() ?? "",
+          dailyRate: c.dailyRate?.toString() ?? "",
+          allowances: c.allowances.toString(),
+          currency: c.currency,
+          absentDeductionAfterDays: c.absentDeductionAfterDays.toString(),
+          lateDeductionPerMinute: c.lateDeductionPerMinute.toString(),
+          overtimeRateMultiplier: c.overtimeRateMultiplier.toString(),
+          startDate: c.startDate,
+          endDate: c.endDate ?? "",
+          notes: c.notes ?? "",
+        });
+
+        try {
+          const changeRes = await api.get(
+            `/employees/contracts/${c.id}/change-request`,
+          );
+          setPendingContractChange(
+            changeRes.data
+              ? {
+                  id: String(changeRes.data.id),
+                  requestedAt: changeRes.data.requestedAt,
+                }
+              : null,
+          );
+        } catch {
+          setPendingContractChange(null);
+        }
+      } else {
+        setPendingContractChange(null);
+        try {
+          const { data } = await api.get(
+            "/employees/resolve-deduction-defaults",
+            {
+              params: {
+                branchId: item.branchId || undefined,
+                departmentId: item.departmentId || undefined,
+                designationId: item.designationId || undefined,
+              },
+            },
+          );
+          setContractForm({
+            ...EMPTY_CONTRACT,
+            startDate: item.joinDate,
+            absentDeductionAfterDays: String(data.absentDeductionAfterDays),
+            lateDeductionPerMinute: String(data.lateDeductionPerMinute),
+            overtimeRateMultiplier: String(data.overtimeRateMultiplier),
+          });
+        } catch {
+          setContractForm({ ...EMPTY_CONTRACT, startDate: item.joinDate });
+        }
+      }
     } catch {
       setContract(null);
+      setPendingContractChange(null);
       setContractForm({ ...EMPTY_CONTRACT, startDate: item.joinDate });
     }
     setEditOpen(true);
@@ -849,17 +1198,21 @@ const s2 = (field: keyof ContractForm) => (e: { target: { value: string } }) =>
     (field: keyof EmployeeForm) => (e: { target: { value: string } }) =>
       setEditForm((f) => ({ ...f, [field]: e.target.value }));
 
-const cf = (field: keyof ContractForm) => (e: { target: { value: string } }) =>
-  setContractForm((f) => ({ ...f, [field]: e.target.value }));
+  const cf =
+    (field: keyof ContractForm) => (e: { target: { value: string } }) =>
+      setContractForm((f) => ({ ...f, [field]: e.target.value }));
 
   const handleEditSave = async () => {
-    setEditError("");
     if (!editForm.firstName.trim()) {
-      setEditError("First name is required.");
+      showError("Missing information", "First name is required.");
       return;
     }
     if (!editForm.lastName.trim()) {
-      setEditError("Last name is required.");
+      showError("Missing information", "Last name is required.");
+      return;
+    }
+    if (editNicError) {
+      showError("Duplicate National ID", editNicError);
       return;
     }
     setEditSaving(true);
@@ -894,7 +1247,7 @@ const cf = (field: keyof ContractForm) => (e: { target: { value: string } }) =>
         notes: editForm.notes.trim() || null,
         crewId: editForm.crewId || null,
         groupId: editForm.groupId || null,
-        userId: 1,
+        userId: userId,
       });
       setEditOpen(false);
       await load();
@@ -903,8 +1256,9 @@ const cf = (field: keyof ContractForm) => (e: { target: { value: string } }) =>
         `${editForm.firstName} ${editForm.lastName}`,
       );
     } catch (err: any) {
-      setEditError(
-        err?.response?.data?.message ?? "Failed to update employee.",
+      showError(
+        "Failed to update employee",
+        err?.response?.data?.message ?? "Please try again.",
       );
     } finally {
       setEditSaving(false);
@@ -912,50 +1266,91 @@ const cf = (field: keyof ContractForm) => (e: { target: { value: string } }) =>
   };
 
   const handleContractSave = async () => {
-    setContractError("");
     if (!contractForm.startDate) {
-      setContractError("Start date is required.");
+      showError("Missing information", "Start date is required.");
+      return;
+    }
+    if (pendingContractChange) {
+      showError(
+        "Change already pending",
+        "This contract has a change awaiting approval. Wait for it to be reviewed before submitting another.",
+      );
       return;
     }
     setContractSaving(true);
     try {
-      await api.post("/employees/contracts/save", {
-        action: contract ? "UPDATE" : "ADD",
-        id: contract?.id ?? null,
-        employeeId: editing!.id,
-        designationId: editForm.designationId || null,
-        contractType: contractForm.contractType,
-        payrollBasis: contractForm.payrollBasis,
-        basicSalary: parseFloat(contractForm.basicSalary) || 0,
-        hourlyRate: contractForm.hourlyRate
-          ? parseFloat(contractForm.hourlyRate)
-          : null,
-        dailyRate: contractForm.dailyRate
-          ? parseFloat(contractForm.dailyRate)
-          : null,
-        allowances: parseFloat(contractForm.allowances) || 0,
-        currency: contractForm.currency,
-        absentDeductionAfterDays:
-          parseInt(contractForm.absentDeductionAfterDays) || 0,
-        lateDeductionPerMinute:
-          parseFloat(contractForm.lateDeductionPerMinute) || 0,
-        overtimeRateMultiplier:
-          parseFloat(contractForm.overtimeRateMultiplier) || 1.5,
-        startDate: contractForm.startDate,
-        endDate: contractForm.endDate || null,
-        isActive: true,
-        notes: contractForm.notes.trim() || null,
-        userId: 1,
-      });
-      setEditOpen(false);
-      await load();
-      showSuccess(
-        "Contract updated",
-        `${editForm.firstName} ${editForm.lastName}`,
-      );
+      if (contract) {
+        // Existing contract — route through two-level approval, do NOT update directly
+        await api.post("/employees/contracts/request-change", {
+          contractId: contract.id,
+          designationId: editForm.designationId || null,
+          contractType: contractForm.contractType,
+          payrollBasis: contractForm.payrollBasis,
+          basicSalary: parseFloat(contractForm.basicSalary) || 0,
+          hourlyRate: contractForm.hourlyRate
+            ? parseFloat(contractForm.hourlyRate)
+            : null,
+          dailyRate: contractForm.dailyRate
+            ? parseFloat(contractForm.dailyRate)
+            : null,
+          allowances: parseFloat(contractForm.allowances) || 0,
+          currency: contractForm.currency,
+          absentDeductionAfterDays:
+            parseInt(contractForm.absentDeductionAfterDays) || 0,
+          lateDeductionPerMinute:
+            parseFloat(contractForm.lateDeductionPerMinute) || 0,
+          overtimeRateMultiplier:
+            parseFloat(contractForm.overtimeRateMultiplier) || 1.5,
+          startDate: contractForm.startDate,
+          endDate: contractForm.endDate || null,
+          notes: contractForm.notes.trim() || null,
+          userId: userId,
+        });
+        setEditOpen(false);
+        showSuccess(
+          "Change submitted",
+          "Awaiting approval before it goes live.",
+        );
+      } else {
+        // No contract yet — first-time creation stays instant, no approval gate
+        await api.post("/employees/contracts/save", {
+          action: "ADD",
+          employeeId: editing!.id,
+          designationId: editForm.designationId || null,
+          contractType: contractForm.contractType,
+          payrollBasis: contractForm.payrollBasis,
+          basicSalary: parseFloat(contractForm.basicSalary) || 0,
+          hourlyRate: contractForm.hourlyRate
+            ? parseFloat(contractForm.hourlyRate)
+            : null,
+          dailyRate: contractForm.dailyRate
+            ? parseFloat(contractForm.dailyRate)
+            : null,
+          allowances: parseFloat(contractForm.allowances) || 0,
+          currency: contractForm.currency,
+          absentDeductionAfterDays:
+            parseInt(contractForm.absentDeductionAfterDays) || 0,
+          lateDeductionPerMinute:
+            parseFloat(contractForm.lateDeductionPerMinute) || 0,
+          overtimeRateMultiplier:
+            parseFloat(contractForm.overtimeRateMultiplier) || 1.5,
+          startDate: contractForm.startDate,
+          endDate: contractForm.endDate || null,
+          isActive: true,
+          notes: contractForm.notes.trim() || null,
+          userId: userId,
+        });
+        setEditOpen(false);
+        await load();
+        showSuccess(
+          "Contract created",
+          `${editForm.firstName} ${editForm.lastName}`,
+        );
+      }
     } catch (err: any) {
-      setContractError(
-        err?.response?.data?.message ?? "Failed to update contract.",
+      showError(
+        "Failed to save contract",
+        err?.response?.data?.message ?? "Please try again.",
       );
     } finally {
       setContractSaving(false);
@@ -1715,6 +2110,21 @@ const cf = (field: keyof ContractForm) => (e: { target: { value: string } }) =>
         )}
       </WizardModal>
 
+      <ConfirmDialog
+        open={resumeDraftOpen}
+        variant="info"
+        title="Resume Employee Entry?"
+        message={
+          pendingDraft
+            ? `You have an unfinished employee entry for "${pendingDraft.form1.firstName} ${pendingDraft.form1.lastName}" (${pendingDraft.form1.employeeCode}). Resume where you left off?`
+            : ""
+        }
+        confirmLabel="Resume"
+        cancelLabel="Start New"
+        onConfirm={handleResumeDraft}
+        onCancel={handleDiscardDraft}
+      />
+
       {/* ── Edit Modal ──────────────────────────────────────────────────── */}
       {editing && (
         <WizardModal open={editOpen} onClose={() => setEditOpen(false)}>
@@ -1923,9 +2333,6 @@ const cf = (field: keyof ContractForm) => (e: { target: { value: string } }) =>
                 </div>
               </div>
               <div className="px-8 py-5 border-t border-gray-100 dark:border-gray-700 shrink-0">
-                {editError && (
-                  <p className="text-error text-sm mb-3">{editError}</p>
-                )}
                 <div className="flex justify-end gap-3">
                   <Button variant="plain" onClick={() => setEditOpen(false)}>
                     Cancel
@@ -1949,6 +2356,19 @@ const cf = (field: keyof ContractForm) => (e: { target: { value: string } }) =>
                 {!contract && (
                   <div className="mb-4 px-4 py-3 bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400 rounded-lg text-sm">
                     No active contract found. A new contract will be created.
+                  </div>
+                )}
+                {pendingContractChange && (
+                  <div className="mb-4 px-4 py-3 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 rounded-lg text-sm flex items-center gap-2">
+                    <span className="xp-badge xp-badge-warning">
+                      Pending Approval
+                    </span>
+                    A change to this contract was submitted on{" "}
+                    {new Date(
+                      pendingContractChange.requestedAt,
+                    ).toLocaleDateString()}{" "}
+                    and is awaiting authorization. Editing is disabled until
+                    it's reviewed.
                   </div>
                 )}
                 <Section title="Contract" />
@@ -2093,9 +2513,6 @@ const cf = (field: keyof ContractForm) => (e: { target: { value: string } }) =>
                 </div>
               </div>
               <div className="px-8 py-5 border-t border-gray-100 dark:border-gray-700 shrink-0">
-                {contractError && (
-                  <p className="text-error text-sm mb-3">{contractError}</p>
-                )}
                 <div className="flex justify-end gap-3">
                   <Button variant="plain" onClick={() => setEditOpen(false)}>
                     Cancel
@@ -2103,9 +2520,14 @@ const cf = (field: keyof ContractForm) => (e: { target: { value: string } }) =>
                   <Button
                     variant="solid"
                     loading={contractSaving}
+                    disabled={!!pendingContractChange}
                     onClick={handleContractSave}
                   >
-                    {contract ? "Update Contract" : "Create Contract"}
+                    {pendingContractChange
+                      ? "Change Pending"
+                      : contract
+                        ? "Submit Change for Approval"
+                        : "Create Contract"}
                   </Button>
                 </div>
               </div>

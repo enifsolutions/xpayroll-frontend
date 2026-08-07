@@ -36,11 +36,10 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
+import { useAuthStore } from "@/store/authStore";
 
-// Leaflet must be loaded client-side only
 const MapView = dynamic(() => import('@/components/branches/BranchMapView'), { ssr: false });
 
-// ── Types ─────────────────────────────────────────────────────
 interface Branch {
   id: number;
   name: string;
@@ -52,6 +51,9 @@ interface Branch {
   isActive: boolean;
   latitude: number | null;
   longitude: number | null;
+  absentDeductionAfterDays: number | null;
+  lateDeductionPerMinute: number | null;
+  overtimeRateMultiplier: number | null;
 }
 
 interface BranchMetrics {
@@ -71,6 +73,9 @@ interface BranchForm {
   email: string;
   isHeadOffice: boolean;
   isActive: boolean;
+  absentDeductionAfterDays: string;
+  lateDeductionPerMinute: string;
+  overtimeRateMultiplier: string;
 }
 
 const EMPTY_FORM: BranchForm = {
@@ -81,11 +86,13 @@ const EMPTY_FORM: BranchForm = {
   email: "",
   isHeadOffice: false,
   isActive: true,
+  absentDeductionAfterDays: "",
+  lateDeductionPerMinute: "",
+  overtimeRateMultiplier: "",
 };
 
 type Tab = 'table' | 'map' | 'trends';
 
-// ── Nominatim geocode ─────────────────────────────────────────
 async function geocode(query: string): Promise<{ lat: number; lng: number } | null> {
   try {
     const res = await fetch(
@@ -100,10 +107,10 @@ async function geocode(query: string): Promise<{ lat: number; lng: number } | nu
   }
 }
 
-// ── Page ──────────────────────────────────────────────────────
 export default function BranchesPage() {
   useRequirePermission(Permissions.MasterData.Branches.View);
   const canManage = usePermission(Permissions.MasterData.Branches.Manage);
+  const userId = useAuthStore((s) => s.user?.userId);
 
   const initialized = useRef(false);
 
@@ -122,7 +129,6 @@ export default function BranchesPage() {
   >("all");
   const [activeTab, setActiveTab] = useState<Tab>("table");
 
-  // ── Load ──────────────────────────────────────────────────────
   const load = async () => {
     try {
       setLoading(true);
@@ -145,7 +151,6 @@ export default function BranchesPage() {
     load();
   }, []);
 
-  // ── Dialog ────────────────────────────────────────────────────
   const openAdd = () => {
     setEditing(null);
     setForm(EMPTY_FORM);
@@ -163,6 +168,9 @@ export default function BranchesPage() {
       email: b.email ?? "",
       isHeadOffice: b.isHeadOffice,
       isActive: b.isActive,
+      absentDeductionAfterDays: b.absentDeductionAfterDays?.toString() ?? "",
+      lateDeductionPerMinute: b.lateDeductionPerMinute?.toString() ?? "",
+      overtimeRateMultiplier: b.overtimeRateMultiplier?.toString() ?? "",
     });
     setError("");
     setDialogOpen(true);
@@ -176,7 +184,6 @@ export default function BranchesPage() {
     setSaving(true);
     setError("");
 
-    // Geocode from address first, fallback to branch name
     let lat: number | null = null;
     let lng: number | null = null;
     setGeocoding(true);
@@ -201,7 +208,16 @@ export default function BranchesPage() {
         isActive: form.isActive,
         latitude: lat,
         longitude: lng,
-        userId: null,
+        absentDeductionAfterDays: form.absentDeductionAfterDays
+          ? parseInt(form.absentDeductionAfterDays)
+          : null,
+        lateDeductionPerMinute: form.lateDeductionPerMinute
+          ? parseFloat(form.lateDeductionPerMinute)
+          : null,
+        overtimeRateMultiplier: form.overtimeRateMultiplier
+          ? parseFloat(form.overtimeRateMultiplier)
+          : null,
+        userId,
       });
       setDialogOpen(false);
       await load();
@@ -216,7 +232,6 @@ export default function BranchesPage() {
     }
   };
 
-  // ── CSV export ────────────────────────────────────────────────
   const handleExportCSV = () => {
     const headers = [
       "Name",
@@ -252,7 +267,6 @@ export default function BranchesPage() {
     URL.revokeObjectURL(url);
   };
 
-  // ── Derived ───────────────────────────────────────────────────
   const totalBranches = branches.length;
   const activeBranches = branches.filter((b) => b.isActive).length;
   const headOffice = branches.find((b) => b.isHeadOffice);
@@ -282,7 +296,6 @@ export default function BranchesPage() {
     employees: m.employeeCount,
   }));
 
-  // ── Tabs config ───────────────────────────────────────────────
   const tabs: { key: Tab; label: string; Icon: React.ElementType }[] = [
     { key: "table", label: "Branch List", Icon: Building2 },
     { key: "map", label: "Regional Distribution", Icon: MapPin },
@@ -291,7 +304,6 @@ export default function BranchesPage() {
 
   return (
     <div>
-      {/* ── Page header ── */}
       <div className="flex items-start justify-between mb-6">
         <div>
           <h3 className="h3">Branches</h3>
@@ -315,7 +327,6 @@ export default function BranchesPage() {
         </div>
       </div>
 
-      {/* ── Metrics strip ── */}
       <div className="grid grid-cols-3 gap-4 mb-6">
         <div className="card">
           <div className="card-body flex items-center gap-4">
@@ -373,7 +384,6 @@ export default function BranchesPage() {
         </div>
       </div>
 
-      {/* ── Tab bar ── */}
       <div className="flex gap-1 mb-4 border-b border-gray-100 dark:border-gray-700">
         {tabs.map(({ key, label, Icon }) => (
           <button
@@ -391,7 +401,6 @@ export default function BranchesPage() {
         ))}
       </div>
 
-      {/* ── TAB: Branch List ── */}
       {activeTab === "table" && (
         <div className="card">
           <div className="card-body border-b border-gray-100 dark:border-gray-700 pb-4">
@@ -564,7 +573,6 @@ export default function BranchesPage() {
         </div>
       )}
 
-      {/* ── TAB: Regional Distribution (Map) ── */}
       {activeTab === "map" && (
         <div className="card">
           <div className="card-body">
@@ -595,10 +603,8 @@ export default function BranchesPage() {
         </div>
       )}
 
-      {/* ── TAB: Growth Trends ── */}
       {activeTab === "trends" && (
         <div className="space-y-4">
-          {/* Leave remaining */}
           <div className="card">
             <div className="card-body">
               <div className="flex items-center gap-2 mb-1">
@@ -648,7 +654,6 @@ export default function BranchesPage() {
             </div>
           </div>
 
-          {/* Loan outstanding */}
           <div className="card">
             <div className="card-body">
               <div className="flex items-center gap-2 mb-1">
@@ -702,7 +707,6 @@ export default function BranchesPage() {
             </div>
           </div>
 
-          {/* Headcount + active loans side by side */}
           <div className="grid grid-cols-2 gap-4">
             <div className="card">
               <div className="card-body">
@@ -779,11 +783,11 @@ export default function BranchesPage() {
         </div>
       )}
 
-      {/* ── Add / Edit Dialog ── */}
       <Dialog
         isOpen={dialogOpen}
         onClose={() => setDialogOpen(false)}
         onRequestClose={() => setDialogOpen(false)}
+        width={640}
       >
         <h5 className="h5 mb-1">{editing ? "Edit Branch" : "Add Branch"}</h5>
         <p className="text-sm text-gray-500 dark:text-gray-400 mb-5">
@@ -845,6 +849,53 @@ export default function BranchesPage() {
                 value={form.email}
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
               />
+            </div>
+          </div>
+
+          <div>
+            <p className="text-xs font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-3">
+              Deduction Rule Overrides
+            </p>
+            <p className="text-xs text-gray-400 mb-3">
+              Optional. Leave blank to use the Company default (or whichever
+              hierarchy channel is configured in Company Settings).
+            </p>
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <label className="form-label">Absent Deduct After (days)</label>
+                <Input
+                  type="number"
+                  placeholder="Company default"
+                  value={form.absentDeductionAfterDays}
+                  onChange={(e) =>
+                    setForm({ ...form, absentDeductionAfterDays: e.target.value })
+                  }
+                />
+              </div>
+              <div>
+                <label className="form-label">Late Deduct / Minute</label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  placeholder="Company default"
+                  value={form.lateDeductionPerMinute}
+                  onChange={(e) =>
+                    setForm({ ...form, lateDeductionPerMinute: e.target.value })
+                  }
+                />
+              </div>
+              <div>
+                <label className="form-label">OT Rate Multiplier</label>
+                <Input
+                  type="number"
+                  step="0.1"
+                  placeholder="Company default"
+                  value={form.overtimeRateMultiplier}
+                  onChange={(e) =>
+                    setForm({ ...form, overtimeRateMultiplier: e.target.value })
+                  }
+                />
+              </div>
             </div>
           </div>
 

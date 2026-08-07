@@ -10,6 +10,7 @@ import { showSuccess, showError } from '@/lib/toast'
 import api from '@/lib/axios'
 import { usePermission } from '@/hooks/usePermission'
 import { Permissions } from '@/lib/permissions'
+import { useAuthStore } from "@/store/authStore";
 
 interface BankBranch {
   id: string; bankName: string; branchName: string;
@@ -56,6 +57,7 @@ function StatCard({ label, value, sub, icon, color }: {
 }
 
 export default function BankBranchesPage() {
+  const userId = useAuthStore((s) => s.user?.userId);
   useRequirePermission(Permissions.MasterData.BankBranches.View)
   const canManage = usePermission(Permissions.MasterData.BankBranches.Manage)
   const initialized = useRef(false)
@@ -152,15 +154,17 @@ export default function BankBranchesPage() {
     if (!form.branchName.trim()) { setError('Branch name is required.'); return }
     setSaving(true)
     try {
-      await api.post('bank-branches/save', {
-        action: editing ? 'UPDATE' : 'ADD',
+      await api.post("bank-branches/save", {
+        action: editing ? "UPDATE" : "ADD",
         id: editing?.id ?? null,
-        bankName: form.bankName.trim(), branchName: form.branchName.trim(),
+        bankName: form.bankName.trim(),
+        branchName: form.branchName.trim(),
         branchCode: form.branchCode.trim() || null,
         city: form.city.trim() || null,
         swiftCode: form.swiftCode.trim() || null,
-        isActive: form.isActive, userId: 1,
-      })
+        isActive: form.isActive,
+        userId: userId,
+      });
       setDialogOpen(false); await load()
       showSuccess(editing ? 'Branch Updated' : 'Branch Added', `${form.bankName} — ${form.branchName}`)
     } catch (e: any) { setError(e?.response?.data?.message ?? 'Failed to save branch.') }
@@ -171,7 +175,11 @@ export default function BankBranchesPage() {
   const handleDelete = async () => {
     if (!deleteTarget) return; setDeleting(true)
     try {
-      await api.post('bank-branches/save', { action: 'DELETE', id: deleteTarget.id, userId: 1 })
+      await api.post("bank-branches/save", {
+        action: "DELETE",
+        id: deleteTarget.id,
+        userId: userId,
+      });
       setConfirmOpen(false); setDeleteTarget(null); await load()
       showSuccess('Branch Removed', deleteTarget.branchName)
     } catch { showError('Delete Failed', 'Could not remove branch.') }

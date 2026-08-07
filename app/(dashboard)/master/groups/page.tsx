@@ -19,6 +19,7 @@ import { showSuccess, showError } from '@/lib/toast'
 import api from '@/lib/axios'
 import { usePermission } from '@/hooks/usePermission'
 import { Permissions } from '@/lib/permissions'
+import { useAuthStore } from "@/store/authStore";
 
 interface Group {
   id: string; name: string; code: string; description?: string | null;
@@ -104,6 +105,7 @@ function Pagination({ total, page, onChange }: { total: number; page: number; on
 
 // ── Main page ────────────────────────────────────────────────────────────────
 export default function GroupsPage() {
+  const userId = useAuthStore((s) => s.user?.userId);
   useRequirePermission(Permissions.MasterData.Groups.View);
   const canManage = usePermission(Permissions.MasterData.Groups.Manage);
   const initialized = useRef(false);
@@ -234,7 +236,7 @@ export default function GroupsPage() {
         leadId: form.leadId || null,
         departmentId: form.departmentId || null,
         isActive: form.isActive,
-        userId: 1,
+        userId: userId,
       });
       setDialogOpen(false);
       await load();
@@ -257,7 +259,7 @@ export default function GroupsPage() {
       await api.post("groups/save", {
         action: "DELETE",
         id: deleteTarget.id,
-        userId: 1,
+        userId: userId,
       });
       setConfirmOpen(false);
       setDeleteTarget(null);
