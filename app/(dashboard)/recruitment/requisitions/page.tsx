@@ -262,8 +262,11 @@ export default function RequisitionsPage() {
       setDesignations(
         (dg.data ?? []).map((x: any) => ({ id: x.id, name: x.title })),
       );
-    } catch {
-      // lookups are non-fatal — the form still works with them empty
+    } catch (err: any) {
+      showError(
+        "Load failed",
+        err?.response?.data?.error ?? "Fail to load master data.",
+      );
     }
   };
 
@@ -372,8 +375,10 @@ export default function RequisitionsPage() {
         form.title,
       );
     } catch (err: any) {
-      const msg = err?.response?.data?.message ?? err?.response?.data?.error;
-      setError(msg ?? "Could not save requisition.");
+      showError(
+        "Save failed",
+        err?.response?.data?.error ?? "Could not save requisition.",
+      );
     } finally {
       setSaving(false);
     }
@@ -403,9 +408,7 @@ export default function RequisitionsPage() {
     } catch (err: any) {
       showError(
         "Action failed",
-        err?.response?.data?.message ??
-          err?.response?.data?.error ??
-          "Could not complete the action.",
+        err?.response?.data?.error ?? "Could not complete the action.",
       );
     } finally {
       setActing(false);
@@ -446,10 +449,9 @@ export default function RequisitionsPage() {
         approveRow.requisitionCode,
       );
     } catch (err: any) {
-      setApproveError(
-        err?.response?.data?.message ??
-          err?.response?.data?.error ??
-          "Could not record the decision.",
+      showError(
+        "Save failed",
+        err?.response?.data?.error ?? "Could not record the decision.",
       );
     } finally {
       setApproving(false);

@@ -81,7 +81,12 @@ export default function BankBranchesPage() {
     try {
       const res = await api.get<BankBranch[]>('bank-branches')
       setItems(res.data)
-    } catch { showError('Load Failed', 'Could not load bank branches.') }
+    } catch (err:any){ 
+      showError(
+        "Load Failed",
+        err?.response?.data?.error ?? "Could not load bank branches.",
+      );
+    }
     finally { setLoading(false) }
   }
 
@@ -167,7 +172,7 @@ export default function BankBranchesPage() {
       });
       setDialogOpen(false); await load()
       showSuccess(editing ? 'Branch Updated' : 'Branch Added', `${form.bankName} — ${form.branchName}`)
-    } catch (e: any) { setError(e?.response?.data?.message ?? 'Failed to save branch.') }
+    } catch (e: any) { setError(e?.response?.data?.error ?? 'Failed to save branch.') }
     finally { setSaving(false) }
   }
 
@@ -182,7 +187,12 @@ export default function BankBranchesPage() {
       });
       setConfirmOpen(false); setDeleteTarget(null); await load()
       showSuccess('Branch Removed', deleteTarget.branchName)
-    } catch { showError('Delete Failed', 'Could not remove branch.') }
+    } catch (err:any){ 
+      showError(
+        "Delete Failed",
+        err?.response?.data?.error ?? "Could not remove branch.",
+      );
+    }
     finally { setDeleting(false) }
   }
 

@@ -35,8 +35,11 @@ export default function EpfCFormPage() {
     try {
       const res = await api.get(`payroll-reports/${runId}/statutory`);
       setRows(res.data);
-    } catch {
-      showError('Failed to load EPF data.');
+    } catch  (err:any){
+      showError(
+        "Load failed",
+        err?.response?.data?.error ?? "Failed to load EPF data.",
+      );
     } finally {
       setLoading(false);
     }
@@ -55,8 +58,11 @@ export default function EpfCFormPage() {
       a.click();
       URL.revokeObjectURL(url);
       showSuccess('EPF C-Form PDF downloaded.');
-    } catch {
-      showError('Failed to generate PDF.');
+    } catch (err:any){
+      showError(
+        "Generate failed",
+        err?.response?.data?.error ?? "Failed to generate PDF.",
+      );
     } finally {
       setPdfLoading(false);
     }

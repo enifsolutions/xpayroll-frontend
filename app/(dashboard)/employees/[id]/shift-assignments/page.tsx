@@ -19,6 +19,7 @@ import {
   PolicyOption,
   defaultForm,
 } from './shift-assignments.types'
+import { getErrorMessage } from "@/lib/apiError";
 
 export default function ShiftAssignmentsPage() {
   useRequirePermission('HR.Employee.View');
@@ -55,8 +56,11 @@ export default function ShiftAssignmentsPage() {
       setAssignments(aRes.data)
       setShifts(sRes.data)
       setPolicies(pRes.data)
-    } catch {
-      showError('Load Failed', 'Could not load shift assignments.')
+    } catch (err) {
+      showError(
+          "Load Failed",
+          getErrorMessage(err, "Could not load shift assignments."),
+        );
     } finally {
       setLoading(false)
     }
@@ -122,8 +126,10 @@ export default function ShiftAssignmentsPage() {
         editing ? 'Shift assignment has been updated.' : 'Shift assignment has been created.'
       )
     } catch (e: unknown) {
-      const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.error
-      showError('Save Failed', msg ?? 'Could not save shift assignment.')
+      showError(
+        "Save Failed",
+        getErrorMessage(e, "Could not save shift assignment."),
+      );
     } finally {
       setSaving(false)
     }
@@ -147,8 +153,11 @@ export default function ShiftAssignmentsPage() {
       setDeleteTarget(null)
       await load()
       showSuccess('Assignment Removed', `${deleteTarget.shiftName} assignment has been removed.`)
-    } catch {
-      showError('Delete Failed', 'Could not remove shift assignment.')
+    } catch (err){
+      showError(
+          "Delete Failed",
+          getErrorMessage(err, "Could not remove shift assignment."),
+        );
     } finally {
       setDeleting(false)
     }

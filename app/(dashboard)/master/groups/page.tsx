@@ -141,8 +141,11 @@ export default function GroupsPage() {
       setItems(grpRes.data);
       setDepartments(deptRes.data.filter((d: any) => d.isActive));
       setEmployees(empRes.data);
-    } catch {
-      showError("Load Failed", "Could not load groups.");
+    } catch (err:any) {
+      showError(
+        "Load failed",
+        err?.response?.data?.error ?? "Could not load groups.",
+      );
     } finally {
       setLoading(false);
     }
@@ -242,7 +245,10 @@ export default function GroupsPage() {
       await load();
       showSuccess(editing ? "Group Updated" : "Group Added", form.name);
     } catch (e: any) {
-      setError(e?.response?.data?.message ?? "Failed to save group.");
+      showError(
+        "Save failed",
+        e?.response?.data?.error ?? "Failed to save group.",
+      );
     } finally {
       setSaving(false);
     }
@@ -265,8 +271,11 @@ export default function GroupsPage() {
       setDeleteTarget(null);
       await load();
       showSuccess("Group Removed", deleteTarget.name);
-    } catch {
-      showError("Delete Failed", "Could not remove group.");
+    } catch (e:any){
+      showError(
+        "Delete Failed",
+        e?.response?.data?.error ?? "Could not remove group.",
+      );
     } finally {
       setDeleting(false);
     }

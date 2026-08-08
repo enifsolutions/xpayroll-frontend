@@ -77,8 +77,11 @@ export default function InterviewsPage() {
         (r: ApplicationSearchResult) => !TERMINAL_STAGES.includes(r.stage),
       );
       setResults(filtered);
-    } catch {
-      showError("Search failed", "Could not search applications.");
+    } catch (err:any) {
+      showError(
+        "Search failed",
+        err?.response?.data?.error ?? "Could not search applications.",
+      );
     } finally {
       setSearching(false);
     }

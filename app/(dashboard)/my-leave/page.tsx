@@ -71,8 +71,11 @@ export default function MyLeavePage() {
       if (empFilter) params.employeeId = empFilter;
       const res = await api.get("/leave-requests", { params });
       setItems(res.data.map((r: LeaveRequest) => ({ ...r, id: String(r.id) })));
-    } catch {
-      showError("Load Failed", "Could not load leave requests.");
+    } catch (err:any) {
+      showError(
+        "Load Failed",
+        err?.response?.data?.error ?? "Could not load leave requests.",
+      );
     } finally {
       setLoading(false);
     }
@@ -99,8 +102,11 @@ export default function MyLeavePage() {
           employeeCode: e.employeeCode,
         })),
       );
-    } catch {
-      showError("Load Failed", "Could not load master data.");
+    } catch (err: any) {
+      showError(
+        "Load Failed",
+        err?.response?.data?.error ?? "Could not load master data.",
+      );
     }
   }
 
@@ -202,7 +208,7 @@ export default function MyLeavePage() {
       setCancelDialog(false);
       load();
     } catch (err: any) {
-      showError("Error", err?.response?.data?.error ?? "Could not cancel.");
+      showError("Failed", err?.response?.data?.error ?? "Could not cancel.");
     } finally {
       setCancelling(false);
     }

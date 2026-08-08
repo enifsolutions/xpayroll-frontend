@@ -138,8 +138,11 @@ export default function BranchesPage() {
       ]);
       setBranches(b);
       setMetrics(m);
-    } catch {
-      showError("Failed to load", "Could not load branches.");
+    } catch (err:any){
+      showError(
+        "Failed to load",
+        err?.response?.data?.error ?? "Could not load branches.",
+      );
     } finally {
       setLoading(false);
     }
@@ -225,8 +228,11 @@ export default function BranchesPage() {
         editing ? "Branch updated" : "Branch created",
         form.name.trim(),
       );
-    } catch {
-      showError("Failed to save", "Could not save branch. Please try again.");
+    } catch (err:any){
+      showError(
+        "Failed to save",
+        err?.response?.data?.error ?? "Could not save branch.",
+      );
     } finally {
       setSaving(false);
     }

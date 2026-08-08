@@ -18,6 +18,7 @@ import Dialog from "@/components/ui/Dialog";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
+import { getErrorMessage } from "@/lib/apiError";
 
 const STATUSES = ["Pending", "Approved", "Rejected"];
 
@@ -168,8 +169,8 @@ export default function ContractApprovalsPage() {
         params,
       });
       setItems(res.data);
-    } catch {
-      showError("Failed to load", "Could not fetch contract change requests.");
+    } catch (err){
+      showError("Failed to load", getErrorMessage(err, "Could not fetch contract change requests."));
     } finally {
       setLoading(false);
     }

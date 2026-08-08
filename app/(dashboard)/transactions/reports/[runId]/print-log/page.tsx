@@ -35,8 +35,11 @@ export default function PrintLogPage() {
     try {
       const res = await api.get(`payroll-reports/${runId}/print-log`);
       setRows(res.data);
-    } catch {
-      showError('Failed to load print log.');
+    } catch (err:any){
+      showError(
+        "Load failed",
+        err?.response?.data?.error ?? "Failed to load print log.",
+      );
     } finally {
       setLoading(false);
     }
@@ -55,8 +58,11 @@ export default function PrintLogPage() {
       a.click();
       URL.revokeObjectURL(url);
       showSuccess('PDF downloaded.');
-    } catch {
-      showError('Failed to generate PDF.');
+    } catch (err:any){
+      showError(
+        "Generate failed",
+        err?.response?.data?.error ?? "Failed to generate PDF.",
+      );
     } finally {
       setPdfLoading(false);
     }

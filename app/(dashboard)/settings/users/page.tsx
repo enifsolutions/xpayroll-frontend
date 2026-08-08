@@ -132,8 +132,11 @@ export default function UsersPage() {
           email: e.email,
         })),
       );
-    } catch {
-      showError("Load Failed", "Could not load users.");
+    } catch (err:any){
+      showError(
+        "Load Failed",
+        err?.response?.data?.error ?? "Could not load users.",
+      );
     } finally {
       setLoading(false);
     }
@@ -244,7 +247,7 @@ export default function UsersPage() {
     } catch (e: any) {
       showError(
         "Save Failed",
-        e?.response?.data?.message ?? "Could not save user.",
+        e?.response?.data?.error ?? "Could not save user.",
       );
     }
   };
@@ -273,8 +276,11 @@ export default function UsersPage() {
         "User Deleted",
         `${deleteTarget.firstName} ${deleteTarget.lastName} removed.`,
       );
-    } catch {
-      showError("Delete Failed", "Could not delete user.");
+    } catch (err: any) {
+      showError(
+        "Delete Failed",
+        err?.response?.data?.error ?? "Could not delete user.",
+      );
     }
   };
 
@@ -300,8 +306,11 @@ export default function UsersPage() {
         "Password Reset",
         `A temporary password has been sent to ${resetTarget.email}.`,
       );
-    } catch {
-      showError("Reset Failed", "Could not reset password.");
+    } catch (err: any) {
+      showError(
+        "Reset Failed",
+        err?.response?.data?.error ?? "Could not reset password.",
+      );
     }
   };
 

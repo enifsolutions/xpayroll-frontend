@@ -285,8 +285,8 @@ export default function AttendanceLogsPage() {
       if (f.status) params.status = f.status;
       const res = await api.get("/attendance-logs", { params });
       setItems(res.data);
-    } catch {
-      showError("Failed to load", "Could not fetch attendance logs.");
+    } catch (err:any){
+      showError("Load failed", err?.response?.data?.error ?? "Could not fetch attendance logs.");
     } finally {
       setLoading(false);
     }
@@ -299,8 +299,8 @@ export default function AttendanceLogsPage() {
         params: { limit: 10 },
       });
       setGenLogs(res.data);
-    } catch {
-      showError("Failed to load", "Could not fetch generation logs.");
+    } catch (err:any) {
+      showError("Load failed", err?.response?.data?.error ?? "Could not fetch generation logs.");
     } finally {
       setGenLoading(false);
     }
@@ -325,8 +325,8 @@ export default function AttendanceLogsPage() {
           }),
         ),
       );
-    } catch {
-      showError("Failed to load employees", "Could not fetch employee list.");
+    } catch (err:any){
+      showError("Load failed", err?.response?.data?.error ?? "Could not fetch employee list.");
     } finally {
       setEmpLoading(false);
     }
@@ -633,8 +633,8 @@ export default function AttendanceLogsPage() {
       });
       await load();
       showSuccess("Deleted", "Attendance log deleted.");
-    } catch {
-      showError("Delete failed", "Could not delete attendance log.");
+    } catch (err:any) {
+      showError("Delete failed", err?.response?.data?.error ?? "Could not delete attendance log.");
     } finally {
       setDeleting(null);
     }

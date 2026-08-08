@@ -2,6 +2,7 @@
 import { useState } from "react";
 import ReportPage, { ReportColumn } from "@/components/reports/ReportPage";
 import { Permissions } from "@/lib/permissions";
+import { useRequirePermission } from "@/hooks/useRequirePermission";
 
 const columns: ReportColumn[] = [
   { header: "Stage", field: "stage" },
@@ -11,6 +12,8 @@ const columns: ReportColumn[] = [
 ];
 
 export default function RecruitmentFunnelReportPage() {
+  useRequirePermission(Permissions.Recruitment.Reports.Funnel.View);
+
   const [requisitionId, setRequisitionId] = useState("");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");

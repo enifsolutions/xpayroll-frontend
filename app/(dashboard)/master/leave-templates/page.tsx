@@ -141,8 +141,11 @@ export default function LeaveTemplatesPage() {
       setTemplates(tRes.data);
       // Ensure all IDs are strings for consistent comparison
       setLeaveTypes(ltRes.data.map((lt) => ({ ...lt, id: String(lt.id) })));
-    } catch {
-      showError("Failed to load leave templates.");
+    } catch (err:any){
+      showError(
+        "Load failed",
+        err?.response?.data?.error ?? "Failed to load leave templates.",
+      );
     } finally {
       setLoading(false);
     }
@@ -286,7 +289,10 @@ export default function LeaveTemplatesPage() {
       setDialogOpen(false);
       load();
     } catch (err: any) {
-      showError(err?.response?.data?.message ?? "Failed to save template.");
+      showError(
+        "Failed to save",
+        err?.response?.data?.error ?? "Failed to save template.",
+      );
     } finally {
       setSaving(false);
     }
@@ -311,7 +317,10 @@ export default function LeaveTemplatesPage() {
       setDeleteTarget(null);
       load();
     } catch (err: any) {
-      showError(err?.response?.data?.message ?? "Failed to delete template.");
+      showError(
+        "Delete failed",
+        err?.response?.data?.error ?? "Failed to delete template.",
+      );
     } finally {
       setDeleting(false);
     }

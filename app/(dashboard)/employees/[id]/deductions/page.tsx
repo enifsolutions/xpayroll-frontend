@@ -15,6 +15,7 @@ import { Permissions } from "@/lib/permissions";
 import {
   EmployeeDeduction, DeductionTypeOption, DeductionForm, defaultForm,
 } from './deductions.types'
+import { getErrorMessage } from "@/lib/apiError";
 
 const fmt = (iso: string | null) =>
   iso ? new Date(iso).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'
@@ -60,8 +61,11 @@ export default function DeductionsPage() {
       ]);
       setDeductions(dRes.data)
       setDeductionTypes(dtRes.data)
-    } catch {
-      showError('Load Failed', 'Could not load deductions.')
+    } catch (err){
+      showError(
+        "Load Failed",
+        getErrorMessage(err, "Could not load deductions."),
+      );
     } finally {
       setLoading(false)
     }
@@ -124,8 +128,7 @@ export default function DeductionsPage() {
         editing ? 'Employee deduction has been updated.' : 'Employee deduction has been added.'
       )
     } catch (e: unknown) {
-      const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.error
-      showError('Save Failed', msg ?? 'Could not save deduction.')
+      showError("Save Failed", getErrorMessage(e, "Could not save deduction."));
     } finally {
       setSaving(false)
     }
@@ -141,8 +144,11 @@ export default function DeductionsPage() {
       setConfirmOpen(false); setDeleteTarget(null)
       await load()
       showSuccess('Deduction Removed', `${deleteTarget.deductionName} has been removed.`)
-    } catch {
-      showError('Delete Failed', 'Could not remove deduction.')
+    } catch (err){
+      showError(
+        "Delete Failed",
+        getErrorMessage(err, "Could not remove deduction."),
+      );
     } finally {
       setDeleting(false)
     }

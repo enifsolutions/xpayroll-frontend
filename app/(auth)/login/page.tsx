@@ -387,8 +387,10 @@ export default function LoginPage() {
       );
       router.push(data.isTempPassword ? "/change-password" : "/dashboard");
     } catch (err) {
-      console.error("LOGIN ERROR:", err);
-      setError(err instanceof Error ? err.message : String(err));
+      const axiosErr = err as import("axios").AxiosError<{ error?: string }>;
+      setError(
+        axiosErr.response?.data?.error ?? "Login failed. Please try again.",
+      );
     } finally {
       setLoading(false);
     }

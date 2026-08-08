@@ -212,8 +212,8 @@ export default function LeaveRequestsPage() {
         approvedCount: approved,
         approvedLabel: `${approved} Approved`,
       });
-    } catch {
-      showError("Load Failed", "Could not load leave requests.");
+    } catch (err:any){
+      showError("Load failed", err?.response?.data?.error ?? "Could not load leave requests.");
     } finally {
       setLoading(false);
     }

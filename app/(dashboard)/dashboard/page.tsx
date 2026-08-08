@@ -18,6 +18,7 @@ import {
     ArrowUpRight, Bell, Maximize2, Minimize2,
     Square, Cake, Star, Building2, GitBranch,
 } from 'lucide-react'
+import { getErrorMessage } from "@/lib/apiError";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface DashboardSummary {
@@ -741,7 +742,9 @@ export default function DashboardPage() {
             setExpiries(ex.data); setCalEvents(cal.data)
             setDeptHc(dh.data); setBranchHc(bh.data)
             setBirthdays(bd.data); setAnniversaries(an.data)
-        } catch { showError('Failed to load dashboard') }
+        } catch (err){ 
+            showError('Failed to load dashboard', getErrorMessage(err, "Failed to load dashboard.")) 
+        }
         finally  { setLoading(false) }
     }, [calYear, calMonth])
 
@@ -750,7 +753,17 @@ export default function DashboardPage() {
 
     const navigateCal = useCallback(async (year:number, month:number) => {
         setCalYear(year); setCalMonth(month)
-        try { const res=await axios.get(`/dashboard/calendar-events?year=${year}&month=${month}`); setCalEvents(res.data) } catch {}
+        try {
+          const res = await axios.get(
+            `/dashboard/calendar-events?year=${year}&month=${month}`,
+          );
+          setCalEvents(res.data);
+        } catch (err) {
+          showError(
+            "Failed to load calender events",
+            getErrorMessage(err, "Failed to load calendar events."),
+          );
+        }
     },[])
 
     const toggleWidget = (id:WidgetId) => setPrefs(p=>({...p,visible:{...p.visible,[id]:!p.visible[id]}}))

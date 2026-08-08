@@ -80,8 +80,11 @@ export default function CrewsPage() {
       setItems(crewRes.data);
       setDepartments(deptRes.data.filter((d: any) => d.isActive));
       setEmployees(empRes.data);
-    } catch {
-      showError("Load Failed", "Could not load crews.");
+    } catch (err:any){
+      showError(
+        "Load Failed",
+        err?.response?.data?.error ?? "Could not load crews.",
+      );
     } finally {
       setLoading(false);
     }
@@ -209,7 +212,10 @@ export default function CrewsPage() {
       await load();
       showSuccess(editing ? "Crew Updated" : "Crew Added", form.name);
     } catch (e: any) {
-      setError(e?.response?.data?.message ?? "Failed to save crew.");
+      showError(
+        "Save failed",
+        e?.response?.data?.error ?? "Failed to save crew.",
+      );
     } finally {
       setSaving(false);
     }
@@ -232,8 +238,11 @@ export default function CrewsPage() {
       setDeleteTarget(null);
       await load();
       showSuccess("Crew Removed", deleteTarget.name);
-    } catch {
-      showError("Delete Failed", "Could not remove crew.");
+    } catch (err:any){
+      showError(
+        "Delete Failed",
+        err?.response?.data?.error ?? "Could not remove crew.",
+      );
     } finally {
       setDeleting(false);
     }

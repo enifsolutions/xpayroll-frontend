@@ -193,8 +193,11 @@ export default function BiometricBindingsPage() {
       setBindings(bRes.data);
       setDevices(dRes.data);
       setStats(sRes.data);
-    } catch {
-      showError("Load failed", "Could not load biometric bindings.");
+    } catch (err:any){
+      showError(
+        "Load failed",
+        err?.response?.data?.error ?? "Could not load biometric bindings.",
+      );
     } finally {
       setLoading(false);
     }
@@ -217,8 +220,11 @@ export default function BiometricBindingsPage() {
       });
       await load();
       showSuccess("Binding removed", `${b.employeeName} — ${b.deviceName}`);
-    } catch {
-      showError("Delete failed", "Could not remove binding.");
+    } catch (err: any) {
+      showError(
+        "Delete failed",
+        err?.response?.data?.error ?? "Could not remove binding.",
+      );
     }
   };
 

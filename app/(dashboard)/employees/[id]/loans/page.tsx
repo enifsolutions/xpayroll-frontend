@@ -18,6 +18,7 @@ import {
   LOAN_STATUSES, LIABILITY_TYPES,
   defaultLoanForm, defaultLiabilityForm,
 } from './loans.types'
+import { getErrorMessage } from "@/lib/apiError";
 
 const DSR_THRESHOLD = 40  // block new loans above this %
 
@@ -163,8 +164,11 @@ export default function LoansPage() {
       setLoans(lRes.data)
       setLiabilities(elRes.data)
       setDsr(dsrRes.data)
-    } catch {
-      showError('Load Failed', 'Could not load loan data.')
+    } catch (err){
+      showError(
+                "Load Failed",
+                getErrorMessage(err, "Could not load loan data."),
+              );
     } finally {
       setLoading(false)
     }
@@ -237,8 +241,7 @@ export default function LoansPage() {
       await load()
       showSuccess(editingLoan ? 'Loan Updated' : 'Loan Added', 'Loan record saved.')
     } catch (e: unknown) {
-      const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error
-      showError('Save Failed', msg ?? 'Could not save loan.')
+      showError("Save Failed", getErrorMessage(e, "Could not save loan."));
     } finally {
       setLoanSaving(false)
     }
@@ -292,8 +295,7 @@ export default function LoansPage() {
       await load()
       showSuccess(editingLiab ? 'Liability Updated' : 'Liability Added', 'External liability saved.')
     } catch (e: unknown) {
-      const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error
-      showError('Save Failed', msg ?? 'Could not save liability.')
+      showError("Save Failed", getErrorMessage(e, "Could not save liability."));
     } finally {
       setLiabSaving(false)
     }
@@ -313,8 +315,11 @@ export default function LoansPage() {
       setConfirmOpen(false); setDeleteTarget(null)
       await load()
       showSuccess('Removed', `${deleteTarget.label} has been removed.`)
-    } catch {
-      showError('Delete Failed', 'Could not remove record.')
+    } catch (err){
+      showError(
+                "Delete Failed",
+                getErrorMessage(err, "Could not remove record."),
+              );
     } finally {
       setDeleting(false)
     }

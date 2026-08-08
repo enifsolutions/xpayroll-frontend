@@ -134,8 +134,11 @@ export default function ScorecardTemplatesPage() {
         designationId: String(t.designationId),
       }));
       setTemplates(data);
-    } catch (err) {
-      showError("Error", "Failed to load scorecard templates");
+    } catch (err:any) {
+      showError(
+        "Load failed",
+        err?.response?.data?.error ?? "Failed to load scorecard templates.",
+      );
     } finally {
       setLoading(false);
     }
@@ -149,8 +152,11 @@ export default function ScorecardTemplatesPage() {
         id: String(d.id),
       }));
       setDesignations(data);
-    } catch (err) {
-      showError("Error", "Failed to load designations");
+    } catch (err: any) {
+      showError(
+        "Load failed",
+        err?.response?.data?.error ?? "Failed to load designations.",
+      );
     }
   };
 
@@ -270,7 +276,10 @@ export default function ScorecardTemplatesPage() {
         `"${t.name}" is now the default for ${t.designationTitle}`,
       );
     } catch (err: any) {
-      showError("Error", err?.response?.data?.error || "Failed to set default");
+      showError(
+        "Save failed",
+        err?.response?.data?.error || "Failed to set default",
+      );
     }
   };
 
@@ -300,7 +309,7 @@ export default function ScorecardTemplatesPage() {
       showSuccess("Success", `"${t.name}" activated`);
     } catch (err: any) {
       showError(
-        "Error",
+        "Action failed",
         err?.response?.data?.error || "Failed to activate template",
       );
     }
@@ -337,7 +346,7 @@ export default function ScorecardTemplatesPage() {
           : "Template deactivated",
       );
     } catch (err: any) {
-      showError("Error", err?.response?.data?.error || "Action failed");
+      showError("Action failed", err?.response?.data?.error || "Action failed");
     } finally {
       setConfirmLoading(false);
     }

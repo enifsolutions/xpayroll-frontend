@@ -24,6 +24,7 @@ import {
 import { useRequirePermission } from "@/hooks/useRequirePermission";
 import { usePermission } from "@/hooks/usePermission";
 import { Permissions } from "@/lib/permissions";
+import { getErrorMessage } from "@/lib/apiError";
 
 interface StatutoryRate {
   id: string;
@@ -195,7 +196,7 @@ export default function StatutoryRatesPage() {
     } catch (err: any) {
       showError(
         "Load failed",
-        err?.response?.data?.error ?? "Could not load statutory rates.",
+        getErrorMessage(err, "Could not load statutory rates."),
       );
     } finally {
       setLoading(false);

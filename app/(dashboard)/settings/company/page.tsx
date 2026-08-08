@@ -226,8 +226,11 @@ export default function CompanySettingsPage() {
         createdAt: d.createdAt ?? "",
         updatedAt: d.updatedAt ?? null,
       });
-    } catch {
-      showError("Failed to load company settings.");
+    } catch (err:any){
+      showError(
+        "Load Failed",
+        err?.response?.data?.error ?? "Failed to load company settings.",
+      );
     } finally {
       setLoading(false);
     }
@@ -359,7 +362,10 @@ export default function CompanySettingsPage() {
       showSuccess("Settings saved successfully.");
       await fetchSettings();
     } catch (err: any) {
-      showError(err?.response?.data?.error ?? "Failed to save settings.");
+      showError(
+        "Save failed",
+        err?.response?.data?.error ?? "Failed to save settings.",
+      );
     } finally {
       setSaving(false);
     }

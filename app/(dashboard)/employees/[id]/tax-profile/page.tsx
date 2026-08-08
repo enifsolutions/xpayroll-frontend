@@ -17,6 +17,7 @@ import {
   TaxConfigOption, TaxProfileForm, ExemptionForm,
   RESIDENCY_STATUSES, defaultProfileForm, defaultExemptionForm,
 } from './tax-profile.types'
+import { getErrorMessage } from "@/lib/apiError";
 
 const CURRENT_YEAR = new Date().getFullYear()
 const fmt = (n: number) => n.toLocaleString('en-LK', { minimumFractionDigits: 2 })
@@ -65,8 +66,11 @@ export default function TaxProfilePage() {
       setProfiles(pRes.data)
       setExemptions(eRes.data)
       setTaxConfigs(tcRes.data)
-    } catch {
-      showError('Load Failed', 'Could not load tax profile.')
+    } catch (err){
+      showError(
+              "Load Failed",
+              getErrorMessage(err, "Could not load tax profile."),
+            );
     } finally {
       setLoading(false)
     }
@@ -119,8 +123,10 @@ export default function TaxProfilePage() {
       await load()
       showSuccess(editingProfile ? 'Profile Updated' : 'Profile Added', 'Tax profile saved.')
     } catch (e: unknown) {
-      const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error
-      showError('Save Failed', msg ?? 'Could not save tax profile.')
+      showError(
+        "Save Failed",
+        getErrorMessage(e, "Could not save tax profile."),
+      );
     } finally {
       setProfileSaving(false)
     }
@@ -164,8 +170,7 @@ export default function TaxProfilePage() {
       await load()
       showSuccess(editingExemption ? 'Exemption Updated' : 'Exemption Added', 'Tax exemption saved.')
     } catch (e: unknown) {
-      const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error
-      showError('Save Failed', msg ?? 'Could not save exemption.')
+      showError("Save Failed", getErrorMessage(e, "Could not save exemption."));
     } finally {
       setExemptionSaving(false)
     }
@@ -187,8 +192,11 @@ export default function TaxProfilePage() {
       setConfirmOpen(false); setDeleteTarget(null)
       await load()
       showSuccess('Removed', `${deleteTarget.name} has been removed.`)
-    } catch {
-      showError('Delete Failed', 'Could not remove record.')
+    } catch (err){
+      showError(
+          "Delete Failed",
+          getErrorMessage(err, "Could not remove record."),
+        );
     } finally {
       setDeleting(false)
     }

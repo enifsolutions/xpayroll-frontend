@@ -189,12 +189,7 @@ export default function RequisitionDetailPage() {
       setReqs(rr.data);
       if (msg) showSuccess(msg);
     } catch (e: any) {
-      showError(
-        "Failed",
-        e?.response?.data?.message ??
-          e?.response?.data?.error ??
-          "Action failed.",
-      );
+      showError("Action failed", e?.response?.data?.error ?? "Action failed.");
     }
   };
 

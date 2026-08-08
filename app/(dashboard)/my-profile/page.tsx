@@ -83,15 +83,15 @@ function MyProfileInner() {
       setTwoFa(res.data.twoFactorEnabled ?? false)
     } catch {
       // fallback to JWT store while API is being wired
-      if (user?.fullName) {
+      if (user?.firstName) {
         setProfile({
-          userId:           user.userId,
-          fullName:         user.fullName,
-          email:            user.email,
-          roleName:         user.roleName  ?? 'User',
-          systemRole:       user.systemRole ?? 'User',
+          userId: user.userId,
+          fullName: user.firstName + " " + user.lastName,
+          email: user.email,
+          roleName: user.systemRole ?? "User",
+          systemRole: user.systemRole ?? "User",
           twoFactorEnabled: false,
-        })
+        });
       }
     } finally {
       setLoading(false)
@@ -111,7 +111,10 @@ function MyProfileInner() {
       showSuccess('Password updated successfully.')
       setCurrentPwd(''); setNewPwd(''); setConfirmPwd('')
     } catch (e: any) {
-      showError(e?.response?.data?.message ?? 'Failed to update password.')
+      showError(
+        "Update failed",
+        e?.response?.data?.error ?? "Failed to update password.",
+      );
     } finally {
       setPwdLoading(false)
     }
@@ -128,8 +131,8 @@ function MyProfileInner() {
       const res = await api.post('/users/profile-picture', fd)
       setProfile((p) => p ? { ...p, profilePicture: res.data.url } : p)
       showSuccess('Profile picture updated.')
-    } catch {
-      showError('Failed to upload picture.')
+    } catch (err:any) {
+      showError("Update failed", err?.response?.data?.error ?? 'Failed to upload picture.')
     } finally {
       setUploading(false)
       e.target.value = ''

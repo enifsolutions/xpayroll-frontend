@@ -536,8 +536,10 @@ function JobPostingsPageInner() {
       await load();
       showSuccess(editing ? "Posting updated" : "Posting created", form.title);
     } catch (err: any) {
-      const msg = err?.response?.data?.message ?? err?.response?.data?.error;
-      setError(msg ?? "Could not save job posting.");
+      showError(
+        "Save failed",
+        err?.response?.data?.error ?? "Could not save job posting.",
+      );
     } finally {
       setSaving(false);
     }
@@ -567,9 +569,7 @@ function JobPostingsPageInner() {
     } catch (err: any) {
       showError(
         "Action failed",
-        err?.response?.data?.message ??
-          err?.response?.data?.error ??
-          "Could not complete the action.",
+        err?.response?.data?.error ?? "Could not complete the action.",
       );
     } finally {
       setActing(false);

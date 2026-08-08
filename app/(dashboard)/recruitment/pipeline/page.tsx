@@ -181,10 +181,13 @@ function PipelineBoard() {
 
   const loadRequisitions = useCallback(async () => {
     try {
-      const { data } = await api.get<RequisitionDto[]>('/requisitions');
+      const { data } = await api.get<RequisitionDto[]>("/requisitions");
       setRequisitions(data);
-    } catch {
-      showError('Load failed', 'Could not load requisitions.');
+    } catch (err: any) {
+      showError(
+        "Load failed",
+        err?.response?.data?.error ?? "Could not load requisitions.",
+      );
     }
   }, []);
 
@@ -195,8 +198,11 @@ function PipelineBoard() {
         params: reqId ? { requisitionId: reqId } : undefined,
       });
       setApplications(data);
-    } catch {
-      showError('Load failed', 'Could not load applications.');
+    } catch (err:any){
+      showError(
+        "Load failed",
+        err?.response?.data?.error ?? "Could not load applications.",
+      );
     } finally {
       setLoading(false);
     }
@@ -283,7 +289,10 @@ function PipelineBoard() {
       showSuccess('Stage updated', `${app.candidateName} moved to ${STAGE_LABELS[toStage]}.`);
     } catch (err: any) {
       setApplications(prev);
-      showError('Move failed', err?.response?.data?.message || 'Could not update the stage.');
+      showError(
+        "Move failed",
+        err?.response?.data?.error ?? "Could not update the stage.",
+      );
     }
   };
 
@@ -295,8 +304,11 @@ function PipelineBoard() {
     try {
       const { data } = await api.get<StageHistoryDto[]>(`/applications/${app.id}/history`);
       setHistoryItems(data);
-    } catch {
-      showError('Load failed', 'Could not load stage history.');
+    } catch (err:any) {
+      showError(
+        "Load failed",
+        err?.response?.data?.error ?? "Could not load stage history.",
+      );
     } finally {
       setHistoryLoading(false);
     }
@@ -325,7 +337,10 @@ function PipelineBoard() {
       setRejectReason('');
       refresh();
     } catch (err: any) {
-      showError('Action failed', err?.response?.data?.message || 'Could not complete this action.');
+      showError(
+        "Action failed",
+        err?.response?.data?.error ?? "Could not complete this action.",
+      );
     } finally {
       setRejectSaving(false);
     }
@@ -360,7 +375,10 @@ function PipelineBoard() {
       );
       refresh();
     } catch (err: any) {
-      showError('Scoring failed', err?.response?.data?.message || 'Could not score the shortlist.');
+      showError(
+        "Scoring failed",
+        err?.response?.data?.error ?? "Could not score the shortlist.",
+      );
     } finally {
       setScoringShortlist(false);
     }
@@ -752,8 +770,11 @@ function AddToPipelineDialog({
         params: { search: q || undefined, isBlacklisted: false },
       });
       setCandidates(data);
-    } catch {
-      showError('Load failed', 'Could not load candidates.');
+    } catch (err:any){
+      showError(
+        "Load failed",
+        err?.response?.data?.error ?? "Could not load candidates.",
+      );
     } finally {
       setLoading(false);
     }
@@ -799,10 +820,10 @@ function AddToPipelineDialog({
       showSuccess('Added to pipeline', "The candidate has been added to this requisition's pipeline.");
       onSaved();
     } catch (err: any) {
-      const msg = err?.response?.status === 409
-        ? 'This candidate has already applied to this requisition.'
-        : err?.response?.data?.message || 'Could not add candidate to pipeline.';
-      showError('Add failed', msg);
+      showError(
+        "Add failed",
+        err?.response?.data?.error ?? "Could not add candidate to pipeline.",
+      );
     } finally {
       setSaving(false);
     }

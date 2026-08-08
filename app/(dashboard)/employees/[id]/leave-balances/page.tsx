@@ -14,6 +14,7 @@ import { Permissions } from "@/lib/permissions";
 import {
   EmployeeLeaveBalance, LeaveTypeOption, LeaveBalanceForm, defaultForm,
 } from './leave-balances.types'
+import { getErrorMessage } from "@/lib/apiError";
 
 const CURRENT_YEAR = new Date().getFullYear()
 
@@ -69,8 +70,11 @@ export default function LeaveBalancesPage() {
       ]);
       setBalances(bRes.data)
       setLeaveTypes(ltRes.data)
-    } catch {
-      showError('Load Failed', 'Could not load leave balances.')
+    } catch (err){
+      showError(
+        "Load Failed",
+        getErrorMessage(err, "Could not load leave balances."),
+      );
     } finally {
       setLoading(false)
     }
@@ -139,8 +143,10 @@ export default function LeaveBalancesPage() {
         editing ? 'Leave balance has been updated.' : 'Leave balance has been added.'
       )
     } catch (e: unknown) {
-      const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error
-      showError('Save Failed', msg ?? 'Could not save leave balance.')
+      showError(
+        "Save Failed",
+        getErrorMessage(e, "Could not save leave balance."),
+      );
     } finally {
       setSaving(false)
     }
@@ -156,8 +162,11 @@ export default function LeaveBalancesPage() {
       setConfirmOpen(false); setDeleteTarget(null)
       await load()
       showSuccess('Balance Removed', `${deleteTarget.leaveTypeName} balance has been removed.`)
-    } catch {
-      showError('Delete Failed', 'Could not remove leave balance.')
+    } catch (err){
+      showError(
+        "Delete Failed",
+        getErrorMessage(err, "Could not remove leave balance."),
+      );
     } finally {
       setDeleting(false)
     }

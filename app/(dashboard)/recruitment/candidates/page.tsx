@@ -387,7 +387,7 @@ function CandidatesPageInner() {
     } catch (err: any) {
       showError(
         "Upload failed",
-        err?.response?.data?.message ?? "Could not upload the CV file.",
+        err?.response?.data?.error ?? "Could not upload the CV file.",
       );
     } finally {
       setUploading(false);
@@ -443,7 +443,7 @@ function CandidatesPageInner() {
     } catch (err: any) {
       showError(
         "Parse failed",
-        err?.response?.data?.message ??
+        err?.response?.data?.error ??
           "Could not parse the CV. You can still fill the form in manually.",
       );
     } finally {
@@ -529,7 +529,7 @@ function CandidatesPageInner() {
         } catch (linkErr: any) {
           showError(
             "CV parse not linked",
-            linkErr?.response?.data?.message ??
+            linkErr?.response?.data?.error ??
               "The candidate was saved, but the parsed CV data could not be linked. You can re-run parsing from Edit.",
           );
         }
@@ -556,13 +556,16 @@ function CandidatesPageInner() {
               lastName: "(details not loaded)",
             } as Candidate),
         );
-        setError(
-          err.response.data.message ??
+        showError(
+          "Duplicate NIC",
+          err?.response?.data?.error ??
             "A candidate with this NIC already exists.",
         );
       } else {
-        const msg = err?.response?.data?.message ?? err?.response?.data?.error;
-        setError(msg ?? "Could not save candidate.");
+        showError(
+          "Save failed",
+          err?.response?.data?.error ?? "Could not save candidate.",
+        );
       }
     } finally {
       setSaving(false);
@@ -619,9 +622,7 @@ function CandidatesPageInner() {
     } catch (err: any) {
       showError(
         "Action failed",
-        err?.response?.data?.message ??
-          err?.response?.data?.error ??
-          "Could not complete the action.",
+        err?.response?.data?.error ?? "Could not complete the action.",
       );
     } finally {
       setActing(false);

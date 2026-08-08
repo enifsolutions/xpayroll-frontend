@@ -31,27 +31,44 @@ export default function RolesManagementPage() {
 
   const loadRoles = async () => {
     try {
-      const res = await api.get('/roles');
+      const res = await api.get("/roles");
       setRoles(res.data.map((r: any) => ({ ...r, id: String(r.id) })));
-    } catch { showError('Load Failed', 'Could not load roles.'); }
+    } catch (err: any) {
+      showError(
+        "Load Failed",
+        err?.response?.data?.error ?? "Could not load roles.",
+      );
+    }
   };
 
   const loadPermissions = async () => {
     try {
-      const res = await api.get('/roles/permissions');
+      const res = await api.get("/roles/permissions");
       setPermissions(res.data.map((p: any) => ({ ...p, id: String(p.id) })));
-    } catch { showError('Load Failed', 'Could not load permissions.'); }
+    } catch (err: any) {
+      showError(
+        "Load Failed",
+        err?.response?.data?.error ?? "Could not load permissions.",
+      );
+    }
   };
 
   const loadUsers = async () => {
     try {
-      const res = await api.get('/roles/users');
-      setUsers(res.data.map((u: any) => ({
-        ...u,
-        id:     String(u.id),
-        roleId: u.roleId ? String(u.roleId) : null,
-      })));
-    } catch { showError('Load Failed', 'Could not load users.'); }
+      const res = await api.get("/roles/users");
+      setUsers(
+        res.data.map((u: any) => ({
+          ...u,
+          id: String(u.id),
+          roleId: u.roleId ? String(u.roleId) : null,
+        })),
+      );
+    } catch (err: any) {
+      showError(
+        "Load Failed",
+        err?.response?.data?.error ?? "Could not load users.",
+      );
+    }
   };
 
   const loadAll = async () => {

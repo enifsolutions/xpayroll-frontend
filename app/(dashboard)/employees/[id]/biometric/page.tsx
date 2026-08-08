@@ -10,6 +10,7 @@ import { PlusIcon, Trash2, Fingerprint } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import { usePermission } from '@/hooks/usePermission';
 import { Permissions } from '@/lib/permissions';
+import { getErrorMessage } from "@/lib/apiError";
 
 interface Device {
   id: string;
@@ -102,8 +103,11 @@ export default function EmployeeBiometricPage() {
       ]);
       setBindings(bRes.data);
       setDevices(dRes.data);
-    } catch {
-      showError('Load failed', 'Could not load biometric bindings.');
+    } catch (err){
+      showError(
+        "Load failed",
+        getErrorMessage(err, "Could not load biometric bindings."),
+      );
     } finally {
       setLoading(false);
     }
@@ -147,7 +151,7 @@ export default function EmployeeBiometricPage() {
       await load();
       showSuccess('Binding added', 'Biometric binding registered successfully.');
     } catch (err: unknown) {
-      showError('Failed', (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Could not save binding.');
+      showError("Failed", getErrorMessage(err, "Could not save binding."));
     } finally {
       setSaving(false);
     }
@@ -156,11 +160,18 @@ export default function EmployeeBiometricPage() {
   const handleDelete = async (b: Binding) => {
     if (!confirm(`Remove binding for ${b.deviceName}?`)) return;
     try {
-      await api.post('/biometric-bindings/save', { action: 'DELETE', id: b.id, userId });
+      await api.post("/biometric-bindings/save", {
+        action: "DELETE",
+        id: b.id,
+        userId,
+      });
       await load();
-      showSuccess('Binding removed', b.deviceName);
-    } catch {
-      showError('Delete failed', 'Could not remove binding.');
+      showSuccess("Binding removed", b.deviceName);
+    } catch (err) {
+      showError(
+        "Delete failed",
+        getErrorMessage(err, "Could not remove binding."),
+      );
     }
   };
 

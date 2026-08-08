@@ -250,8 +250,11 @@ export default function DepartmentsPage() {
       ]);
       setDepartments(deptRes.data ?? []);
       setBranches(branchRes.data ?? []);
-    } catch {
-      showError("Failed to load departments");
+    } catch (err:any){
+      showError(
+        "Load failed",
+        err?.response?.data?.error ?? "Failed to load departments.",
+      );
     } finally {
       setLoading(false);
     }
@@ -262,7 +265,11 @@ export default function DepartmentsPage() {
     try {
       const res = await api.get("/departments/stats");
       setStats(res.data);
-    } catch {
+    } catch (err:any) {
+      showError(
+        "Load failed",
+        err?.response?.data?.error ?? "Failed to load leave departments.",
+      );
     } finally {
       setStatsLoading(false);
     }
@@ -357,7 +364,7 @@ export default function DepartmentsPage() {
       showSuccess(editingId ? "Department updated" : "Department added");
       await Promise.all([load(), loadStats()]);
     } catch (e: any) {
-      const msg = e?.response?.data?.message;
+      const msg = e?.response?.data?.error;
       setFormError(
         msg ??
           (e?.response?.status === 409
@@ -375,8 +382,11 @@ export default function DepartmentsPage() {
       setDeleteId(null);
       showSuccess("Department deleted");
       await Promise.all([load(), loadStats()]);
-    } catch {
-      showError("Failed to delete department");
+    } catch (err: any) {
+      showError(
+        "Delete failed",
+        err?.response?.data?.error ?? "Failed to delete department.",
+      );
     }
   };
 
@@ -396,8 +406,11 @@ export default function DepartmentsPage() {
       a.click();
       URL.revokeObjectURL(url);
       showSuccess("CSV exported");
-    } catch {
-      showError("Failed to export CSV");
+    } catch (err:any){
+      showError(
+        "Failed to export",
+        err?.response?.data?.error ?? "Failed to export CSV.",
+      );
     } finally {
       setExporting(false);
     }

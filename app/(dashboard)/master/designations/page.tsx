@@ -146,7 +146,11 @@ export default function DesignationsPage() {
       setStatsLoading(true);
       const res = await api.get<DesignationStats>("/designations/stats");
       setStats(res.data);
-    } catch {
+    } catch (e:any) {
+      showError(
+        "Load failed",
+        e?.response?.data?.error ?? "Failed to load designations.",
+      );
     } finally {
       setStatsLoading(false);
     }

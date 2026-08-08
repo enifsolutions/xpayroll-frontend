@@ -77,8 +77,11 @@ export default function TaxReportsHubPage() {
         userId: parseInt(userId),
       });
       showSuccess(`Tax summary generated for ${selectedYear}.`);
-    } catch {
-      showError("Failed to generate tax summary.");
+    } catch (err:any) {
+      showError(
+        "Generate failed",
+        err?.response?.data?.error ?? "Failed to generate tax summary.",
+      );
     } finally {
       setGenerating(false);
     }

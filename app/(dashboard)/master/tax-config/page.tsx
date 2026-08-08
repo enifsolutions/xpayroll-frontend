@@ -23,6 +23,7 @@ import { useRequirePermission } from "@/hooks/useRequirePermission";
 import { usePermission } from "@/hooks/usePermission";
 import { Permissions } from "@/lib/permissions";
 import TaxYearReadinessBanner from "@/components/master/TaxYearReadinessBanner";
+import { getErrorMessage } from "@/lib/apiError";
 
 interface TaxConfig {
   id: string;
@@ -116,7 +117,7 @@ export default function TaxConfigPage() {
     } catch (err: any) {
       showError(
         "Load failed",
-        err?.response?.data?.error ?? "Could not load tax configurations.",
+        getErrorMessage(err, "Could not load tax configurations."),
       );
     } finally {
       setLoading(false);
@@ -211,7 +212,7 @@ export default function TaxConfigPage() {
     } catch (err: any) {
       showError(
         "Failed to save",
-        err?.response?.data?.error ?? "Could not save tax config.",
+        getErrorMessage(err, "Could not save tax config."),
       );
     } finally {
       setSaving(false);
@@ -225,10 +226,7 @@ export default function TaxConfigPage() {
       await load();
       showSuccess("Tax config deleted", item.name);
     } catch (err: any) {
-      showError(
-        "Delete failed",
-        err?.response?.data?.error ?? "Could not delete.",
-      );
+      showError("Delete failed", getErrorMessage(err, "Could not delete."));
     }
   };
 

@@ -35,7 +35,12 @@ export default function Schedule01Page() {
     try {
       const res = await api.get(`tax-reports/${year.replace(/\//g, '-')}/schedule01`);
       setRows(res.data);
-    } catch { showError('Failed to load Schedule 01 data.'); }
+    } catch (err:any) { 
+      showError(
+        "Load failed",
+        err?.response?.data?.error ?? "Failed to load Schedule 01 data.",
+      );
+    }
     finally { setLoading(false); }
   }
 

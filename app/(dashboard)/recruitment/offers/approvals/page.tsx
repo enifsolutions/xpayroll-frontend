@@ -46,7 +46,7 @@ export default function OfferApprovalsPage() {
     } catch (err: any) {
       showError(
         "Load failed",
-        err?.response?.data?.message ?? "Could not load pending approvals.",
+        err?.response?.data?.error ?? "Could not load pending approvals.",
       );
     } finally {
       setLoading(false);
@@ -68,7 +68,7 @@ export default function OfferApprovalsPage() {
     } catch (err: any) {
       showError(
         "Approve failed",
-        err?.response?.data?.message ?? "Could not approve the offer.",
+        err?.response?.data?.error ?? "Could not approve the offer.",
       );
     } finally {
       setApprovingId(null);
@@ -97,7 +97,7 @@ export default function OfferApprovalsPage() {
     } catch (err: any) {
       showError(
         "Reject failed",
-        err?.response?.data?.message ?? "Could not reject the offer.",
+        err?.response?.data?.error ?? "Could not reject the offer.",
       );
     } finally {
       setRejecting(false);

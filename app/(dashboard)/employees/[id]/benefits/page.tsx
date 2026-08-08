@@ -15,6 +15,7 @@ import { Permissions } from "@/lib/permissions";
 import {
   EmployeeBenefit, BenefitTypeOption, BenefitForm, defaultForm,
 } from './benefits.types'
+import { getErrorMessage } from "@/lib/apiError";
 
 const fmt = (iso: string | null) =>
   iso ? new Date(iso).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'
@@ -53,8 +54,11 @@ export default function BenefitsPage() {
       ]);
       setBenefits(bRes.data)
       setBenefitTypes(btRes.data)
-    } catch {
-      showError('Load Failed', 'Could not load benefits.')
+    } catch (err){
+      showError(
+        "Load Failed",
+        getErrorMessage(err, "Could not load benefits."),
+      );
     } finally {
       setLoading(false)
     }
@@ -120,8 +124,7 @@ export default function BenefitsPage() {
         editing ? 'Employee benefit has been updated.' : 'Employee benefit has been added.'
       )
     } catch (e: unknown) {
-      const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.error
-      showError('Save Failed', msg ?? 'Could not save benefit.')
+      showError("Save Failed", getErrorMessage(e, "Could not save benefit."));
     } finally {
       setSaving(false)
     }
@@ -138,8 +141,11 @@ export default function BenefitsPage() {
       setDeleteTarget(null)
       await load()
       showSuccess('Benefit Removed', `${deleteTarget.benefitName} has been removed.`)
-    } catch {
-      showError('Delete Failed', 'Could not remove benefit.')
+    } catch (err){
+      showError(
+        "Delete Failed",
+        getErrorMessage(err, "Could not remove benefit."),
+      );
     } finally {
       setDeleting(false)
     }

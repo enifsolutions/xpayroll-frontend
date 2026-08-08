@@ -65,6 +65,7 @@ import {
 } from "@/lib/api/cvParser";
 import { useAuthStore } from "@/store/authStore";
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
+import { getErrorMessage } from "@/lib/apiError";
 
 interface LeaveTemplateOption {
   id: string;
@@ -647,10 +648,7 @@ export default function EmployeesPage() {
           .map((t: any) => ({ id: String(t.id), name: t.name, code: t.code })),
       );
     } catch (err: any) {
-      showError(
-        "Load failed",
-        err?.response?.data?.error ?? "Could not load data.",
-      );
+      showError("Load failed", getErrorMessage(err, "Could not load data."));
     } finally {
       setLoading(false);
     }
@@ -1026,7 +1024,7 @@ export default function EmployeesPage() {
       } else {
         showError(
           "Failed to save employee",
-          err?.response?.data?.message ?? err?.message ?? "Please try again.",
+          getErrorMessage(err, "Please try again."),
         );
       }
     } finally {
@@ -1068,8 +1066,8 @@ export default function EmployeesPage() {
       await load();
     } catch (err: any) {
       showError(
-        "Failed to save contract.",
-        err?.response?.data?.message ?? err?.message ?? "Please try again.",
+        "Failed to save contract",
+        getErrorMessage(err, "Failed to save contract."),
       );
     } finally {
       setWizardSaving(false);
@@ -1186,10 +1184,14 @@ export default function EmployeesPage() {
           setContractForm({ ...EMPTY_CONTRACT, startDate: item.joinDate });
         }
       }
-    } catch {
+    } catch (err) {
       setContract(null);
       setPendingContractChange(null);
       setContractForm({ ...EMPTY_CONTRACT, startDate: item.joinDate });
+      showError(
+        "Failed to load contract",
+        getErrorMessage(err, "Failed to load contract."),
+      );
     }
     setEditOpen(true);
   };
@@ -1258,7 +1260,7 @@ export default function EmployeesPage() {
     } catch (err: any) {
       showError(
         "Failed to update employee",
-        err?.response?.data?.message ?? "Please try again.",
+        getErrorMessage(err, "Failed to update employee."),
       );
     } finally {
       setEditSaving(false);
@@ -1350,7 +1352,7 @@ export default function EmployeesPage() {
     } catch (err: any) {
       showError(
         "Failed to save contract",
-        err?.response?.data?.message ?? "Please try again.",
+        getErrorMessage(err, "Failed to save contract."),
       );
     } finally {
       setContractSaving(false);

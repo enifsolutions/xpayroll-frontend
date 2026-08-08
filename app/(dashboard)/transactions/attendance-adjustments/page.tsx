@@ -158,8 +158,8 @@ export default function AttendanceAdjustmentsPage() {
       if (dateTo) params.dateTo = dateTo;
       const res = await api.get("/attendance-adjustments", { params });
       setItems(res.data);
-    } catch {
-      showError("Failed to load", "Could not fetch adjustment requests.");
+    } catch (err:any){
+      showError("Load failed", err?.response?.data?.error ?? "Could not fetch adjustment requests.");
     } finally {
       setLoading(false);
     }

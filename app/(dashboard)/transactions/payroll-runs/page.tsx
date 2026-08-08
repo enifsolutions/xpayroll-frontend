@@ -142,8 +142,11 @@ export default function PayrollRunsPage() {
     setLoading(true);
     try {
       setRuns(await payrollService.getAll());
-    } catch {
-      showError("Error", "Failed to load payroll runs");
+    } catch (err:any){
+      showError(
+        "Load failed",
+        err?.response?.data?.error ?? "Failed to load payroll runs.",
+      );
     } finally {
       setLoading(false);
     }
@@ -211,8 +214,8 @@ export default function PayrollRunsPage() {
       load();
     } catch (e: any) {
       showError(
-        "Error",
-        e?.response?.data?.message ?? "Failed to create payroll run",
+        "Save failed",
+        e?.response?.data?.error ?? "Failed to create payroll run",
       );
     } finally {
       setSaving(false);
@@ -247,7 +250,7 @@ export default function PayrollRunsPage() {
       setSelectedRun(null);
       load();
     } catch (e: any) {
-      showError("Error", e?.response?.data?.message ?? "Action failed");
+      showError("Action failed", e?.response?.data?.error ?? "Action failed");
     } finally {
       setConfirming(false);
     }
