@@ -13,6 +13,7 @@ import {
   BarChart3,
   MessageCircle,
   BookOpen,
+  Briefcase,
 } from "lucide-react";
 
 /* ------------------------------------------------------------------ */
@@ -230,6 +231,61 @@ const CATEGORIES: FaqCategory[] = [
         id: "export-report",
         q: "How do I export a report to Excel or PDF?",
         a: "Open any report, apply your filters (date range, branch, department), then click the Export button and choose Excel or PDF. Exports run in the background for large date ranges and download automatically once ready.",
+      },
+    ],
+  },
+  {
+    id: "recruitment",
+    title: "Recruitment",
+    description:
+      "Requisitions, postings, candidates, pipeline, interviews, offers",
+    icon: Briefcase,
+    accent: "violet",
+    items: [
+      {
+        id: "rec-requisition",
+        q: "How do I raise and approve a job requisition?",
+        a: "Go to Recruitment > Requisitions and click New Requisition. Fill in the designation, branch, headcount, and justification, then submit. Requisitions go through a two-level approval workflow (ApproveL1, then ApproveL2) before they can be linked to a posting. You need Recruitment.Requisition.ApproveL1 or ApproveL2 depending on your role to action pending requisitions.",
+      },
+      {
+        id: "rec-posting",
+        q: "How do I publish a job posting?",
+        a: "Go to Recruitment > Postings, select an approved requisition, and create a posting from it. Once ready, click Publish to make it live on the public careers page (accessible via its public slug). Unpublish at any time to close applications without deleting the posting or its data.",
+      },
+      {
+        id: "rec-candidate-cv",
+        q: "How do I add a candidate and use AI CV parsing?",
+        a: "Go to Recruitment > Candidates and click Add Candidate, or upload a CV directly. If AI CV Parsing is enabled in Company Settings (Recruitment.Ai.ParseCv), the system extracts name, contact details, skills, experience, and education automatically. Low-confidence fields are amber-flagged for you to review and correct before saving. The manual entry form is always available even if AI parsing is off.",
+      },
+      {
+        id: "rec-pipeline",
+        q: "How does the recruitment Pipeline (Kanban) work?",
+        a: "Recruitment > Pipeline is the daily-driver screen. Each requisition shows candidates as cards across stages: Applied, Screening, Shortlisted, Interview, Offer, Hired, Rejected, Withdrawn, On Hold. Drag a card to move it to the next stage, or use the card menu. Every stage change is written to the application's audit history along with who made the change and when.",
+      },
+      {
+        id: "rec-match-score",
+        q: "How do I use AI Match Scoring to rank candidates?",
+        a: "On a requisition's pipeline, use the Score Shortlist action (requires Recruitment.Ai.MatchScore) to have AI score candidates against the requisition's skills and experience requirements. Each candidate gets a score with reasoning, strengths, gaps, and suggested interview questions. Scoring is on-demand only — it never runs automatically — and the score is advisory: a human always makes the reject decision. Name, gender, age, marital status, photo, religion, ethnicity, and address are excluded from every scoring prompt.",
+      },
+      {
+        id: "rec-interview-scorecard",
+        q: "How do I schedule an interview and submit a scorecard?",
+        a: "From a candidate's application, go to Interviews and click Schedule Interview to set the round, type (Phone/Technical/HR/Panel/Final), date, and panel members. After the interview, each panellist submits their own Scorecard using the designation's scorecard template. To prevent anchoring bias, you only see your own scorecard until you submit it — Recruitment.Interview.ViewAllScorecards unlocks all panellists' scores afterward or for HR Manager.",
+      },
+      {
+        id: "rec-offers",
+        q: "How do I create, approve, and send an offer?",
+        a: "Go to Recruitment > Offers to see all offers with KPI cards and lifecycle status (Draft, Pending Approval, Approved, Sent, Accepted, Declined, Negotiating, Expired, Withdrawn). Use the offer builder to set designation, branch, salary, and allowances — a live statutory preview shows EPF/ETF/APIT and true employer cost as you type. Submit for approval (Recruitment.Offer.Approve), then Send to generate the PDF offer letter and email it to the candidate. Filters and pagination let you track every offer in flight.",
+      },
+      {
+        id: "rec-onboarding",
+        q: "What happens when a candidate accepts an offer?",
+        a: "Once an offer is marked Accepted, use Convert to Employee (Recruitment.Onboarding.ConvertToEmployee) to open the standard Employee Add wizard pre-filled with the candidate's personal data, designation, branch, and offered salary. The candidate's CV and offer letter are attached automatically as employee documents, and deduction defaults resolve through the normal Company > Branch > Department > Designation override chain — no re-entry needed.",
+      },
+      {
+        id: "rec-reports",
+        q: "What recruitment reports are available?",
+        a: "Recruitment > Reports covers five report types: hiring funnel, time-to-hire, source effectiveness, requisition aging, and diversity snapshot. Access is controlled by Recruitment.Reports.View, and export by Recruitment.Reports.Export.",
       },
     ],
   },

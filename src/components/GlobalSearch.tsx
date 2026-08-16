@@ -336,7 +336,7 @@ export default function GlobalSearch() {
 
               {displayItems.map((item, idx) => {
                 const Icon = iconMap[item.icon] ?? Search;
-                const style = categoryStyle[item.category];
+                const style = categoryStyle[item.category] ?? categoryStyle.System;
                 const isActive = idx === activeIdx;
                 return (
                   <div

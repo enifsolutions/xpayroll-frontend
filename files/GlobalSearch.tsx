@@ -52,32 +52,112 @@ import {
   X,
   ArrowRight,
   ClipboardEdit,
-} from 'lucide-react'
+  Rss,
+  UserSearch,
+  Kanban,
+  Video,
+  FileSignature,
+} from "lucide-react";
 import { searchIndex, SearchItem, SearchCategory } from '@/data/searchIndex'
 
 // ── Icon resolver ─────────────────────────────────────────────────────────────
 const iconMap: Record<string, React.ElementType> = {
-  LayoutDashboard, Users, UserPlus, FileText, Banknote, Gift, Minus, Receipt,
-  CalendarCheck, Clock, ClipboardList, Ban, CalendarOff, LayoutTemplate, Play,
-  Building2, PieChart, BarChart2, FileSpreadsheet, Printer, FileBarChart,
-  FilePlus, Award, CalendarDays, AlarmClock, Timer, TrendingUp, CalendarX,
-  MapPin, Network, Briefcase, Percent, Settings2, ShieldCheck, Fingerprint,
-  CalendarHeart, CalendarMinus, MinusCircle, UsersRound, Layers, Bell, Shield,
-  UserCog, Building, UserCircle, ClipboardEdit,
-}
+  LayoutDashboard,
+  Users,
+  UserPlus,
+  FileText,
+  Banknote,
+  Gift,
+  Minus,
+  Receipt,
+  CalendarCheck,
+  Clock,
+  ClipboardList,
+  Ban,
+  CalendarOff,
+  LayoutTemplate,
+  Play,
+  Building2,
+  PieChart,
+  BarChart2,
+  FileSpreadsheet,
+  Printer,
+  FileBarChart,
+  FilePlus,
+  Award,
+  CalendarDays,
+  AlarmClock,
+  Timer,
+  TrendingUp,
+  CalendarX,
+  MapPin,
+  Network,
+  Briefcase,
+  Percent,
+  Settings2,
+  ShieldCheck,
+  Fingerprint,
+  CalendarHeart,
+  CalendarMinus,
+  MinusCircle,
+  UsersRound,
+  Layers,
+  Bell,
+  Shield,
+  UserCog,
+  Building,
+  UserCircle,
+  ClipboardEdit,
+  Rss,
+  UserSearch,
+  Kanban,
+  Video,
+  FileSignature,
+};
 
 // ── Category colours ──────────────────────────────────────────────────────────
 const categoryStyle: Record<SearchCategory, { bg: string; text: string }> = {
-  Dashboard:    { bg: 'bg-violet-100 dark:bg-violet-900/30', text: 'text-violet-700 dark:text-violet-300' },
-  Employees:    { bg: 'bg-blue-100 dark:bg-blue-900/30',   text: 'text-blue-700 dark:text-blue-300' },
-  Attendance:   { bg: 'bg-amber-100 dark:bg-amber-900/30', text: 'text-amber-700 dark:text-amber-300' },
-  Leave:        { bg: 'bg-teal-100 dark:bg-teal-900/30',   text: 'text-teal-700 dark:text-teal-300' },
-  Payroll:      { bg: 'bg-emerald-100 dark:bg-emerald-900/30', text: 'text-emerald-700 dark:text-emerald-300' },
-  Tax:          { bg: 'bg-rose-100 dark:bg-rose-900/30',   text: 'text-rose-700 dark:text-rose-300' },
-  Reports:      { bg: 'bg-orange-100 dark:bg-orange-900/30', text: 'text-orange-700 dark:text-orange-300' },
-  'Master Data':{ bg: 'bg-indigo-100 dark:bg-indigo-900/30', text: 'text-indigo-700 dark:text-indigo-300' },
-  System:       { bg: 'bg-slate-100 dark:bg-slate-700/40', text: 'text-slate-600 dark:text-slate-300' },
-}
+  Dashboard: {
+    bg: "bg-violet-100 dark:bg-violet-900/30",
+    text: "text-violet-700 dark:text-violet-300",
+  },
+  Employees: {
+    bg: "bg-blue-100 dark:bg-blue-900/30",
+    text: "text-blue-700 dark:text-blue-300",
+  },
+  Attendance: {
+    bg: "bg-amber-100 dark:bg-amber-900/30",
+    text: "text-amber-700 dark:text-amber-300",
+  },
+  Leave: {
+    bg: "bg-teal-100 dark:bg-teal-900/30",
+    text: "text-teal-700 dark:text-teal-300",
+  },
+  Payroll: {
+    bg: "bg-emerald-100 dark:bg-emerald-900/30",
+    text: "text-emerald-700 dark:text-emerald-300",
+  },
+  Tax: {
+    bg: "bg-rose-100 dark:bg-rose-900/30",
+    text: "text-rose-700 dark:text-rose-300",
+  },
+  Reports: {
+    bg: "bg-orange-100 dark:bg-orange-900/30",
+    text: "text-orange-700 dark:text-orange-300",
+  },
+  Recruitment: {
+    bg: "bg-fuchsia-100 dark:bg-fuchsia-900/30",
+    text: "text-fuchsia-700 dark:text-fuchsia-300",
+  },
+  "Master Data": {
+    bg: "bg-indigo-100 dark:bg-indigo-900/30",
+    text: "text-indigo-700 dark:text-indigo-300",
+  },
+  System: {
+    bg: "bg-slate-100 dark:bg-slate-700/40",
+    text: "text-slate-600 dark:text-slate-300",
+  },
+};
 
 // ── Fuzzy search ──────────────────────────────────────────────────────────────
 function scoreItem(item: SearchItem, query: string): number {
@@ -272,7 +352,8 @@ export default function GlobalSearch() {
               {/* Items */}
               {displayItems.map((item, idx) => {
                 const Icon = iconMap[item.icon] ?? Search
-                const style = categoryStyle[item.category]
+                const style =
+                  categoryStyle[item.category] ?? categoryStyle.System;
                 const isActive = idx === activeIdx
                 return (
                   <div

@@ -395,26 +395,79 @@ function LoansWidget({ d, loading, router, grip }: { d:DashboardSummary|null; lo
 
 function PayrollTrendWidget({ trend, loading, router, grip }: { trend:PayrollTrend[]; loading:boolean; router:ReturnType<typeof useRouter>; grip?:React.HTMLAttributes<HTMLSpanElement> }) {
     return (
-        <WCard>
-            <WHead title="Monthly Net Pay Trend" href="/transactions/payroll-runs" router={router} grip={grip}/>
-            <div className="px-5 pb-5">
-                {loading ? <Skel h="h-52"/> : trend.length===0 ? (
-                    <div className="text-center py-12 text-gray-300"><TrendingUp size={36} className="mx-auto mb-2"/><p className="text-sm">No payroll data yet</p></div>
-                ) : (
-                    <ResponsiveContainer width="100%" height={210}>
-                        <BarChart data={trend} margin={{top:4,right:4,left:0,bottom:0}} barCategoryGap="30%">
-                            <defs><linearGradient id="barGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#6366f1"/><stop offset="100%" stopColor="#8b5cf6"/></linearGradient></defs>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false}/>
-                            <XAxis dataKey="monthLabel" tick={{fill:"#8d90a0"}} axisLine={{stroke:"#273647"}} tickLine={false} tick={{fontSize:11,fill:'#9ca3af'}} axisLine={false} tickLine={false}/>
-                            <YAxis tickFormatter={fmtS} tick={{fontSize:11,fill:'#9ca3af'}} axisLine={false} tickLine={false} width={68}/>
-                            <Tooltip formatter={(v:number)=>[fmtC(v),'Net Pay']} contentStyle={{borderRadius:10,border:'none',boxShadow:'0 4px 20px rgba(0,0,0,0.1)',fontSize:12}} cursor={{fill:'rgba(99,102,241,0.06)'}}/>
-                            <Bar dataKey="netPay" fill="url(#barGrad)" radius={[6,6,0,0]}/>
-                        </BarChart>
-                    </ResponsiveContainer>
-                )}
+      <WCard>
+        <WHead
+          title="Monthly Net Pay Trend"
+          href="/transactions/payroll-runs"
+          router={router}
+          grip={grip}
+        />
+        <div className="px-5 pb-5">
+          {loading ? (
+            <Skel h="h-52" />
+          ) : trend.length === 0 ? (
+            <div className="text-center py-12 text-gray-300">
+              <TrendingUp size={36} className="mx-auto mb-2" />
+              <p className="text-sm">No payroll data yet</p>
             </div>
-        </WCard>
-    )
+          ) : (
+            <ResponsiveContainer width="100%" height={210}>
+              <BarChart
+                data={trend}
+                margin={{ top: 4, right: 4, left: 0, bottom: 0 }}
+                barCategoryGap="30%"
+              >
+                <defs>
+                  <linearGradient id="barGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#6366f1" />
+                    <stop offset="100%" stopColor="#8b5cf6" />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  stroke="#f0f0f0"
+                  vertical={false}
+                />
+                <XAxis
+                  dataKey="monthLabel"
+                  tick={{ fill: "#8d90a0" }}
+                  axisLine={{ stroke: "#273647" }}
+                  tickLine={false}
+                  tick={{ fontSize: 11, fill: "#9ca3af" }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <YAxis
+                  tickFormatter={fmtS}
+                  tick={{ fontSize: 11, fill: "#9ca3af" }}
+                  axisLine={false}
+                  tickLine={false}
+                  width={68}
+                />
+                <Tooltip
+                  formatter={(v: any, _n: any, p: any) => [
+                    `${v} (${p?.payload?.pctOfApplied}%)`,
+                    "Reached",
+                  ]}
+                  contentStyle={{
+                    borderRadius: 10,
+                    border: "none",
+                    boxShadow: "0 4px 20px rgba(0,0,0,0.1)",
+                    fontSize: 12,
+                  }}
+                  cursor={{ fill: "rgba(99,102,241,0.06)" }}
+                />
+                <Bar
+                  dataKey="netPay"
+                  fill="url(#barGrad)"
+                  radius={[6, 6, 0, 0]}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+      </WCard>
+    );
 }
 
 function AttTrendWidget({ trend, loading, router, grip }: { trend:AttTrend[]; loading:boolean; router:ReturnType<typeof useRouter>; grip?:React.HTMLAttributes<HTMLSpanElement> }) {

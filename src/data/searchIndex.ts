@@ -10,6 +10,7 @@ export type SearchCategory =
   | "Payroll"
   | "Tax"
   | "Reports"
+  | "Recruitment"
   | "Master Data"
   | "System";
 
@@ -400,6 +401,90 @@ export const searchIndex: SearchItem[] = [
     category: "Reports",
     keywords: ["contract", "expiry", "expiring", "renewal", "end date"],
     icon: "CalendarX",
+  },
+
+  // ── Recruitment
+  {
+    id: "recruitment-requisitions",
+    title: "Requisitions",
+    description: "Raise and approve new hiring requisitions",
+    href: "/recruitment/requisitions",
+    category: "Recruitment",
+    keywords: [
+      "requisition",
+      "vacancy",
+      "headcount request",
+      "approve",
+      "job opening",
+    ],
+    icon: "Briefcase",
+  },
+  {
+    id: "recruitment-postings",
+    title: "Job Postings",
+    description: "Publish and manage career page job postings",
+    href: "/recruitment/postings",
+    category: "Recruitment",
+    keywords: ["posting", "job ad", "publish", "career page", "vacancy"],
+    icon: "Rss",
+  },
+  {
+    id: "recruitment-candidates",
+    title: "Candidates",
+    description: "Talent pool with parsed CVs and profiles",
+    href: "/recruitment/candidates",
+    category: "Recruitment",
+    keywords: ["candidate", "talent pool", "cv", "resume", "applicant"],
+    icon: "UserSearch",
+  },
+  {
+    id: "recruitment-pipeline",
+    title: "Hiring Pipeline",
+    description: "Kanban board tracking applications through stages",
+    href: "/recruitment/pipeline",
+    category: "Recruitment",
+    keywords: [
+      "pipeline",
+      "kanban",
+      "stage",
+      "shortlist",
+      "screening",
+      "applications",
+    ],
+    icon: "Kanban",
+  },
+  {
+    id: "recruitment-interviews",
+    title: "Interviews",
+    description: "Schedule interviews and submit scorecards",
+    href: "/recruitment/interviews",
+    category: "Recruitment",
+    keywords: ["interview", "schedule", "scorecard", "panel", "calendar"],
+    icon: "Video",
+  },
+  {
+    id: "recruitment-offers",
+    title: "Offers",
+    description: "Offer builder with live EPF/ETF/APIT preview",
+    href: "/recruitment/offers",
+    category: "Recruitment",
+    keywords: ["offer", "offer letter", "ctc", "salary", "accept", "decline"],
+    icon: "FileSignature",
+  },
+  {
+    id: "recruitment-reports",
+    title: "Recruitment Reports",
+    description: "Funnel, time-to-hire and source effectiveness reports",
+    href: "/recruitment/reports",
+    category: "Recruitment",
+    keywords: [
+      "recruitment",
+      "funnel",
+      "time to hire",
+      "source",
+      "hiring report",
+    ],
+    icon: "FileBarChart",
   },
 
   // ── Master Data
