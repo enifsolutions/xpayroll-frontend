@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "check:permissions": "node scripts/check-permissions-drift.mjs"
   },
   "dependencies": {
     "@floating-ui/react": "^0.27.19",

@@ -67,6 +67,10 @@ import { useAuthStore } from "@/store/authStore";
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { getErrorMessage } from "@/lib/apiError";
 
+import { useTour } from "@/hooks/useTour";
+import TourOverlay from "@/components/onboarding/TourOverlay";
+import { EMPLOYEES_PAGE_STEPS } from "@/lib/tours/employeesPage";
+
 interface LeaveTemplateOption {
   id: string;
   name: string;
@@ -516,6 +520,8 @@ export default function EmployeesPage() {
   const [qualifications, setQualifications] = useState<EmployeeQualification[]>(
     [],
   );
+
+  const tour = useTour("admin-page-employees", EMPLOYEES_PAGE_STEPS);
 
   /* ── computed stats ────────────────────────────────────────────────────── */
 
@@ -1372,13 +1378,15 @@ export default function EmployeesPage() {
           </p>
         </div>
         {canAdd && (
-          <Button
-            variant="solid"
-            icon={<PlusIcon size={16} />}
-            onClick={openWizard}
-          >
-            Add Employee
-          </Button>
+          <div data-tour="add-employee-button">
+            <Button
+              variant="solid"
+              icon={<PlusIcon size={16} />}
+              onClick={openWizard}
+            >
+              Add Employee
+            </Button>
+          </div>
         )}
       </div>
 
@@ -1410,76 +1418,79 @@ export default function EmployeesPage() {
         />
       </div>
 
-      {/* ── Filters ─────────────────────────────────────────────────────── */}
-      <div className="flex items-center gap-3 mb-4 flex-wrap">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search
-            size={15}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
-          />
-          <input
-            className="input pl-9 w-full"
-            placeholder="Search by name, code, department…"
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              resetPage();
-            }}
-          />
-        </div>
-        <select
-          className="input w-40"
-          value={statusFilter}
-          onChange={(e) => {
-            setStatusFilter(e.target.value);
-            resetPage();
-          }}
-        >
-          <option value="">All Statuses</option>
-          {EMPLOYEE_STATUSES.map((s) => (
-            <option key={s} value={s}>
-              {s}
-            </option>
-          ))}
-        </select>
-        <select
-          className="input w-44"
-          value={typeFilter}
-          onChange={(e) => {
-            setTypeFilter(e.target.value);
-            resetPage();
-          }}
-        >
-          <option value="">All Types</option>
-          {EMPLOYMENT_TYPES.map((t) => (
-            <option key={t} value={t}>
-              {t}
-            </option>
-          ))}
-        </select>
-        <select
-          className="input w-44"
-          value={branchFilter}
-          onChange={(e) => {
-            setBranchFilter(e.target.value);
-            resetPage();
-          }}
-        >
-          <option value="">All Branches</option>
-          {branches.map((b) => (
-            <option key={b.id} value={b.id}>
-              {b.name}
-            </option>
-          ))}
-        </select>
-        <span className="text-sm text-gray-400 whitespace-nowrap">
-          {filtered.length} result{filtered.length !== 1 ? "s" : ""}
-        </span>
-      </div>
-
       {/* ── Table ───────────────────────────────────────────────────────── */}
-      <div className="card">
+      <div className="card" data-tour="employee-table">
         <div className="card-body">
+          {/* ── Filters ─────────────────────────────────────────────────────── */}
+          <div
+            className="flex items-center gap-3 mb-4 flex-wrap"
+            data-tour="employee-filters-panel"
+          >
+            <div className="relative flex-1 min-w-[200px]">
+              <Search
+                size={15}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+              />
+              <input
+                className="input pl-9 w-full"
+                placeholder="Search by name, code, department…"
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  resetPage();
+                }}
+              />
+            </div>
+            <select
+              className="input w-40"
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(e.target.value);
+                resetPage();
+              }}
+            >
+              <option value="">All Statuses</option>
+              {EMPLOYEE_STATUSES.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+            <select
+              className="input w-44"
+              value={typeFilter}
+              onChange={(e) => {
+                setTypeFilter(e.target.value);
+                resetPage();
+              }}
+            >
+              <option value="">All Types</option>
+              {EMPLOYMENT_TYPES.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+            <select
+              className="input w-44"
+              value={branchFilter}
+              onChange={(e) => {
+                setBranchFilter(e.target.value);
+                resetPage();
+              }}
+            >
+              <option value="">All Branches</option>
+              {branches.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name}
+                </option>
+              ))}
+            </select>
+            <span className="text-sm text-gray-400 whitespace-nowrap">
+              {filtered.length} result{filtered.length !== 1 ? "s" : ""}
+            </span>
+          </div>
+
           {loading ? (
             <div className="flex justify-center py-12">
               <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full" />
@@ -2557,6 +2568,18 @@ export default function EmployeesPage() {
             </div>
           )}
         </WizardModal>
+      )}
+
+      {tour.visible && (
+        <TourOverlay
+          step={tour.step}
+          stepIndex={tour.stepIndex}
+          totalSteps={tour.totalSteps}
+          onNext={tour.next}
+          onPrev={tour.prev}
+          onDismiss={tour.dismiss}
+          nextStepTarget={tour.nextStep?.target}
+        />
       )}
     </div>
   );

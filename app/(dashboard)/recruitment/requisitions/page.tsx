@@ -29,6 +29,9 @@ import { showSuccess, showError } from "@/lib/toast";
 import { useRequirePermission } from "@/hooks/useRequirePermission";
 import { usePermission } from "@/hooks/usePermission";
 import { Permissions } from "@/lib/permissions";
+import { useTour } from "@/hooks/useTour";
+import TourOverlay from "@/components/onboarding/TourOverlay";
+import { REQUISITIONS_STEPS } from "@/lib/tours/requisitions";
 
 interface Requisition {
   id: string;
@@ -194,6 +197,7 @@ function ApprovalChip({
 }
 
 export default function RequisitionsPage() {
+  const tour = useTour("admin-page-requisitions", REQUISITIONS_STEPS);
   useRequirePermission("Recruitment.Requisition.View");
 
   const canManage = usePermission(Permissions.Recruitment.Requisition.Create);
@@ -552,6 +556,7 @@ export default function RequisitionsPage() {
             size="sm"
             icon={<Plus size={15} />}
             onClick={openAdd}
+            data-tour="requisitions-add-button"
           >
             New Requisition
           </Button>
@@ -591,8 +596,11 @@ export default function RequisitionsPage() {
 
       <div className="card">
         <div className="card-body">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-5">
-            <div className="flex-1 max-w-xs">
+          <div
+            className="flex items-center gap-3 mb-4 flex-wrap"
+            data-tour="requisitions-filter-row"
+          >
+            <div className="flex-1 min-w-[200px]">
               <Input
                 placeholder="Search code, title or department…"
                 value={search}
@@ -601,10 +609,9 @@ export default function RequisitionsPage() {
             </div>
 
             <select
-              className="input"
+              className="input w-auto"
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              style={{ minWidth: 170 }}
             >
               <option value="">All Statuses</option>
               <option value="Draft">Draft</option>
@@ -652,7 +659,10 @@ export default function RequisitionsPage() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="table-default table-hover w-full">
+              <table
+                className="table-default table-hover w-full"
+                data-tour="requisitions-table-card"
+              >
                 <thead>
                   <tr>
                     <th>Code</th>
@@ -1168,6 +1178,18 @@ export default function RequisitionsPage() {
           </div>
         </div>
       </Dialog>
+
+      {tour.visible && (
+        <TourOverlay
+          step={tour.step}
+          stepIndex={tour.stepIndex}
+          totalSteps={tour.totalSteps}
+          onNext={tour.next}
+          onPrev={tour.prev}
+          onDismiss={tour.dismiss}
+          nextStepTarget={tour.nextStep?.target}
+        />
+      )}
     </div>
   );
 }

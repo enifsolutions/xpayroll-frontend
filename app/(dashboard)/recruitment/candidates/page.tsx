@@ -32,6 +32,9 @@ import { usePermission } from "@/hooks/usePermission";
 import { Permissions } from "@/lib/permissions";
 import DownloadComplianceDocLink from "@/components/recruitment/DownloadComplianceDocLink";
 import CandidateErasureDialog from "@/components/recruitment/CandidateErasureDialog";
+import { useTour } from "@/hooks/useTour";
+import TourOverlay from "@/components/onboarding/TourOverlay";
+import { CANDIDATES_STEPS } from "@/lib/tours/candidates";
 
 interface Candidate {
   id: string;
@@ -198,6 +201,7 @@ function KpiCard({
 }
 
 function CandidatesPageInner() {
+  const tour = useTour("admin-page-candidates", CANDIDATES_STEPS);
   useRequirePermission(Permissions.Recruitment.Candidate.View);
 
   const canCreate = usePermission(Permissions.Recruitment.Candidate.Create);
@@ -683,6 +687,7 @@ function CandidatesPageInner() {
             size="sm"
             icon={<Plus size={15} />}
             onClick={openAdd}
+            data-tour="candidate-add-button"
           >
             Add Candidate
           </Button>
@@ -722,8 +727,11 @@ function CandidatesPageInner() {
 
       <div className="card">
         <div className="card-body">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-5">
-            <div className="flex-1 max-w-xs">
+          <div
+            className="flex items-center gap-3 mb-4 flex-wrap"
+            data-tour="candidate-filter-row"
+          >
+            <div className="flex-1 min-w-[200px]">
               <Input
                 placeholder="Search name, email, phone, NIC…"
                 value={search}
@@ -732,10 +740,9 @@ function CandidatesPageInner() {
             </div>
 
             <select
-              className="input"
+              className="input w-auto"
               value={sourceFilter}
               onChange={(e) => setSourceFilter(e.target.value)}
-              style={{ minWidth: 150 }}
             >
               <option value="">All Sources</option>
               {SOURCES.map((s) => (
@@ -746,10 +753,9 @@ function CandidatesPageInner() {
             </select>
 
             <select
-              className="input"
+              className="input w-auto"
               value={blacklistFilter}
               onChange={(e) => setBlacklistFilter(e.target.value)}
-              style={{ minWidth: 150 }}
             >
               <option value="">All Candidates</option>
               <option value="false">Active only</option>
@@ -792,7 +798,10 @@ function CandidatesPageInner() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="table-default table-hover w-full">
+              <table
+                className="table-default table-hover w-full"
+                data-tour="candidate-table-card"
+              >
                 <thead>
                   <tr>
                     <th>Candidate</th>
@@ -1437,6 +1446,18 @@ function CandidatesPageInner() {
           isOpen={true}
           onClose={() => setEraseTarget(null)}
           onErased={load}
+        />
+      )}
+
+      {tour.visible && (
+        <TourOverlay
+          step={tour.step}
+          stepIndex={tour.stepIndex}
+          totalSteps={tour.totalSteps}
+          onNext={tour.next}
+          onPrev={tour.prev}
+          onDismiss={tour.dismiss}
+          nextStepTarget={tour.nextStep?.target}
         />
       )}
     </div>

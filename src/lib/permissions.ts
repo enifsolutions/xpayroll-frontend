@@ -2,6 +2,15 @@
  * XpayRoll Permission Keys
  * Mirrors XpayRoll.Application.Common.Permissions.cs
  * Format: Module.Feature.Action
+ *
+ * NOTE: Portal.* permissions intentionally excluded - they gate the ESS
+ * portal backend, not the admin app, even though both share the same
+ * API and permissions table. Do not add them here.
+ *
+ * NOTE: HR.Employee.UnmaskSalary exists on the backend but is
+ * intentionally left unused on the frontend - the salary reveal control
+ * in employees/page.tsx is gated by ViewSalary alone (single-tier).
+ * Reserved key, not a bug.
  */
 export const Permissions = {
   MasterData: {
@@ -83,6 +92,7 @@ export const Permissions = {
       Update: "HR.Employee.Update",
       Delete: "HR.Employee.Delete",
       ViewSalary: "HR.Employee.ViewSalary",
+      UnmaskSalary: "HR.Employee.UnmaskSalary", // reserved - see file header note
       ParseCv: "HR.Employee.ParseCv",
     },
     Contract: { View: "HR.Contract.View", Manage: "HR.Contract.Manage" },
@@ -94,6 +104,9 @@ export const Permissions = {
       View: "HR.Leave.View",
       Approve: "HR.Leave.Approve",
       Manage: "HR.Leave.Manage",
+    },
+    Notifications: {
+      ViewAll: "HR.Notifications.ViewAll",
     },
     Dependents: {
       View: "HR.Dependents.View",
@@ -119,11 +132,40 @@ export const Permissions = {
   Payroll: {
     PayrollRun: {
       View: "Payroll.PayrollRun.View",
-      Run: "Payroll.PayrollRun.Run",
+      Create: "Payroll.PayrollRun.Create",
+      Process: "Payroll.PayrollRun.Process",
       Approve: "Payroll.PayrollRun.Approve",
       Void: "Payroll.PayrollRun.Void",
+      // Run: removed - phantom key, no backend counterpart, zero usages found
     },
-    Loan: { View: "Payroll.Loan.View", Manage: "Payroll.Loan.Manage" },
+    Loan: {
+      View: "Payroll.Loan.View",
+      Manage: "Payroll.Loan.Manage",
+      Create: "Payroll.Loan.Create",
+      Approve: "Payroll.Loan.Approve",
+      Reject: "Payroll.Loan.Reject",
+      Disburse: "Payroll.Loan.Disburse",
+      Skip: "Payroll.Loan.Skip",
+      Hold: "Payroll.Loan.Hold",
+      Resume: "Payroll.Loan.Resume",
+      Settle: "Payroll.Loan.Settle",
+      Restructure: "Payroll.Loan.Restructure",
+      Delete: "Payroll.Loan.Delete",
+    },
+    LoanType: {
+      View: "Payroll.LoanType.View",
+      Manage: "Payroll.LoanType.Manage",
+    },
+    Payslip: {
+      View: "Payroll.Payslip.View",
+      ViewAll: "Payroll.Payslip.ViewAll",
+    },
+    Reports: {
+      View: "Payroll.Reports.View",
+      PrintLog: "Payroll.Reports.PrintLog",
+      EpfCForm: "Payroll.Reports.EpfCForm",
+      EtfReturn: "Payroll.Reports.EtfReturn",
+    },
   },
   Leave: {
     Request: {
@@ -134,9 +176,22 @@ export const Permissions = {
       Revoke: "Leave.Request.Revoke",
     },
   },
+  SystemAdmin: {
+    Alerts: {
+      View: "System.Alerts.View",
+      Acknowledge: "System.Alerts.Acknowledge",
+    },
+  },
   Settings: {
     Roles: { View: "Settings.Roles.View", Manage: "Settings.Roles.Manage" },
-    Users: { View: "Settings.Users.View", Manage: "Settings.Users.Manage" },
+    Users: {
+      View: "Settings.Users.View",
+      Create: "Settings.Users.Create",
+      Edit: "Settings.Users.Edit",
+      Delete: "Settings.Users.Delete",
+      ResetPassword: "Settings.Users.ResetPassword",
+      // Manage: removed - phantom key, no backend counterpart, zero usages found
+    },
     Company: {
       View: "Settings.Company.View",
       Manage: "Settings.Company.Manage",
@@ -149,6 +204,24 @@ export const Permissions = {
       Add: "Attendance.Log.Add",
       Edit: "Attendance.Log.Edit",
       Delete: "Attendance.Log.Delete",
+    },
+    Generation: {
+      View: "Attendance.Generation.View",
+      Run: "Attendance.Generation.Run",
+    },
+    Sync: {
+      View: "Attendance.Sync.View",
+      Run: "Attendance.Sync.Run",
+    },
+    Adjustment: {
+      View: "Attendance.Adjustment.View",
+      Request: "Attendance.Adjustment.Request",
+      Approve: "Attendance.Adjustment.Approve",
+    },
+    Ot: {
+      View: "Attendance.Ot.View",
+      Request: "Attendance.Ot.Request",
+      Approve: "Attendance.Ot.Approve",
     },
   },
   Biometric: {
@@ -164,6 +237,61 @@ export const Permissions = {
       View: "Biometric.Sync.View",
     },
   },
+  Tax: {
+    Reports: {
+      View: "Tax.Reports.View",
+      Generate: "Tax.Reports.Generate",
+      DownloadSchedule: "Tax.Reports.DownloadSchedule",
+      DownloadT10: "Tax.Reports.DownloadT10",
+    },
+  },
+  Reports: {
+    BankTransfer: {
+      View: "Reports.BankTransfer.View",
+      Export: "Reports.BankTransfer.Export",
+    },
+    CostCentre: {
+      View: "Reports.CostCentre.View",
+      Export: "Reports.CostCentre.Export",
+    },
+    Comparison: {
+      View: "Reports.Comparison.View",
+      Export: "Reports.Comparison.Export",
+    },
+    LoanDeduction: {
+      View: "Reports.LoanDeduction.View",
+      Export: "Reports.LoanDeduction.Export",
+    },
+    Attendance: {
+      View: "Reports.Attendance.View",
+      Export: "Reports.Attendance.Export",
+    },
+    LeaveBalance: {
+      View: "Reports.LeaveBalance.View",
+      Export: "Reports.LeaveBalance.Export",
+    },
+    Headcount: {
+      View: "Reports.Headcount.View",
+      Export: "Reports.Headcount.Export",
+    },
+    LateArrivals: {
+      View: "Reports.LateArrivals.View",
+      Export: "Reports.LateArrivals.Export",
+    },
+    Overtime: {
+      View: "Reports.Overtime.View",
+      Export: "Reports.Overtime.Export",
+    },
+    NoPay: { View: "Reports.NoPay.View", Export: "Reports.NoPay.Export" },
+    LeaveUtil: {
+      View: "Reports.LeaveUtil.View",
+      Export: "Reports.LeaveUtil.Export",
+    },
+    ContractExpiry: {
+      View: "Reports.ContractExpiry.View",
+      Export: "Reports.ContractExpiry.Export",
+    },
+  },
   PayslipExport: {
     ExportPdf: "Payroll.PayslipExport.ExportPdf",
     ExportBulkPdf: "Payroll.PayslipExport.ExportBulkPdf",
@@ -172,6 +300,7 @@ export const Permissions = {
     ExportBankLetter: "Payroll.PayslipExport.ExportBankLetter",
     EmailPayslip: "Payroll.PayslipExport.EmailPayslip",
     BulkEmail: "Payroll.PayslipExport.BulkEmail",
+    Reprint: "Payroll.PayslipExport.Reprint",
   },
   Recruitment: {
     Requisition: {
@@ -218,6 +347,9 @@ export const Permissions = {
       Edit: "Recruitment.SalaryBand.Edit",
       Delete: "Recruitment.SalaryBand.Delete",
     },
+    Skill: { Manage: "Recruitment.Skill.Manage" },
+    Certification: { Manage: "Recruitment.Certification.Manage" },
+    Competency: { Manage: "Recruitment.Competency.Manage" },
     Ai: {
       ParseCv: "Recruitment.Ai.ParseCv",
       MatchScore: "Recruitment.Ai.MatchScore",
@@ -249,6 +381,8 @@ export const Permissions = {
       Edit: "Recruitment.Interview.Edit",
       Delete: "Recruitment.Interview.Delete",
       ManagePanel: "Recruitment.Interview.ManagePanel",
+      SubmitScorecard: "Recruitment.Interview.SubmitScorecard",
+      ViewAllScorecards: "Recruitment.Interview.ViewAllScorecards",
     },
     Offer: {
       View: "Recruitment.Offer.View",
@@ -260,6 +394,14 @@ export const Permissions = {
       Send: "Recruitment.Offer.Send",
       RecordResponse: "Recruitment.Offer.RecordResponse",
       Withdraw: "Recruitment.Offer.Withdraw",
+    },
+  },
+  Ai: {
+    Chat: {
+      Use: "Ai.Chat.Use",
+      ViewHistory: "Ai.Chat.ViewHistory",
+      DeleteHistory: "Ai.Chat.DeleteHistory",
+      ViewUsage: "Ai.Chat.ViewUsage",
     },
   },
 } as const;

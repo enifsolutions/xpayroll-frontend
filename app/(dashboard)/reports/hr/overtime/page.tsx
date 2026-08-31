@@ -12,6 +12,8 @@ const COLS = [
   { header: "Branch",     field: "branch" },
   { header: "Department", field: "department" },
   { header: "OT Days",    field: "otDays",       align: "right" as const, format: "number" as const },
+  { header: "Pre OT Hrs", field: "preOtHours",   align: "right" as const, format: "number" as const },
+  { header: "Post OT Hrs",field: "postOtHours",  align: "right" as const, format: "number" as const },
   { header: "OT Hours",   field: "totalOtHours", align: "right" as const, format: "number" as const },
 ];
 

@@ -29,6 +29,9 @@ import { showSuccess, showError } from "@/lib/toast";
 import { useRequirePermission } from "@/hooks/useRequirePermission";
 import { usePermission } from "@/hooks/usePermission";
 import { Permissions } from "@/lib/permissions";
+import { useTour } from "@/hooks/useTour";
+import TourOverlay from "@/components/onboarding/TourOverlay";
+import { POSTINGS_STEPS } from "@/lib/tours/postings";
 
 interface JobPosting {
   id: string;
@@ -263,6 +266,7 @@ function KpiCard({
 }
 
 function JobPostingsPageInner() {
+  const tour = useTour("admin-page-postings", POSTINGS_STEPS);
   useRequirePermission("Recruitment.Posting.View");
 
   const canManage = usePermission(Permissions.Recruitment.Posting.Create);
@@ -635,6 +639,7 @@ function JobPostingsPageInner() {
             size="sm"
             icon={<Plus size={15} />}
             onClick={openAdd}
+            data-tour="postings-add-button"
           >
             New Posting
           </Button>
@@ -695,8 +700,11 @@ function JobPostingsPageInner() {
 
       <div className="card">
         <div className="card-body">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-5">
-            <div className="flex-1 max-w-xs">
+          <div
+            className="flex items-center gap-3 mb-4 flex-wrap"
+            data-tour="postings-filter-row"
+          >
+            <div className="flex-1 min-w-[200px]">
               <Input
                 placeholder="Search title, code or location…"
                 value={search}
@@ -705,10 +713,9 @@ function JobPostingsPageInner() {
             </div>
 
             <select
-              className="input"
+              className="input w-auto"
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              style={{ minWidth: 170 }}
             >
               <option value="">All Statuses</option>
               <option value="Draft">Draft</option>
@@ -725,7 +732,7 @@ function JobPostingsPageInner() {
               <RefreshCw size={15} className={loading ? "animate-spin" : ""} />
             </button>
 
-            <span className="text-sm text-gray-400 ml-auto whitespace-nowrap">
+            <span className="text-sm text-gray-400 whitespace-nowrap">
               {filtered.length} posting{filtered.length !== 1 ? "s" : ""}
             </span>
           </div>
@@ -752,7 +759,10 @@ function JobPostingsPageInner() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="table-default table-hover w-full">
+              <table
+                className="table-default table-hover w-full"
+                data-tour="postings-table-card"
+              >
                 <thead>
                   <tr>
                     <th>Posting</th>
@@ -1188,6 +1198,18 @@ function JobPostingsPageInner() {
           </div>
         </div>
       </Dialog>
+
+      {tour.visible && (
+        <TourOverlay
+          step={tour.step}
+          stepIndex={tour.stepIndex}
+          totalSteps={tour.totalSteps}
+          onNext={tour.next}
+          onPrev={tour.prev}
+          onDismiss={tour.dismiss}
+          nextStepTarget={tour.nextStep?.target}
+        />
+      )}
     </div>
   );
 }

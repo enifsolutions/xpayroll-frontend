@@ -14,6 +14,9 @@ import {
 import { useRequirePermission } from '@/hooks/useRequirePermission';
 import { usePermission } from '@/hooks/usePermission';
 import { Permissions } from '@/lib/permissions';
+import { useTour } from "@/hooks/useTour";
+import TourOverlay from "@/components/onboarding/TourOverlay";
+import { DEVICES_STEPS } from "@/lib/tours/devices";
 
 /* ─────────────────────────────────── types ────────────────────────────── */
 
@@ -240,6 +243,7 @@ function StatCard({
 /* ─────────────────────────────────── page ──────────────────────────────── */
 
 export default function DevicesPage() {
+  const tour = useTour("admin-page-devices", DEVICES_STEPS);
   useRequirePermission(Permissions.MasterData.Devices.View);
   const canManage = usePermission(Permissions.MasterData.Devices.Manage);
 
@@ -446,6 +450,7 @@ export default function DevicesPage() {
             variant="solid"
             icon={<PlusIcon size={16} />}
             onClick={openAdd}
+            data-tour="device-add-button"
           >
             Register Device
           </Button>
@@ -497,206 +502,217 @@ export default function DevicesPage() {
         />
       </div>
 
-      {/* ── Filter Row ── */}
-      <div className="flex flex-wrap items-center gap-3 mb-4">
-        <div className="relative flex-1 min-w-[200px] max-w-xs">
-          <Search
-            size={15}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
-          />
-          <input
-            className="input pl-9 w-full"
-            placeholder="Search by name, code or branch…"
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              resetPage();
-            }}
-          />
-        </div>
-
-        <select
-          className="input w-auto"
-          value={typeFilter}
-          onChange={(e) => {
-            setTypeFilter(e.target.value);
-            resetPage();
-          }}
-        >
-          <option value="">All Types</option>
-          {DEVICE_TYPE_OPTIONS.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </select>
-
-        <select
-          className="input w-auto"
-          value={statusFilter}
-          onChange={(e) => {
-            setStatusFilter(e.target.value);
-            resetPage();
-          }}
-        >
-          <option value="">All Statuses</option>
-          <option value="active">Active</option>
-          <option value="inactive">Inactive</option>
-        </select>
-
-        <span className="ml-auto text-sm text-gray-400">
-          {filtered.length} {filtered.length === 1 ? "device" : "devices"}
-        </span>
-      </div>
-
       {/* ── Table ── */}
       <div className="card">
-        <div className="card-body p-0">
+        <div className="card-body">
+          {/* ── Filter Row ── */}
+          <div
+            className="flex items-center gap-3 mb-5 flex-wrap"
+            data-tour="device-filter-row"
+          >
+            <div className="relative flex-1 min-w-0">
+              <Search
+                size={15}
+                className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+              />
+              <input
+                className="w-full pl-10 pr-4 py-2.5 rounded-full bg-gray-100 dark:bg-gray-800 border-0 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                placeholder="Search by name, code or branch…"
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  resetPage();
+                }}
+              />
+            </div>
+
+            <select
+              className="px-4 py-2.5 rounded-full bg-gray-100 dark:bg-gray-800 border-0 text-sm font-medium text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/30 cursor-pointer"
+              value={typeFilter}
+              onChange={(e) => {
+                setTypeFilter(e.target.value);
+                resetPage();
+              }}
+            >
+              <option value="">All Types</option>
+              {DEVICE_TYPE_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+
+            <select
+              className="px-4 py-2.5 rounded-full bg-gray-100 dark:bg-gray-800 border-0 text-sm font-medium text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/30 cursor-pointer"
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(e.target.value);
+                resetPage();
+              }}
+            >
+              <option value="">All Statuses</option>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </select>
+
+            <span className="ml-auto text-sm text-gray-400 whitespace-nowrap flex-shrink-0">
+              {filtered.length} {filtered.length === 1 ? "device" : "devices"}
+            </span>
+          </div>
+
           {loading ? (
             <div className="flex justify-center py-12">
               <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full" />
             </div>
           ) : (
-            <table className="table-default table-hover w-full">
-              <thead>
-                <tr>
-                  <th>Device</th>
-                  <th>Code</th>
-                  <th>Protocol</th>
-                  <th>Punch Mode</th>
-                  <th>Branch</th>
-                  <th>Last Sync</th>
-                  <th>Online</th>
-                  <th>Status</th>
-                  {canManage && <th className="w-20 text-center">Actions</th>}
-                </tr>
-              </thead>
-              <tbody>
-                {paginated.length === 0 ? (
+            <div className="overflow-x-auto">
+              <table
+                className="table-default table-hover w-full"
+                data-tour="device-table-card"
+              >
+                <thead>
                   <tr>
-                    <td colSpan={9} className="text-center py-10 text-gray-400">
-                      No devices found
-                    </td>
+                    <th>Device</th>
+                    <th>Code</th>
+                    <th>Protocol</th>
+                    <th>Punch Mode</th>
+                    <th>Branch</th>
+                    <th>Last Sync</th>
+                    <th>Online</th>
+                    <th>Status</th>
+                    {canManage && <th className="w-20 text-center">Actions</th>}
                   </tr>
-                ) : (
-                  paginated.map((item) => {
-                    const hb = heartbeatStatus(item.lastHeartbeatAt);
-                    return (
-                      <tr key={item.id}>
-                        <td>
-                          <div className="flex items-center gap-3">
-                            <DeviceIcon
-                              type={item.deviceType}
-                              seed={item.deviceCode}
-                            />
-                            <div>
-                              <div className="font-medium text-gray-800 dark:text-gray-100">
-                                {item.name}
-                              </div>
-                              {item.locationTag && (
-                                <div className="text-xs text-gray-400">
-                                  {item.locationTag}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </td>
-                        <td>
-                          <code className="text-xs bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">
-                            {item.deviceCode}
-                          </code>
-                        </td>
-                        <td>
-                          <span
-                            className={`xp-badge ${PROTOCOL_BADGE[item.protocol ?? ""] ?? "xp-badge-neutral"}`}
-                          >
-                            {protocolLabel(item.protocol)}
-                          </span>
-                        </td>
-                        <td className="text-sm text-gray-600 dark:text-gray-400">
-                          {punchModeLabel(item.punchMode)}
-                        </td>
-                        <td className="text-gray-500 text-sm">
-                          {item.branchName ?? "—"}
-                        </td>
-                        <td className="text-gray-500 text-sm">
-                          {item.lastSyncAt ? (
-                            new Date(item.lastSyncAt).toLocaleString([], {
-                              month: "short",
-                              day: "numeric",
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })
-                          ) : (
-                            <span className="text-gray-300 dark:text-gray-600">
-                              Never
-                            </span>
-                          )}
-                        </td>
-                        <td>
-                          {hb === "online" && (
-                            <span className="flex items-center gap-1.5 text-emerald-500 text-xs font-medium">
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block animate-pulse" />
-                              Online
-                            </span>
-                          )}
-                          {hb === "idle" && (
-                            <span className="flex items-center gap-1.5 text-amber-500 text-xs font-medium">
-                              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" />
-                              Idle
-                            </span>
-                          )}
-                          {hb === "offline" && (
-                            <span className="flex items-center gap-1.5 text-red-400 text-xs font-medium">
-                              <span className="w-1.5 h-1.5 rounded-full bg-red-400 inline-block" />
-                              Offline
-                            </span>
-                          )}
-                          {hb === "never" && (
-                            <span className="text-gray-300 dark:text-gray-600 text-xs">
-                              —
-                            </span>
-                          )}
-                        </td>
-                        <td>
-                          <span
-                            className={`xp-badge ${item.isActive ? "xp-badge-success" : "xp-badge-danger"}`}
-                          >
-                            {item.isActive ? "Active" : "Inactive"}
-                          </span>
-                        </td>
-                        {canManage && (
+                </thead>
+                <tbody>
+                  {paginated.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={9}
+                        className="text-center py-10 text-gray-400"
+                      >
+                        No devices found
+                      </td>
+                    </tr>
+                  ) : (
+                    paginated.map((item) => {
+                      const hb = heartbeatStatus(item.lastHeartbeatAt);
+                      return (
+                        <tr key={item.id}>
                           <td>
-                            <div className="flex items-center justify-center gap-1">
-                              <button
-                                onClick={() => openEdit(item)}
-                                className="p-1.5 rounded-lg text-violet-500 hover:bg-violet-50 dark:hover:bg-violet-900/20 transition-colors"
-                                title="Edit"
-                              >
-                                <Pencil size={15} />
-                              </button>
-                              <button
-                                onClick={() => handleDelete(item)}
-                                className="p-1.5 rounded-lg text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-                                title="Delete"
-                              >
-                                <Trash2 size={15} />
-                              </button>
+                            <div className="flex items-center gap-3">
+                              <DeviceIcon
+                                type={item.deviceType}
+                                seed={item.deviceCode}
+                              />
+                              <div>
+                                <div className="font-medium text-gray-800 dark:text-gray-100">
+                                  {item.name}
+                                </div>
+                                {item.locationTag && (
+                                  <div className="text-xs text-gray-400">
+                                    {item.locationTag}
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           </td>
-                        )}
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
+                          <td>
+                            <code className="text-xs bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">
+                              {item.deviceCode}
+                            </code>
+                          </td>
+                          <td>
+                            <span
+                              className={`xp-badge ${PROTOCOL_BADGE[item.protocol ?? ""] ?? "xp-badge-neutral"}`}
+                            >
+                              {protocolLabel(item.protocol)}
+                            </span>
+                          </td>
+                          <td className="text-sm text-gray-600 dark:text-gray-400">
+                            {punchModeLabel(item.punchMode)}
+                          </td>
+                          <td className="text-gray-500 text-sm">
+                            {item.branchName ?? "—"}
+                          </td>
+                          <td className="text-gray-500 text-sm">
+                            {item.lastSyncAt ? (
+                              new Date(item.lastSyncAt).toLocaleString([], {
+                                month: "short",
+                                day: "numeric",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })
+                            ) : (
+                              <span className="text-gray-300 dark:text-gray-600">
+                                Never
+                              </span>
+                            )}
+                          </td>
+                          <td>
+                            {hb === "online" && (
+                              <span className="flex items-center gap-1.5 text-emerald-500 text-xs font-medium">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block animate-pulse" />
+                                Online
+                              </span>
+                            )}
+                            {hb === "idle" && (
+                              <span className="flex items-center gap-1.5 text-amber-500 text-xs font-medium">
+                                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" />
+                                Idle
+                              </span>
+                            )}
+                            {hb === "offline" && (
+                              <span className="flex items-center gap-1.5 text-red-400 text-xs font-medium">
+                                <span className="w-1.5 h-1.5 rounded-full bg-red-400 inline-block" />
+                                Offline
+                              </span>
+                            )}
+                            {hb === "never" && (
+                              <span className="text-gray-300 dark:text-gray-600 text-xs">
+                                —
+                              </span>
+                            )}
+                          </td>
+                          <td>
+                            <span
+                              className={`xp-badge ${item.isActive ? "xp-badge-success" : "xp-badge-danger"}`}
+                            >
+                              {item.isActive ? "Active" : "Inactive"}
+                            </span>
+                          </td>
+                          {canManage && (
+                            <td>
+                              <div className="flex items-center justify-center gap-1">
+                                <button
+                                  onClick={() => openEdit(item)}
+                                  className="p-1.5 rounded-lg text-violet-500 hover:bg-violet-50 dark:hover:bg-violet-900/20 transition-colors"
+                                  title="Edit"
+                                >
+                                  <Pencil size={15} />
+                                </button>
+                                <button
+                                  onClick={() => handleDelete(item)}
+                                  className="p-1.5 rounded-lg text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                                  title="Delete"
+                                >
+                                  <Trash2 size={15} />
+                                </button>
+                              </div>
+                            </td>
+                          )}
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
 
         {/* ── Pagination ── */}
         {!loading && filtered.length > PAGE_SIZE && (
-          <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 dark:border-gray-700">
+          <div className="flex items-center justify-between px-6 py-3 border-t border-gray-100 dark:border-gray-700">
             <span className="text-sm text-gray-400">
               Showing {(page - 1) * PAGE_SIZE + 1}–
               {Math.min(page * PAGE_SIZE, filtered.length)} of {filtered.length}{" "}
@@ -1020,6 +1036,18 @@ export default function DevicesPage() {
           </Button>
         </div>
       </Dialog>
+
+      {tour.visible && (
+        <TourOverlay
+          step={tour.step}
+          stepIndex={tour.stepIndex}
+          totalSteps={tour.totalSteps}
+          onNext={tour.next}
+          onPrev={tour.prev}
+          onDismiss={tour.dismiss}
+          nextStepTarget={tour.nextStep?.target}
+        />
+      )}
     </div>
   );
 }

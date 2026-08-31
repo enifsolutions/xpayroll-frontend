@@ -232,8 +232,20 @@ export default function PayrollRunsPage() {
     setConfirming(true);
     try {
       if (confirmType === "PROCESS") {
-        await payrollService.process(selectedRun.id, userId);
-        showSuccess("Processed", "Payroll processed successfully");
+        const res = await payrollService.process(selectedRun.id, userId);
+        if (res?.errorCount > 0) {
+          // The run DID succeed and payslips were generated — but some
+          // employees were skipped because their data is incomplete. Surfacing
+          // this loudly matters: a silent success would leave people unpaid
+          // with nobody aware until they complained.
+          showError(
+            `Processed — ${res.errorCount} employee(s) skipped`,
+            res.message ??
+              "Some employees were skipped because their attendance or contract data is incomplete.",
+          );
+        } else {
+          showSuccess("Processed", "Payroll processed successfully");
+        }
       } else {
         await payrollService.action(selectedRun.id, confirmType, userId);
         const labels: Record<string, string> = {
@@ -381,17 +393,18 @@ export default function PayrollRunsPage() {
         />
       </div>
 
-      {/* Filter Bar */}
-      <div className="card mb-4">
-        <div className="card-body py-3 px-4">
-          <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
-            <div className="relative flex-1 max-w-xs">
+      {/* Table */}
+      <div className="card">
+        <div className="card-body">
+          {/* Filter Bar */}
+          <div className="flex items-center gap-3 mb-4 flex-wrap">
+            <div className="relative flex-1 min-w-[200px] w-full">
               <Search
                 size={14}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+                className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
               />
               <input
-                className="input w-full pl-8 text-sm"
+                className="w-full pl-10 pr-4 py-2.5 rounded-full bg-gray-100 dark:bg-gray-800 border-0 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/30"
                 placeholder="Search period..."
                 value={search}
                 onChange={(e) =>
@@ -400,7 +413,7 @@ export default function PayrollRunsPage() {
               />
             </div>
             <select
-              className="input text-sm w-full sm:w-auto"
+              className="input w-auto"
               value={statusFilter}
               onChange={(e) =>
                 handleFilterChange(() => setStatusFilter(e.target.value))
@@ -413,202 +426,202 @@ export default function PayrollRunsPage() {
               <option value="Approved">Approved</option>
               <option value="Cancelled">Cancelled</option>
             </select>
-            <div className="text-xs text-gray-400 whitespace-nowrap sm:ml-auto">
+            <div className="text-sm text-gray-400 whitespace-nowrap sm:ml-auto">
               {filtered.length} {filtered.length === 1 ? "run" : "runs"}
             </div>
           </div>
-        </div>
-      </div>
 
-      {/* Table */}
-      <div className="card">
-        <div className="card-body p-0">
           {loading ? (
             <div className="flex justify-center items-center py-16">
               <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent" />
             </div>
           ) : (
-            <table className="table-default table-hover w-full">
-              <thead>
-                <tr>
-                  <th>Period</th>
-                  <th>Status</th>
-                  <th className="text-right">Total Gross</th>
-                  <th className="text-right">Deductions</th>
-                  <th className="text-right">Net Pay</th>
-                  <th>Processed</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {paginated.length === 0 ? (
+            <div className="overflow-x-auto">
+              <table className="table-default table-hover w-full">
+                <thead>
                   <tr>
-                    <td colSpan={7} className="text-center py-10 text-gray-400">
-                      {runs.length === 0
-                        ? "No payroll runs yet."
-                        : "No runs match the current filters."}
-                    </td>
+                    <th>Period</th>
+                    <th>Status</th>
+                    <th className="text-right">Total Gross</th>
+                    <th className="text-right">Deductions</th>
+                    <th className="text-right">Net Pay</th>
+                    <th>Processed</th>
+                    <th>Actions</th>
                   </tr>
-                ) : (
-                  paginated.map((run) => (
-                    <tr key={run.id}>
-                      <td>
-                        <div className="font-medium">{run.periodLabel}</div>
-                        <div className="text-xs text-gray-400">
-                          {run.periodStart} → {run.periodEnd}
-                        </div>
-                      </td>
-                      <td>
-                        <span className={statusBadge(run.status)}>
-                          {run.status}
-                        </span>
-                      </td>
-                      <td className="text-right font-mono text-sm">
-                        {fmt(run.totalGross)}
-                      </td>
-                      <td className="text-right font-mono text-sm text-red-500">
-                        {fmt(run.totalDeductions)}
-                      </td>
-                      <td className="text-right font-mono text-sm font-semibold text-green-600">
-                        {fmt(run.totalNet)}
-                      </td>
-                      <td className="text-sm text-gray-400">
-                        {run.processedAt
-                          ? new Date(run.processedAt).toLocaleDateString()
-                          : "—"}
-                      </td>
-                      <td>
-                        <div className="flex gap-1 items-center">
-                          {/* View */}
-                          {(run.status === "Completed" ||
-                            run.status === "Approved") && (
-                            <button
-                              className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500"
-                              title="View Payslips"
-                              onClick={() =>
-                                router.push(
-                                  `/transactions/payroll-runs/${run.id}`,
-                                )
-                              }
-                            >
-                              <Eye size={15} />
-                            </button>
-                          )}
-                          {/* Process */}
-                          {canProcess && run.status === "Draft" && (
-                            <button
-                              className="p-1.5 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 text-blue-500"
-                              title="Process"
-                              onClick={() => openConfirm(run, "PROCESS")}
-                            >
-                              <Play size={15} />
-                            </button>
-                          )}
-                          {/* Approve */}
-                          {canApprove && run.status === "Completed" && (
-                            <button
-                              className="p-1.5 rounded-lg hover:bg-green-50 dark:hover:bg-green-900/20 text-green-500"
-                              title="Approve"
-                              onClick={() => openConfirm(run, "APPROVE")}
-                            >
-                              <CheckCircle size={15} />
-                            </button>
-                          )}
-                          {/* Cancel draft */}
-                          {run.status === "Draft" && (
-                            <button
-                              className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-red-400"
-                              title="Cancel"
-                              onClick={() => openConfirm(run, "CANCEL")}
-                            >
-                              <XCircle size={15} />
-                            </button>
-                          )}
-                          {/* Void approved */}
-                          {canVoid && run.status === "Approved" && (
-                            <button
-                              className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-red-400"
-                              title="Void"
-                              onClick={() => openConfirm(run, "VOID")}
-                            >
-                              <XCircle size={15} />
-                            </button>
-                          )}
-                          {/* Export */}
-                          {run.status === "Completed" ||
-                          run.status === "Approved" ? (
-                            <PayslipExportMenu
-                              payrollRunId={run.id}
-                              periodLabel={run.periodLabel}
-                              mode="run"
-                            />
-                          ) : (
-                            <button
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 dark:border-gray-600 text-gray-400 dark:text-gray-500 cursor-not-allowed opacity-50"
-                              disabled
-                              title="Export available after processing"
-                            >
-                              Export
-                            </button>
-                          )}
-                        </div>
+                </thead>
+                <tbody>
+                  {paginated.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={7}
+                        className="text-center py-10 text-gray-400"
+                      >
+                        {runs.length === 0
+                          ? "No payroll runs yet."
+                          : "No runs match the current filters."}
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          )}
-
-          {/* Pagination */}
-          {!loading && filtered.length > PAGE_SIZE && (
-            <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 dark:border-gray-700">
-              <p className="text-xs text-gray-500">
-                Showing {(page - 1) * PAGE_SIZE + 1}–
-                {Math.min(page * PAGE_SIZE, filtered.length)} of{" "}
-                {filtered.length} entries
-              </p>
-              <div className="flex items-center gap-1">
-                <button
-                  className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 disabled:opacity-40 disabled:cursor-not-allowed"
-                  onClick={() => setPage((p) => p - 1)}
-                  disabled={page === 1}
-                >
-                  <ChevronLeft size={15} />
-                </button>
-                {pageNumbers().map((p, i) =>
-                  p === "…" ? (
-                    <span
-                      key={`ellipsis-${i}`}
-                      className="px-1 text-xs text-gray-400"
-                    >
-                      …
-                    </span>
                   ) : (
-                    <button
-                      key={p}
-                      onClick={() => setPage(p as number)}
-                      className={`w-7 h-7 text-xs rounded-lg font-medium transition-colors ${
-                        page === p
-                          ? "bg-primary text-white"
-                          : "hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300"
-                      }`}
-                    >
-                      {p}
-                    </button>
-                  ),
-                )}
-                <button
-                  className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 disabled:opacity-40 disabled:cursor-not-allowed"
-                  onClick={() => setPage((p) => p + 1)}
-                  disabled={page === totalPages}
-                >
-                  <ChevronRight size={15} />
-                </button>
-              </div>
+                    paginated.map((run) => (
+                      <tr key={run.id}>
+                        <td>
+                          <div className="font-medium">{run.periodLabel}</div>
+                          <div className="text-xs text-gray-400">
+                            {run.periodStart} → {run.periodEnd}
+                          </div>
+                        </td>
+                        <td>
+                          <span className={statusBadge(run.status)}>
+                            {run.status}
+                          </span>
+                        </td>
+                        <td className="text-right font-mono text-sm">
+                          {fmt(run.totalGross)}
+                        </td>
+                        <td className="text-right font-mono text-sm text-red-500">
+                          {fmt(run.totalDeductions)}
+                        </td>
+                        <td className="text-right font-mono text-sm font-semibold text-green-600">
+                          {fmt(run.totalNet)}
+                        </td>
+                        <td className="text-sm text-gray-400">
+                          {run.processedAt
+                            ? new Date(run.processedAt).toLocaleDateString()
+                            : "—"}
+                        </td>
+                        <td>
+                          <div className="flex gap-1 items-center">
+                            {/* View */}
+                            {(run.status === "Completed" ||
+                              run.status === "Approved") && (
+                              <button
+                                className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500"
+                                title="View Payslips"
+                                onClick={() =>
+                                  router.push(
+                                    `/transactions/payroll-runs/${run.id}`,
+                                  )
+                                }
+                              >
+                                <Eye size={15} />
+                              </button>
+                            )}
+                            {/* Process */}
+                            {canProcess && run.status === "Draft" && (
+                              <button
+                                className="p-1.5 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 text-blue-500"
+                                title="Process"
+                                onClick={() => openConfirm(run, "PROCESS")}
+                              >
+                                <Play size={15} />
+                              </button>
+                            )}
+                            {/* Approve */}
+                            {canApprove && run.status === "Completed" && (
+                              <button
+                                className="p-1.5 rounded-lg hover:bg-green-50 dark:hover:bg-green-900/20 text-green-500"
+                                title="Approve"
+                                onClick={() => openConfirm(run, "APPROVE")}
+                              >
+                                <CheckCircle size={15} />
+                              </button>
+                            )}
+                            {/* Cancel draft */}
+                            {run.status === "Draft" && (
+                              <button
+                                className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-red-400"
+                                title="Cancel"
+                                onClick={() => openConfirm(run, "CANCEL")}
+                              >
+                                <XCircle size={15} />
+                              </button>
+                            )}
+                            {/* Void approved */}
+                            {canVoid && run.status === "Approved" && (
+                              <button
+                                className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-red-400"
+                                title="Void"
+                                onClick={() => openConfirm(run, "VOID")}
+                              >
+                                <XCircle size={15} />
+                              </button>
+                            )}
+                            {/* Export */}
+                            {run.status === "Completed" ||
+                            run.status === "Approved" ? (
+                              <PayslipExportMenu
+                                payrollRunId={run.id}
+                                periodLabel={run.periodLabel}
+                                mode="run"
+                              />
+                            ) : (
+                              <button
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 dark:border-gray-600 text-gray-400 dark:text-gray-500 cursor-not-allowed opacity-50"
+                                disabled
+                                title="Export available after processing"
+                              >
+                                Export
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
             </div>
           )}
         </div>
+
+        {/* Pagination */}
+        {!loading && filtered.length > PAGE_SIZE && (
+          <div className="flex items-center justify-between px-6 py-3 border-t border-gray-100 dark:border-gray-700">
+            <p className="text-xs text-gray-500">
+              Showing {(page - 1) * PAGE_SIZE + 1}–
+              {Math.min(page * PAGE_SIZE, filtered.length)} of {filtered.length}{" "}
+              entries
+            </p>
+            <div className="flex items-center gap-1">
+              <button
+                className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 disabled:opacity-40 disabled:cursor-not-allowed"
+                onClick={() => setPage((p) => p - 1)}
+                disabled={page === 1}
+              >
+                <ChevronLeft size={15} />
+              </button>
+              {pageNumbers().map((p, i) =>
+                p === "…" ? (
+                  <span
+                    key={`ellipsis-${i}`}
+                    className="px-1 text-xs text-gray-400"
+                  >
+                    …
+                  </span>
+                ) : (
+                  <button
+                    key={p}
+                    onClick={() => setPage(p as number)}
+                    className={`w-7 h-7 text-xs rounded-lg font-medium transition-colors ${
+                      page === p
+                        ? "bg-primary text-white"
+                        : "hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300"
+                    }`}
+                  >
+                    {p}
+                  </button>
+                ),
+              )}
+              <button
+                className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 disabled:opacity-40 disabled:cursor-not-allowed"
+                onClick={() => setPage((p) => p + 1)}
+                disabled={page === totalPages}
+              >
+                <ChevronRight size={15} />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Create Dialog */}

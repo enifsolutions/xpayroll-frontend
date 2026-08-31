@@ -587,10 +587,11 @@ export default function OffersPage() {
         </div>
       </div>
 
-      {/* Filters */}
+      {/* Table */}
       <div className="card">
         <div className="card-body">
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
+          {/* Filters */}
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-3 items-end mb-5">
             <div className="md:col-span-2">
               <label className="form-label">Search</label>
               <div className="relative">
@@ -674,12 +675,7 @@ export default function OffersPage() {
               </button>
             </div>
           )}
-        </div>
-      </div>
 
-      {/* Table */}
-      <div className="card">
-        <div className="card-body">
           {loading ? (
             <div className="flex items-center justify-center py-16">
               <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />

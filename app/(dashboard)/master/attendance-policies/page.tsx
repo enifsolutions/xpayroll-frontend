@@ -33,6 +33,9 @@ import {
 import { useRequirePermission } from "@/hooks/useRequirePermission";
 import { usePermission } from "@/hooks/usePermission";
 import { Permissions } from "@/lib/permissions";
+import { useTour } from "@/hooks/useTour";
+import TourOverlay from "@/components/onboarding/TourOverlay";
+import { ATTENDANCE_POLICIES_STEPS } from "@/lib/tours/attendance-policies";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -48,6 +51,9 @@ interface AttendancePolicy {
   lateGraceMinutes: number;
   overtimeThresholdMinutes: number;
   isDefault: boolean;
+  autoCalculateOvertime: boolean;
+  preOtGraceMinutes: number;
+  earlyLeaveGraceMinutes: number;
 }
 
 interface AttendancePolicyStats {
@@ -77,6 +83,9 @@ interface AttendancePolicyForm {
   lateGraceMinutes: string;
   overtimeThresholdMinutes: string;
   isDefault: boolean;
+  autoCalculateOvertime: boolean;
+  preOtGraceMinutes: string;
+  earlyLeaveGraceMinutes: string;
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -92,6 +101,9 @@ const EMPTY: AttendancePolicyForm = {
   lateGraceMinutes: "10",
   overtimeThresholdMinutes: "0",
   isDefault: false,
+  autoCalculateOvertime: false,
+  preOtGraceMinutes: "0",
+  earlyLeaveGraceMinutes: "0",
 };
 
 const TRACKING_MODE_OPTIONS = [
@@ -149,6 +161,10 @@ function activityTitle(action: string): string {
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function AttendancePoliciesPage() {
+  const tour = useTour(
+    "admin-page-attendance-policies",
+    ATTENDANCE_POLICIES_STEPS,
+  );
   useRequirePermission(Permissions.MasterData.AttendancePolicies.View);
   const canManage = usePermission(
     Permissions.MasterData.AttendancePolicies.Manage,
@@ -274,6 +290,9 @@ export default function AttendancePoliciesPage() {
       lateGraceMinutes: String(item.lateGraceMinutes),
       overtimeThresholdMinutes: String(item.overtimeThresholdMinutes),
       isDefault: item.isDefault,
+      autoCalculateOvertime: item.autoCalculateOvertime,
+      preOtGraceMinutes: String(item.preOtGraceMinutes),
+      earlyLeaveGraceMinutes: String(item.earlyLeaveGraceMinutes),
     });
     setError("");
     setDialogOpen(true);
@@ -300,6 +319,9 @@ export default function AttendancePoliciesPage() {
         lateGraceMinutes: parseInt(form.lateGraceMinutes) || 0,
         overtimeThresholdMinutes: parseInt(form.overtimeThresholdMinutes) || 0,
         isDefault: form.isDefault,
+        autoCalculateOvertime: form.autoCalculateOvertime,
+        preOtGraceMinutes: parseInt(form.preOtGraceMinutes) || 0,
+        earlyLeaveGraceMinutes: parseInt(form.earlyLeaveGraceMinutes) || 0,
       });
       setDialogOpen(false);
       showSuccess(editing ? "Policy updated" : "Policy created", form.name);
@@ -449,12 +471,14 @@ export default function AttendancePoliciesPage() {
           <button
             onClick={loadAll}
             className="p-2 rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+            data-tour="attendance-policies-refresh-button"
             title="Refresh all"
           >
             <RefreshCw size={15} />
           </button>
           <Button
             variant="default"
+            data-tour="attendance-policies-export-button"
             icon={<Download size={15} />}
             size="sm"
             onClick={handleExportCsv}
@@ -466,6 +490,7 @@ export default function AttendancePoliciesPage() {
               variant="solid"
               icon={<PlusIcon size={16} />}
               onClick={openAdd}
+              data-tour="attendance-policies-add-button"
             >
               Add Policy
             </Button>
@@ -505,7 +530,10 @@ export default function AttendancePoliciesPage() {
       <div className="card">
         <div className="card-body p-0">
           {/* Filter row */}
-          <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-100 dark:border-gray-700">
+          <div
+            className="flex items-center gap-3 px-5 py-4 border-b border-gray-100 dark:border-gray-700"
+            data-tour="attendance-policies-filter-row"
+          >
             <div className="relative flex-1 max-w-xs">
               <Search
                 size={14}
@@ -544,7 +572,10 @@ export default function AttendancePoliciesPage() {
             </div>
           ) : (
             <>
-              <div className="overflow-x-auto">
+              <div
+                className="overflow-x-auto"
+                data-tour="attendance-policies-table-card"
+              >
                 <table className="table-default table-hover w-full">
                   <thead>
                     <tr>
@@ -742,7 +773,7 @@ export default function AttendancePoliciesPage() {
       {/* ── Bottom row: Recent Activity + Performance Overview ── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         {/* Recent Activity */}
-        <div className="card">
+        <div className="card" data-tour="attendance-policies-activity-card">
           <div className="card-body p-5">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
@@ -815,7 +846,7 @@ export default function AttendancePoliciesPage() {
         </div>
 
         {/* Policy Performance Overview */}
-        <div className="card">
+        <div className="card" data-tour="attendance-policies-performance-card">
           <div className="card-body p-5">
             <div className="flex items-center gap-2 mb-4">
               <TrendingUp size={15} className="text-primary" />
@@ -985,6 +1016,34 @@ export default function AttendancePoliciesPage() {
             </div>
           </div>
 
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="form-label">Pre-OT Grace (minutes)</label>
+              <Input
+                type="number"
+                min="0"
+                value={form.preOtGraceMinutes}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, preOtGraceMinutes: e.target.value }))
+                }
+              />
+            </div>
+            <div>
+              <label className="form-label">Early Leave Grace (minutes)</label>
+              <Input
+                type="number"
+                min="0"
+                value={form.earlyLeaveGraceMinutes}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    earlyLeaveGraceMinutes: e.target.value,
+                  }))
+                }
+              />
+            </div>
+          </div>
+
           <div className="space-y-2">
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
               Check-in Methods
@@ -1025,7 +1084,10 @@ export default function AttendancePoliciesPage() {
             {(
               [
                 ["trackBreaks", "Track Break Times"],
-                ["trackOvertime", "Track Overtime"],
+                [
+                  "autoCalculateOvertime",
+                  "Auto-Calculate Overtime (off = requires approval)",
+                ],
                 ["isDefault", "Set as Default Policy"],
               ] as const
             ).map(([key, label]) => (
@@ -1054,6 +1116,18 @@ export default function AttendancePoliciesPage() {
           </Button>
         </div>
       </Dialog>
+
+      {tour.visible && (
+        <TourOverlay
+          step={tour.step}
+          stepIndex={tour.stepIndex}
+          totalSteps={tour.totalSteps}
+          onNext={tour.next}
+          onPrev={tour.prev}
+          onDismiss={tour.dismiss}
+          nextStepTarget={tour.nextStep?.target}
+        />
+      )}
     </div>
   );
 }

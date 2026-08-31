@@ -18,6 +18,9 @@ const COLS = [
   { header: "Hours",      field: "totalHours",    align: "right" as const, format: "number" as const },
   { header: "OT Hours",   field: "overtimeHours", align: "right" as const, format: "number" as const },
   { header: "Late Mins",  field: "lateMinutes",   align: "right" as const, format: "number" as const },
+  { header: "Pre OT Mins",    field: "preOtMinutes",      align: "right" as const, format: "number" as const },
+  { header: "Post OT Mins",   field: "postOtMinutes",     align: "right" as const, format: "number" as const },
+  { header: "Early Leave Mins", field: "earlyLeaveMinutes", align: "right" as const, format: "number" as const },
 ];
 
 export default function AttendanceSummaryPage() {
@@ -28,7 +31,7 @@ export default function AttendanceSummaryPage() {
   return (
     <ReportPage
       title="Attendance Summary Report"
-      description="Present, absent, late and overtime summary per employee"
+      description="Present, absent, late, overtime and early-leave summary per employee"
       permissionKey="Reports.Attendance.View"
       endpoint="reports/attendance-summary"
       columns={COLS}

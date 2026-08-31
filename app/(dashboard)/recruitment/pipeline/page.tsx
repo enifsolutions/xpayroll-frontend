@@ -14,6 +14,9 @@ import { usePermission } from '@/hooks/usePermission';
 import { useRequirePermission } from '@/hooks/useRequirePermission';
 import { Permissions } from '@/lib/permissions';
 import MatchScoreDrawer, { MatchReasoningDto } from '@/components/recruitment/MatchScoreDrawer';
+import { useTour } from "@/hooks/useTour";
+import TourOverlay from "@/components/onboarding/TourOverlay";
+import { PIPELINE_STEPS } from "@/lib/tours/pipeline";
 
 // ---------- Types (mirrors backend DTOs exactly, camelCase over the wire) ----------
 
@@ -148,6 +151,8 @@ export default function PipelinePage() {
 }
 
 function PipelineBoard() {
+  const tour = useTour("admin-page-pipeline", PIPELINE_STEPS);
+
   useRequirePermission(Permissions.Recruitment.Application.View);
 
   const searchParams = useSearchParams();
@@ -395,21 +400,38 @@ function PipelineBoard() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="plain" icon={<RefreshCw size={16} />} onClick={refresh}>
+          <Button
+            variant="plain"
+            icon={<RefreshCw size={16} />}
+            onClick={refresh}
+            data-tour="pipeline-refresh-button"
+          >
             Refresh
           </Button>
           {canScore && selectedReqId && (
             <Button
               variant="twoTone"
-              icon={scoringShortlist ? <RefreshCw size={16} className="animate-spin" /> : <Sparkles size={16} />}
+              icon={
+                scoringShortlist ? (
+                  <RefreshCw size={16} className="animate-spin" />
+                ) : (
+                  <Sparkles size={16} />
+                )
+              }
               disabled={scoringShortlist}
               onClick={scoreShortlist}
             >
-              {scoringShortlist ? 'Scoring...' : 'Score Shortlist'}
+              {scoringShortlist ? "Scoring..." : "Score Shortlist"}
             </Button>
           )}
           {canCreate && (
-            <Button variant="solid" color="primary" icon={<Plus size={16} />} onClick={() => setAddOpen(true)}>
+            <Button
+              variant="solid"
+              color="primary"
+              icon={<Plus size={16} />}
+              onClick={() => setAddOpen(true)}
+              data-tour="pipeline-add-button"
+            >
               Add to Pipeline
             </Button>
           )}
@@ -418,37 +440,60 @@ function PipelineBoard() {
 
       {/* KPI strip */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <KpiCard icon={<UsersIcon size={18} className="text-white" />} bg="bg-blue-500" label="Active in pipeline"
-          value={MOVABLE_STAGES.reduce((sum, s) => sum + columns[s].length, 0)} />
-        <KpiCard icon={<History size={18} className="text-white" />} bg="bg-emerald-500" label="Hired"
-          value={terminalCounts.Hired} />
-        <KpiCard icon={<Ban size={18} className="text-white" />} bg="bg-rose-500" label="Rejected"
-          value={terminalCounts.Rejected} />
-        <KpiCard icon={<UserX size={18} className="text-white" />} bg="bg-amber-400" label="Withdrawn"
-          value={terminalCounts.Withdrawn} />
+        <KpiCard
+          icon={<UsersIcon size={18} className="text-white" />}
+          bg="bg-blue-500"
+          label="Active in pipeline"
+          value={MOVABLE_STAGES.reduce((sum, s) => sum + columns[s].length, 0)}
+        />
+        <KpiCard
+          icon={<History size={18} className="text-white" />}
+          bg="bg-emerald-500"
+          label="Hired"
+          value={terminalCounts.Hired}
+        />
+        <KpiCard
+          icon={<Ban size={18} className="text-white" />}
+          bg="bg-rose-500"
+          label="Rejected"
+          value={terminalCounts.Rejected}
+        />
+        <KpiCard
+          icon={<UserX size={18} className="text-white" />}
+          bg="bg-amber-400"
+          label="Withdrawn"
+          value={terminalCounts.Withdrawn}
+        />
       </div>
 
       {/* Filters */}
       <div className="card">
-        <div className="card-body flex flex-wrap items-center gap-3">
+        <div
+          className="card-body flex flex-wrap items-center gap-3"
+          data-tour="pipeline-filter-row"
+        >
           <select
             value={selectedReqId}
-            onChange={e => setSelectedReqId(e.target.value)}
-            style={{ ...selectStyle, minWidth: '260px' }}
+            onChange={(e) => setSelectedReqId(e.target.value)}
+            style={{ ...selectStyle, minWidth: "260px" }}
           >
             <option value="">All Requisitions</option>
-            {requisitions.map(r => (
+            {requisitions.map((r) => (
               <option key={r.id} value={r.id}>
-                {r.requisitionCode} — {r.title} ({r.headcountFilled}/{r.headcount})
+                {r.requisitionCode} — {r.title} ({r.headcountFilled}/
+                {r.headcount})
               </option>
             ))}
           </select>
 
-          <div className="relative flex-1" style={{ minWidth: '200px' }}>
-            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <div className="relative flex-1" style={{ minWidth: "200px" }}>
+            <Search
+              size={16}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+            />
             <Input
               value={search}
-              onChange={e => setSearch(e.target.value)}
+              onChange={(e) => setSearch(e.target.value)}
               placeholder="Search candidate or requisition..."
               className="pl-9"
             />
@@ -458,57 +503,89 @@ function PipelineBoard() {
 
       {/* Kanban board */}
       {loading ? (
-        <div className="card"><div className="card-body text-center text-gray-500 py-10">Loading pipeline...</div></div>
+        <div className="card">
+          <div className="card-body text-center text-gray-500 py-10">
+            Loading pipeline...
+          </div>
+        </div>
       ) : (
-        <div className="flex gap-4 overflow-x-auto pb-4">
-          {MOVABLE_STAGES.map(stage => (
+        <div
+          className="flex gap-4 overflow-x-auto pb-4"
+          data-tour="pipeline-canban-board"
+        >
+          {MOVABLE_STAGES.map((stage) => (
             <div
               key={stage}
-              onDragOver={e => onColumnDragOver(e, stage)}
-              onDragLeave={() => setDragOverStage(cur => (cur === stage ? null : cur))}
-              onDrop={e => onColumnDrop(e, stage)}
+              onDragOver={(e) => onColumnDragOver(e, stage)}
+              onDragLeave={() =>
+                setDragOverStage((cur) => (cur === stage ? null : cur))
+              }
+              onDrop={(e) => onColumnDrop(e, stage)}
               className="flex w-72 flex-shrink-0 flex-col rounded-xl"
               style={{
-                background: dragOverStage === stage ? 'rgba(99,102,241,0.08)' : 'transparent',
-                border: dragOverStage === stage ? '2px dashed rgba(99,102,241,0.5)' : '2px dashed transparent',
-                transition: 'background 0.15s, border-color 0.15s',
+                background:
+                  dragOverStage === stage
+                    ? "rgba(99,102,241,0.08)"
+                    : "transparent",
+                border:
+                  dragOverStage === stage
+                    ? "2px dashed rgba(99,102,241,0.5)"
+                    : "2px dashed transparent",
+                transition: "background 0.15s, border-color 0.15s",
               }}
             >
               <div className="flex items-center justify-between px-2 py-2">
-                <span className={`xp-badge ${STAGE_BADGE[stage]}`}>{STAGE_LABELS[stage]}</span>
-                <span className="text-xs text-gray-400">{columns[stage].length}</span>
+                <span className={`xp-badge ${STAGE_BADGE[stage]}`}>
+                  {STAGE_LABELS[stage]}
+                </span>
+                <span className="text-xs text-gray-400">
+                  {columns[stage].length}
+                </span>
               </div>
 
-              <div className="flex flex-col gap-2 px-1" style={{ minHeight: '80px' }}>
-                {columns[stage].map(app => (
+              <div
+                className="flex flex-col gap-2 px-1"
+                style={{ minHeight: "80px" }}
+              >
+                {columns[stage].map((app) => (
                   <div
                     key={app.id}
                     draggable={canChangeStage}
-                    onDragStart={e => onDragStart(e, app.id)}
+                    onDragStart={(e) => onDragStart(e, app.id)}
                     onDragEnd={onDragEnd}
                     className="card cursor-grab active:cursor-grabbing"
                     style={{ opacity: draggingId === app.id ? 0.4 : 1 }}
                   >
                     <div className="card-body py-3 px-3">
                       <div className="flex items-start gap-2">
-                        <div className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white ${avatarColor(app.candidateName)}`}>
+                        <div
+                          className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white ${avatarColor(app.candidateName)}`}
+                        >
                           {initials(app.candidateName)}
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-medium">{app.candidateName}</p>
+                          <p className="truncate text-sm font-medium">
+                            {app.candidateName}
+                          </p>
                           {!selectedReqId && (
-                            <p className="truncate text-xs text-gray-400">{app.requisitionCode} · {app.requisitionTitle}</p>
+                            <p className="truncate text-xs text-gray-400">
+                              {app.requisitionCode} · {app.requisitionTitle}
+                            </p>
                           )}
                         </div>
                       </div>
 
                       <div className="mt-2 flex flex-wrap items-center gap-1.5">
                         {app.aiMatchScore != null && (
-                          <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${scoreColor(app.aiMatchScore)}`}>
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-xs font-semibold ${scoreColor(app.aiMatchScore)}`}
+                          >
                             {Math.round(app.aiMatchScore)}% match
                           </span>
                         )}
-                        <span className="text-xs text-gray-400">{timeAgo(app.daysInStage)} in stage</span>
+                        <span className="text-xs text-gray-400">
+                          {timeAgo(app.daysInStage)} in stage
+                        </span>
                       </div>
 
                       <div className="mt-2 flex items-center gap-1 border-t border-gray-100 pt-2 dark:border-gray-800">
@@ -532,7 +609,10 @@ function PipelineBoard() {
                           <>
                             <button
                               type="button"
-                              onClick={() => { setRejectApp({ app, action: 'REJECT' }); setRejectReason(''); }}
+                              onClick={() => {
+                                setRejectApp({ app, action: "REJECT" });
+                                setRejectReason("");
+                              }}
                               className="rounded p-1 text-gray-400 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-500/10"
                               title="Reject"
                             >
@@ -540,7 +620,10 @@ function PipelineBoard() {
                             </button>
                             <button
                               type="button"
-                              onClick={() => { setRejectApp({ app, action: 'WITHDRAW' }); setRejectReason(''); }}
+                              onClick={() => {
+                                setRejectApp({ app, action: "WITHDRAW" });
+                                setRejectReason("");
+                              }}
                               className="rounded p-1 text-gray-400 hover:bg-amber-50 hover:text-amber-600 dark:hover:bg-amber-500/10"
                               title="Mark withdrawn"
                             >
@@ -565,9 +648,13 @@ function PipelineBoard() {
       )}
 
       {/* Terminal stages strip */}
-      {(terminalCounts.Rejected > 0 || terminalCounts.Withdrawn > 0 || terminalCounts.Hired > 0) && (
+      {(terminalCounts.Rejected > 0 ||
+        terminalCounts.Withdrawn > 0 ||
+        terminalCounts.Hired > 0) && (
         <TerminalStagesPanel
-          applications={filtered.filter(a => !(MOVABLE_STAGES as readonly string[]).includes(a.stage))}
+          applications={filtered.filter(
+            (a) => !(MOVABLE_STAGES as readonly string[]).includes(a.stage),
+          )}
           onHistory={openHistory}
         />
       )}
@@ -579,7 +666,10 @@ function PipelineBoard() {
           defaultRequisitionId={selectedReqId}
           existingApplications={applications}
           onClose={() => setAddOpen(false)}
-          onSaved={() => { setAddOpen(false); refresh(); }}
+          onSaved={() => {
+            setAddOpen(false);
+            refresh();
+          }}
         />
       )}
 
@@ -589,7 +679,10 @@ function PipelineBoard() {
           app={historyApp}
           items={historyItems}
           loading={historyLoading}
-          onClose={() => { setHistoryApp(null); setHistoryItems([]); }}
+          onClose={() => {
+            setHistoryApp(null);
+            setHistoryItems([]);
+          }}
         />
       )}
 
@@ -607,33 +700,75 @@ function PipelineBoard() {
 
       {/* Reject / Withdraw dialog */}
       {rejectApp && (
-        <Dialog isOpen onClose={() => setRejectApp(null)} onRequestClose={() => setRejectApp(null)}>
-          <h5>{rejectApp.action === 'REJECT' ? 'Reject Application' : 'Mark as Withdrawn'}</h5>
+        <Dialog
+          isOpen
+          onClose={() => setRejectApp(null)}
+          onRequestClose={() => setRejectApp(null)}
+        >
+          <h5>
+            {rejectApp.action === "REJECT"
+              ? "Reject Application"
+              : "Mark as Withdrawn"}
+          </h5>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            {rejectApp.action === 'REJECT'
+            {rejectApp.action === "REJECT"
               ? `${rejectApp.app.candidateName} will be removed from the active pipeline.`
               : `${rejectApp.app.candidateName} will be marked as having withdrawn their application.`}
           </p>
           <div className="mt-4">
             <label className="mb-1 block text-sm font-medium">
-              Reason {rejectApp.action === 'REJECT' && <span className="text-rose-500">*</span>}
+              Reason{" "}
+              {rejectApp.action === "REJECT" && (
+                <span className="text-rose-500">*</span>
+              )}
             </label>
             <textarea
               value={rejectReason}
-              onChange={e => setRejectReason(e.target.value)}
+              onChange={(e) => setRejectReason(e.target.value)}
               rows={3}
               maxLength={2000}
-              placeholder={rejectApp.action === 'REJECT' ? 'Why is this candidate being rejected?' : 'Optional note'}
-              style={{ ...selectStyle, width: '100%' }}
+              placeholder={
+                rejectApp.action === "REJECT"
+                  ? "Why is this candidate being rejected?"
+                  : "Optional note"
+              }
+              style={{ ...selectStyle, width: "100%" }}
             />
           </div>
           <div className="mt-5 flex justify-end gap-2">
-            <Button variant="plain" onClick={() => setRejectApp(null)} disabled={rejectSaving}>Cancel</Button>
-            <Button variant="solid" color="primary" disabled={rejectSaving} onClick={submitReject}>
-              {rejectSaving ? 'Saving...' : rejectApp.action === 'REJECT' ? 'Reject' : 'Confirm Withdrawal'}
+            <Button
+              variant="plain"
+              onClick={() => setRejectApp(null)}
+              disabled={rejectSaving}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="solid"
+              color="primary"
+              disabled={rejectSaving}
+              onClick={submitReject}
+            >
+              {rejectSaving
+                ? "Saving..."
+                : rejectApp.action === "REJECT"
+                  ? "Reject"
+                  : "Confirm Withdrawal"}
             </Button>
           </div>
         </Dialog>
+      )}
+
+      {tour.visible && (
+        <TourOverlay
+          step={tour.step}
+          stepIndex={tour.stepIndex}
+          totalSteps={tour.totalSteps}
+          onNext={tour.next}
+          onPrev={tour.prev}
+          onDismiss={tour.dismiss}
+          nextStepTarget={tour.nextStep?.target}
+        />
       )}
     </div>
   );
@@ -661,14 +796,19 @@ function TerminalStagesPanel({ applications, onHistory }: { applications: Applic
     <div className="card">
       <button
         type="button"
-        onClick={() => setOpen(o => !o)}
+        onClick={() => setOpen((o) => !o)}
         className="card-body flex w-full items-center justify-between text-left"
       >
-        <span className="text-sm font-medium">Closed applications ({applications.length})</span>
-        <span className="text-xs text-gray-400">{open ? 'Hide' : 'Show'}</span>
+        <span className="text-sm font-medium">
+          Closed applications ({applications.length})
+        </span>
+        <span className="text-xs text-gray-400">{open ? "Hide" : "Show"}</span>
       </button>
       {open && (
-        <div className="card-body border-t border-gray-100 pt-0 dark:border-gray-800">
+        <div
+          className="card-body border-t border-gray-100 pt-0 dark:border-gray-800"
+          data-tour="pipeline-closed-pipeline-card"
+        >
           <table className="table-default table-hover w-full">
             <thead>
               <tr>
@@ -680,14 +820,24 @@ function TerminalStagesPanel({ applications, onHistory }: { applications: Applic
               </tr>
             </thead>
             <tbody>
-              {applications.map(a => (
+              {applications.map((a) => (
                 <tr key={a.id}>
                   <td>{a.candidateName}</td>
                   <td>{a.requisitionCode}</td>
-                  <td><span className={`xp-badge ${STAGE_BADGE[a.stage]}`}>{STAGE_LABELS[a.stage]}</span></td>
-                  <td className="max-w-xs truncate text-sm text-gray-500">{a.rejectionReason || '—'}</td>
                   <td>
-                    <button type="button" onClick={() => onHistory(a)} className="text-gray-400 hover:text-gray-600">
+                    <span className={`xp-badge ${STAGE_BADGE[a.stage]}`}>
+                      {STAGE_LABELS[a.stage]}
+                    </span>
+                  </td>
+                  <td className="max-w-xs truncate text-sm text-gray-500">
+                    {a.rejectionReason || "—"}
+                  </td>
+                  <td>
+                    <button
+                      type="button"
+                      onClick={() => onHistory(a)}
+                      className="text-gray-400 hover:text-gray-600"
+                    >
                       <History size={14} />
                     </button>
                   </td>
@@ -837,28 +987,41 @@ function AddToPipelineDialog({
         <label className="mb-1 block text-sm font-medium">Requisition</label>
         <select
           value={requisitionId}
-          onChange={e => { setRequisitionId(e.target.value); setSelectedId(null); }}
-          style={{ ...selectStyle, width: '100%' }}
+          onChange={(e) => {
+            setRequisitionId(e.target.value);
+            setSelectedId(null);
+          }}
+          style={{ ...selectStyle, width: "100%" }}
         >
           <option value="">Select a requisition...</option>
-          {requisitions.filter(r => r.status === 'Open').map(r => (
-            <option key={r.id} value={r.id}>{r.requisitionCode} — {r.title}</option>
-          ))}
+          {requisitions
+            .filter((r) => r.status === "Open")
+            .map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.requisitionCode} — {r.title}
+              </option>
+            ))}
         </select>
       </div>
 
       <div className="mt-4">
         <label className="mb-1 block text-sm font-medium">Candidate</label>
-        <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search candidates by name..." />
+        <Input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search candidates by name..."
+        />
       </div>
 
       <div className="mt-2 max-h-64 overflow-y-auto rounded-lg border border-gray-100 dark:border-gray-800">
         {loading ? (
           <p className="p-4 text-center text-sm text-gray-500">Loading...</p>
         ) : candidates.length === 0 ? (
-          <p className="p-4 text-center text-sm text-gray-500">No candidates found.</p>
+          <p className="p-4 text-center text-sm text-gray-500">
+            No candidates found.
+          </p>
         ) : (
-          candidates.map(c => {
+          candidates.map((c) => {
             const applied = alreadyAppliedIds.has(c.id);
             const closedStage = closedStageByCandidateId.get(c.id);
             const fullName = `${c.firstName} ${c.lastName}`;
@@ -869,24 +1032,37 @@ function AddToPipelineDialog({
                 disabled={applied}
                 onClick={() => setSelectedId(c.id)}
                 className={`flex w-full items-center gap-3 border-b border-gray-100 px-3 py-2 text-left last:border-0 dark:border-gray-800 ${
-                  applied ? 'cursor-not-allowed opacity-50' : 'hover:bg-gray-50 dark:hover:bg-gray-800'
-                } ${selectedId === c.id ? 'bg-indigo-50 dark:bg-indigo-500/10' : ''}`}
+                  applied
+                    ? "cursor-not-allowed opacity-50"
+                    : "hover:bg-gray-50 dark:hover:bg-gray-800"
+                } ${selectedId === c.id ? "bg-indigo-50 dark:bg-indigo-500/10" : ""}`}
               >
-                <div className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white ${avatarColor(fullName)}`}>
+                <div
+                  className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white ${avatarColor(fullName)}`}
+                >
                   {initials(fullName)}
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium">{fullName}</p>
                   <p className="truncate text-xs text-gray-400">
-                    {c.currentDesignation || 'No current designation'} {c.totalExperienceYears ? `· ${c.totalExperienceYears}y exp` : ''}
+                    {c.currentDesignation || "No current designation"}{" "}
+                    {c.totalExperienceYears
+                      ? `· ${c.totalExperienceYears}y exp`
+                      : ""}
                   </p>
                   {!applied && closedStage && (
                     <p className="truncate text-xs text-amber-600">
-                      Previously {closedStage === 'Rejected' ? 'rejected' : 'withdrawn'} — can re-apply
+                      Previously{" "}
+                      {closedStage === "Rejected" ? "rejected" : "withdrawn"} —
+                      can re-apply
                     </p>
                   )}
                 </div>
-                {applied && <span className="xp-badge xp-badge-neutral flex-shrink-0">Already applied</span>}
+                {applied && (
+                  <span className="xp-badge xp-badge-neutral flex-shrink-0">
+                    Already applied
+                  </span>
+                )}
               </button>
             );
           })
@@ -894,9 +1070,16 @@ function AddToPipelineDialog({
       </div>
 
       <div className="mt-5 flex justify-end gap-2">
-        <Button variant="plain" onClick={onClose} disabled={saving}>Cancel</Button>
-        <Button variant="solid" color="primary" disabled={saving} onClick={submit}>
-          {saving ? 'Adding...' : 'Add to Pipeline'}
+        <Button variant="plain" onClick={onClose} disabled={saving}>
+          Cancel
+        </Button>
+        <Button
+          variant="solid"
+          color="primary"
+          disabled={saving}
+          onClick={submit}
+        >
+          {saving ? "Adding..." : "Add to Pipeline"}
         </Button>
       </div>
     </Dialog>

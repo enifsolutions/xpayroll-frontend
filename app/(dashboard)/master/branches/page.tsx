@@ -37,6 +37,9 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { useAuthStore } from "@/store/authStore";
+import { useTour } from "@/hooks/useTour";
+import TourOverlay from "@/components/onboarding/TourOverlay";
+import { BRANCHES_STEPS } from "@/lib/tours/branches";
 
 const MapView = dynamic(() => import('@/components/branches/BranchMapView'), { ssr: false });
 
@@ -108,6 +111,7 @@ async function geocode(query: string): Promise<{ lat: number; lng: number } | nu
 }
 
 export default function BranchesPage() {
+  const tour = useTour("admin-page-branches", BRANCHES_STEPS);
   useRequirePermission(Permissions.MasterData.Branches.View);
   const canManage = usePermission(Permissions.MasterData.Branches.Manage);
   const userId = useAuthStore((s) => s.user?.userId);
@@ -321,12 +325,18 @@ export default function BranchesPage() {
           <button
             onClick={handleExportCSV}
             className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+            data-tour="branches-export-button"
           >
             <Download size={14} />
             Export CSV
           </button>
           {canManage && (
-            <Button variant="solid" icon={<Plus size={15} />} onClick={openAdd}>
+            <Button
+              variant="solid"
+              icon={<Plus size={15} />}
+              onClick={openAdd}
+              data-tour="branches-add-button"
+            >
               Add Branch
             </Button>
           )}
@@ -395,6 +405,13 @@ export default function BranchesPage() {
           <button
             key={key}
             onClick={() => setActiveTab(key)}
+            data-tour={
+              key === "map"
+                ? "branches-tab-map"
+                : key === "trends"
+                  ? "branches-tab-trends"
+                  : undefined
+            }
             className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${
               activeTab === key
                 ? "border-violet-600 text-violet-600 dark:text-violet-400 dark:border-violet-400"
@@ -410,7 +427,10 @@ export default function BranchesPage() {
       {activeTab === "table" && (
         <div className="card">
           <div className="card-body border-b border-gray-100 dark:border-gray-700 pb-4">
-            <div className="flex items-center gap-3">
+            <div
+              className="flex items-center gap-3"
+              data-tour="branches-search-panel"
+            >
               <div className="relative flex-1 max-w-xs">
                 <Search
                   size={14}
@@ -444,7 +464,7 @@ export default function BranchesPage() {
             </div>
           </div>
 
-          <div className="card-body pt-0">
+          <div className="card-body pt-0" data-tour="branches-table">
             {loading ? (
               <div className="flex justify-center py-14">
                 <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full" />
@@ -602,6 +622,7 @@ export default function BranchesPage() {
             <div
               className="rounded-xl overflow-hidden border border-gray-100 dark:border-gray-700"
               style={{ height: 460 }}
+              data-tour="branches-map-view"
             >
               <MapView branches={branches} />
             </div>
@@ -612,7 +633,7 @@ export default function BranchesPage() {
       {activeTab === "trends" && (
         <div className="space-y-4">
           <div className="card">
-            <div className="card-body">
+            <div className="card-body" data-tour="branches-trends-chart">
               <div className="flex items-center gap-2 mb-1">
                 <Leaf size={15} className="text-emerald-500" />
                 <p className="font-medium heading-text text-sm">
@@ -874,7 +895,10 @@ export default function BranchesPage() {
                   placeholder="Company default"
                   value={form.absentDeductionAfterDays}
                   onChange={(e) =>
-                    setForm({ ...form, absentDeductionAfterDays: e.target.value })
+                    setForm({
+                      ...form,
+                      absentDeductionAfterDays: e.target.value,
+                    })
                   }
                 />
               </div>
@@ -943,6 +967,18 @@ export default function BranchesPage() {
           </Button>
         </div>
       </Dialog>
+
+      {tour.visible && (
+        <TourOverlay
+          step={tour.step}
+          stepIndex={tour.stepIndex}
+          totalSteps={tour.totalSteps}
+          onNext={tour.next}
+          onPrev={tour.prev}
+          onDismiss={tour.dismiss}
+          nextStepTarget={tour.nextStep?.target}
+        />
+      )}
     </div>
   );
 }

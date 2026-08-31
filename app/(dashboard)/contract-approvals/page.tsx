@@ -19,6 +19,9 @@ import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import { getErrorMessage } from "@/lib/apiError";
+import { useTour } from "@/hooks/useTour";
+import TourOverlay from "@/components/onboarding/TourOverlay";
+import { CONTRACT_APPROVALS_STEPS } from "@/lib/tours/contract-approvals";
 
 const STATUSES = ["Pending", "Approved", "Rejected"];
 
@@ -136,6 +139,10 @@ function StatCard({ label, value, icon, iconBg, sub }: StatCardProps) {
 }
 
 export default function ContractApprovalsPage() {
+  const tour = useTour(
+    "admin-page-contract-approvals",
+    CONTRACT_APPROVALS_STEPS,
+  );
   useRequirePermission(Permissions.HR.EmployeeContract.Approve);
   const canApprove = usePermission(Permissions.HR.EmployeeContract.Approve);
 
@@ -277,7 +284,9 @@ export default function ContractApprovalsPage() {
           icon={<Clock size={20} className="text-amber-500" />}
           sub={
             pendingCount > 0 ? (
-              <span className="text-amber-500 font-medium">Requires action</span>
+              <span className="text-amber-500 font-medium">
+                Requires action
+              </span>
             ) : (
               <span className="text-emerald-500 font-medium">All clear</span>
             )
@@ -311,53 +320,67 @@ export default function ContractApprovalsPage() {
         />
       </div>
 
-      {/* Filters */}
-      <div className="card mb-4">
-        <div className="card-body">
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-            <div className="relative">
-              <Search
-                size={15}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
-              />
-              <input
-                type="text"
-                className="input input-md w-full pl-9"
-                placeholder="Search employee..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-            </div>
-            <select
-              className="input input-md w-full"
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-            >
-              <option value="">All statuses</option>
-              {STATUSES.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
-            <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
-            <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
-            <Button variant="solid" color="primary" onClick={load}>
-              Apply Filters
-            </Button>
-          </div>
-        </div>
-      </div>
-
       {/* Table */}
       <div className="card">
         <div className="card-body p-0">
+          {/* Filters */}
+          <div className="card mb-4">
+            <div className="card-body">
+              <div
+                className="grid grid-cols-1 md:grid-cols-5 gap-4"
+                data-tour="contract-approvals-filter-row"
+              >
+                <div className="relative">
+                  <Search
+                    size={15}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+                  />
+                  <input
+                    type="text"
+                    className="input input-md w-full pl-9"
+                    placeholder="Search employee..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                  />
+                </div>
+                <select
+                  className="input input-md w-full"
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                >
+                  <option value="">All statuses</option>
+                  {STATUSES.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </select>
+                <Input
+                  type="date"
+                  value={dateFrom}
+                  onChange={(e) => setDateFrom(e.target.value)}
+                />
+                <Input
+                  type="date"
+                  value={dateTo}
+                  onChange={(e) => setDateTo(e.target.value)}
+                />
+                <Button variant="solid" color="primary" onClick={load}>
+                  Apply Filters
+                </Button>
+              </div>
+            </div>
+          </div>
+
           {loading ? (
             <div className="flex justify-center items-center py-16">
               <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent" />
             </div>
           ) : (
-            <table className="table-default table-hover w-full">
+            <table
+              className="table-default table-hover w-full"
+              data-tour="contract-approvals-table-card"
+            >
               <thead>
                 <tr>
                   <th>Employee</th>
@@ -372,7 +395,9 @@ export default function ContractApprovalsPage() {
                 {filtered.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="text-center py-10 text-gray-400">
-                      {search ? "No results match your search." : "No contract change requests found."}
+                      {search
+                        ? "No results match your search."
+                        : "No contract change requests found."}
                     </td>
                   </tr>
                 ) : (
@@ -382,8 +407,12 @@ export default function ContractApprovalsPage() {
                         <div className="flex items-center gap-2.5">
                           <EmployeeAvatar name={item.employeeName} />
                           <div>
-                            <div className="font-medium leading-tight">{item.employeeName}</div>
-                            <div className="text-xs text-gray-400">{item.employeeCode}</div>
+                            <div className="font-medium leading-tight">
+                              {item.employeeName}
+                            </div>
+                            <div className="text-xs text-gray-400">
+                              {item.employeeCode}
+                            </div>
                           </div>
                         </div>
                       </td>
@@ -392,10 +421,16 @@ export default function ContractApprovalsPage() {
                           .map((k) => FIELD_LABELS[k])
                           .join(", ") || "—"}
                       </td>
-                      <td className="text-sm text-gray-500">{item.requestedBy ?? "—"}</td>
-                      <td className="text-sm text-gray-400">{fmtDateTime(item.requestedAt)}</td>
+                      <td className="text-sm text-gray-500">
+                        {item.requestedBy ?? "—"}
+                      </td>
+                      <td className="text-sm text-gray-400">
+                        {fmtDateTime(item.requestedAt)}
+                      </td>
                       <td>
-                        <span className={statusBadge(item.status)}>{item.status}</span>
+                        <span className={statusBadge(item.status)}>
+                          {item.status}
+                        </span>
                       </td>
                       <td>
                         <div className="flex gap-1">
@@ -418,17 +453,25 @@ export default function ContractApprovalsPage() {
       </div>
 
       {/* Detail / Review Dialog */}
-      <Dialog isOpen={detailOpen} onClose={() => setDetailOpen(false)} width={720}>
+      <Dialog
+        isOpen={detailOpen}
+        onClose={() => setDetailOpen(false)}
+        width={720}
+      >
         {selected && (
           <>
             <div className="flex items-center gap-3 mb-5">
               <EmployeeAvatar name={selected.employeeName} size="md" />
               <div>
-                <h5 className="font-semibold leading-tight">{selected.employeeName}</h5>
+                <h5 className="font-semibold leading-tight">
+                  {selected.employeeName}
+                </h5>
                 <p className="text-sm text-gray-400">{selected.employeeCode}</p>
               </div>
               <div className="ml-auto">
-                <span className={statusBadge(selected.status)}>{selected.status}</span>
+                <span className={statusBadge(selected.status)}>
+                  {selected.status}
+                </span>
               </div>
             </div>
 
@@ -441,7 +484,9 @@ export default function ContractApprovalsPage() {
                 <div className="space-y-2 text-sm">
                   {Object.keys(FIELD_LABELS).map((k) => (
                     <div key={k} className="flex justify-between gap-3">
-                      <span className="text-gray-500 shrink-0">{FIELD_LABELS[k]}</span>
+                      <span className="text-gray-500 shrink-0">
+                        {FIELD_LABELS[k]}
+                      </span>
                       <span className="text-right truncate">
                         {fmtValue(selected.oldSnapshot?.[k])}
                       </span>
@@ -462,7 +507,9 @@ export default function ContractApprovalsPage() {
                       String(selected.newSnapshot?.[k] ?? "");
                     return (
                       <div key={k} className="flex justify-between gap-3">
-                        <span className="text-gray-500 shrink-0">{FIELD_LABELS[k]}</span>
+                        <span className="text-gray-500 shrink-0">
+                          {FIELD_LABELS[k]}
+                        </span>
                         <span
                           className={`text-right truncate ${
                             isChanged
@@ -485,10 +532,14 @@ export default function ContractApprovalsPage() {
                 <div className="flex gap-2 mb-1">
                   <span className="text-gray-400">Reviewed by:</span>
                   <span>{selected.reviewedBy ?? "—"}</span>
-                  <span className="text-gray-400 ml-2">{fmtDateTime(selected.reviewedAt)}</span>
+                  <span className="text-gray-400 ml-2">
+                    {fmtDateTime(selected.reviewedAt)}
+                  </span>
                 </div>
                 {selected.reviewNotes && (
-                  <div className="text-gray-600 dark:text-gray-300">{selected.reviewNotes}</div>
+                  <div className="text-gray-600 dark:text-gray-300">
+                    {selected.reviewNotes}
+                  </div>
                 )}
               </div>
             )}
@@ -517,7 +568,10 @@ export default function ContractApprovalsPage() {
                     loading={saving}
                     onClick={() => {
                       if (!reviewNotes.trim()) {
-                        showError("Missing information", "Review notes are required.");
+                        showError(
+                          "Missing information",
+                          "Review notes are required.",
+                        );
                         return;
                       }
                       setDetailOpen(false);
@@ -532,7 +586,10 @@ export default function ContractApprovalsPage() {
                     loading={saving}
                     onClick={() => {
                       if (!reviewNotes.trim()) {
-                        showError("Missing information", "Review notes are required.");
+                        showError(
+                          "Missing information",
+                          "Review notes are required.",
+                        );
                         return;
                       }
                       setDetailOpen(false);
@@ -581,6 +638,18 @@ export default function ContractApprovalsPage() {
         onConfirm={() => handleReview("REJECT")}
         onCancel={() => setConfirmAction(null)}
       />
+
+      {tour.visible && (
+        <TourOverlay
+          step={tour.step}
+          stepIndex={tour.stepIndex}
+          totalSteps={tour.totalSteps}
+          onNext={tour.next}
+          onPrev={tour.prev}
+          onDismiss={tour.dismiss}
+          nextStepTarget={tour.nextStep?.target}
+        />
+      )}
     </div>
   );
 }

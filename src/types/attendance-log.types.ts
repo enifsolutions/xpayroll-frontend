@@ -14,6 +14,9 @@ export interface AttendanceLog {
   breakMinutes: number
   isLate: boolean
   lateMinutes: number
+  preOtMinutes: number
+  postOtMinutes: number
+  earlyLeaveMinutes: number
   status: string
   isAdjusted: boolean
   adjustedBy: string | null
@@ -35,9 +38,13 @@ export interface AttendanceLogForm {
   breakMinutes: string
   isLate: boolean
   lateMinutes: string
+  preOtMinutes: string
+  postOtMinutes: string
+  earlyLeaveMinutes: string
   status: string
   adjustmentReason: string
   notes: string
+  manualOverride: boolean
 }
 
 export interface AttendanceLogFilters {

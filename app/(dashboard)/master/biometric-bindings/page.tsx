@@ -13,12 +13,18 @@ import {
   ShieldCheck,
   AlertTriangle,
   Activity,
+  Search,
+  Plus,
 } from "lucide-react";
 import Link from "next/link";
+import Button from "@/components/ui/Button";
 import { useRequirePermission } from "@/hooks/useRequirePermission";
 import { usePermission } from "@/hooks/usePermission";
 import { useAuthStore } from "@/store/authStore";
 import { Permissions } from "@/lib/permissions";
+import { useTour } from "@/hooks/useTour";
+import TourOverlay from "@/components/onboarding/TourOverlay";
+import { BIO_METRIC_BINDINGS_STEPS } from "@/lib/tours/biometric-bindings";
 
 /* ─────────────────────────────── types ────────────────────────────────── */
 
@@ -168,6 +174,11 @@ function StatCard({
 /* ─────────────────────────────── page ─────────────────────────────────── */
 
 export default function BiometricBindingsPage() {
+  const tour = useTour(
+    "admin-page-biometric-bindings",
+    BIO_METRIC_BINDINGS_STEPS,
+  );
+
   useRequirePermission(Permissions.Biometric.Binding.View);
   const canManage = usePermission(Permissions.Biometric.Binding.Manage);
   const userId = useAuthStore((s) => s.user?.userId);
@@ -193,7 +204,7 @@ export default function BiometricBindingsPage() {
       setBindings(bRes.data);
       setDevices(dRes.data);
       setStats(sRes.data);
-    } catch (err:any){
+    } catch (err: any) {
       showError(
         "Load failed",
         err?.response?.data?.error ?? "Could not load biometric bindings.",
@@ -286,15 +297,16 @@ export default function BiometricBindingsPage() {
           </p>
         </div>
         {canManage && (
-          <button
+          <Button
+            variant="solid"
+            icon={<Plus size={16} />}
             onClick={() => {
               /* open add dialog */
             }}
-            className="btn btn-primary flex items-center gap-2"
+            data-tour="biometric-bindings-add-button"
           >
-            <span className="text-lg leading-none">+</span>
             Add Binding
-          </button>
+          </Button>
         )}
       </div>
 
@@ -340,25 +352,19 @@ export default function BiometricBindingsPage() {
 
       {/* Table card */}
       <div className="card">
-        <div className="card-body p-0">
-          {/* Filter row */}
-          <div className="flex flex-wrap items-center gap-3 px-5 py-4 border-b border-gray-100 dark:border-gray-700">
-            <div className="relative flex-1 min-w-[220px] max-w-xs">
-              <span className="absolute inset-y-0 left-3 flex items-center text-gray-400 pointer-events-none">
-                <svg
-                  width="15"
-                  height="15"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                >
-                  <circle cx="11" cy="11" r="8" />
-                  <path d="m21 21-4.35-4.35" />
-                </svg>
-              </span>
+        <div className="card-body">
+          {/* Filter row — matches Tax Config's search & filters pattern */}
+          <div
+            className="flex flex-col sm:flex-row gap-3 mb-5"
+            data-tour="biometric-bindings-filter-row"
+          >
+            <div className="relative flex-1">
+              <Search
+                size={15}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+              />
               <input
-                className="input input-md pl-9 w-full"
+                className="input w-full pl-9"
                 placeholder="Search employee or identifier..."
                 value={search}
                 onChange={(e) => onSearch(e.target.value)}
@@ -366,7 +372,7 @@ export default function BiometricBindingsPage() {
             </div>
 
             <select
-              className="input input-md min-w-[160px]"
+              className="input w-full sm:w-44"
               value={deviceFilter}
               onChange={(e) => onDevice(e.target.value)}
             >
@@ -379,7 +385,7 @@ export default function BiometricBindingsPage() {
             </select>
 
             <select
-              className="input input-md min-w-[140px]"
+              className="input w-full sm:w-36"
               value={statusFilter}
               onChange={(e) => onStatus(e.target.value)}
             >
@@ -389,7 +395,7 @@ export default function BiometricBindingsPage() {
               <option value="Unverified">Unverified</option>
             </select>
 
-            <div className="ml-auto flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-shrink-0">
               <button
                 onClick={load}
                 className="p-2 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500
@@ -420,202 +426,213 @@ export default function BiometricBindingsPage() {
             </div>
           ) : (
             <>
-              <table className="table-default table-hover w-full">
-                <thead>
-                  <tr>
-                    <th>Employee</th>
-                    <th>Employee ID</th>
-                    <th>Binding Type</th>
-                    <th>Device Group</th>
-                    <th>Finger</th>
-                    <th>Template</th>
-                    <th>Last Sync</th>
-                    <th>Status</th>
-                    {canManage && <th className="w-20 text-center">Actions</th>}
-                  </tr>
-                </thead>
-                <tbody>
-                  {paged.map((b) => {
-                    const typeLabel = identifierTypeLabel(b.identifierType);
-                    const typeCls =
-                      IDENTIFIER_COLORS[typeLabel] ?? IDENTIFIER_COLORS["PIN"];
-                    return (
-                      <tr key={b.id}>
-                        {/* Employee */}
-                        <td>
-                          <div className="flex items-center gap-2.5">
-                            <div
-                              className={`w-8 h-8 rounded-full flex items-center justify-center
-                              text-white text-xs font-semibold flex-shrink-0 ${avatarColor(b.employeeName)}`}
-                            >
-                              {getInitials(b.employeeName)}
-                            </div>
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-1">
-                                <span className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">
-                                  {b.employeeName}
-                                </span>
-                                <Link
-                                  href={`/employees/${b.employeeId}/biometric`}
-                                  className="text-gray-400 hover:text-primary transition-colors flex-shrink-0"
-                                >
-                                  <ExternalLink size={11} />
-                                </Link>
+              <div className="overflow-x-auto">
+                <table
+                  className="table-default table-hover w-full"
+                  data-tour="biometric-bindings-table-card"
+                >
+                  <thead>
+                    <tr>
+                      <th>Employee</th>
+                      <th>Employee ID</th>
+                      <th>Binding Type</th>
+                      <th>Device Group</th>
+                      <th>Finger</th>
+                      <th>Template</th>
+                      <th>Last Sync</th>
+                      <th>Status</th>
+                      {canManage && (
+                        <th className="w-20 text-center">Actions</th>
+                      )}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paged.map((b) => {
+                      const typeLabel = identifierTypeLabel(b.identifierType);
+                      const typeCls =
+                        IDENTIFIER_COLORS[typeLabel] ??
+                        IDENTIFIER_COLORS["PIN"];
+                      return (
+                        <tr key={b.id}>
+                          {/* Employee */}
+                          <td>
+                            <div className="flex items-center gap-2.5">
+                              <div
+                                className={`w-8 h-8 rounded-full flex items-center justify-center
+                                text-white text-xs font-semibold flex-shrink-0 ${avatarColor(b.employeeName)}`}
+                              >
+                                {getInitials(b.employeeName)}
                               </div>
-                              {b.designation && (
-                                <div className="text-xs text-gray-400 truncate">
-                                  {b.designation}
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-1">
+                                  <span className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">
+                                    {b.employeeName}
+                                  </span>
+                                  <Link
+                                    href={`/employees/${b.employeeId}/biometric`}
+                                    className="text-gray-400 hover:text-primary transition-colors flex-shrink-0"
+                                  >
+                                    <ExternalLink size={11} />
+                                  </Link>
                                 </div>
-                              )}
+                                {b.designation && (
+                                  <div className="text-xs text-gray-400 truncate">
+                                    {b.designation}
+                                  </div>
+                                )}
+                              </div>
                             </div>
-                          </div>
-                        </td>
-
-                        {/* Employee ID */}
-                        <td>
-                          <code
-                            className="text-xs font-mono text-gray-500 bg-gray-100 dark:bg-gray-800
-                            px-1.5 py-0.5 rounded"
-                          >
-                            {b.employeeCode}
-                          </code>
-                        </td>
-
-                        {/* Binding Type */}
-                        <td>
-                          <span
-                            className={`inline-flex items-center gap-1.5 text-xs font-medium
-                            px-2.5 py-1 rounded-full ${typeCls}`}
-                          >
-                            {typeLabel === "FaceID" && (
-                              <svg
-                                width="12"
-                                height="12"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                              >
-                                <circle cx="12" cy="8" r="4" />
-                                <path d="M8 14s-2 1-2 4h12c0-3-2-4-2-4" />
-                                <path d="M9 10.5c0 1 .5 1.5 1.5 1.5s1.5-.5 1.5-1.5" />
-                                <path d="M13.5 10.5c0 1 .5 1.5 1.5 1.5" />
-                              </svg>
-                            )}
-                            {typeLabel === "Fingerprint" && (
-                              <svg
-                                width="12"
-                                height="12"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                              >
-                                <path d="M12 10a2 2 0 0 0-2 2c0 1.02-.1 2.51-.26 4" />
-                                <path d="M14 13.12c0 2.38 0 6.38-1 8.88" />
-                                <path d="M17.29 21.02c.12-.6.43-2.3.5-3.02" />
-                                <path d="M2 12a10 10 0 0 1 18-6" />
-                                <path d="M2 17c.7-1.5 1-2.5 1-5a9.98 9.98 0 0 1 3-7" />
-                                <path d="M20 11.5c.2 2 .5 3 1.5 4" />
-                                <path d="M7 13.5c1.1.5 2 .5 2.5 2.5" />
-                              </svg>
-                            )}
-                            {typeLabel === "NFC Card" && (
-                              <svg
-                                width="12"
-                                height="12"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                              >
-                                <rect
-                                  x="2"
-                                  y="5"
-                                  width="20"
-                                  height="14"
-                                  rx="2"
-                                />
-                                <path d="M2 10h20" />
-                              </svg>
-                            )}
-                            {typeLabel}
-                          </span>
-                        </td>
-
-                        {/* Device Group */}
-                        <td>
-                          <div className="text-sm font-medium text-gray-700 dark:text-gray-200">
-                            {b.deviceName}
-                          </div>
-                          <div className="text-xs text-gray-400 font-mono">
-                            {b.deviceCode}
-                          </div>
-                        </td>
-
-                        {/* Finger */}
-                        <td className="text-sm text-gray-500">
-                          {b.fingerIndex !== null ? (
-                            (FINGER_LABELS[b.fingerIndex] ??
-                            `F${b.fingerIndex}`)
-                          ) : (
-                            <span className="text-gray-300">—</span>
-                          )}
-                        </td>
-
-                        {/* Template */}
-                        <td>
-                          <span
-                            className={`xp-badge ${b.hasTemplate ? "xp-badge-success" : "xp-badge-neutral"}`}
-                          >
-                            {b.hasTemplate ? "Stored" : "None"}
-                          </span>
-                        </td>
-
-                        {/* Last Sync */}
-                        <td className="text-sm text-gray-500">
-                          {b.lastVerifiedAt ? (
-                            new Date(b.lastVerifiedAt).toLocaleString("en-GB", {
-                              day: "2-digit",
-                              month: "short",
-                              year: "numeric",
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })
-                          ) : (
-                            <span className="text-gray-300">—</span>
-                          )}
-                        </td>
-
-                        {/* Status */}
-                        <td>
-                          <span
-                            className={`xp-badge ${STATUS_COLORS[b.status] ?? "xp-badge-neutral"}`}
-                          >
-                            {b.status}
-                          </span>
-                        </td>
-
-                        {/* Actions */}
-                        {canManage && (
-                          <td className="text-center">
-                            <button
-                              onClick={() => handleDelete(b)}
-                              className="p-1.5 rounded-lg text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-                              title="Remove binding"
-                            >
-                              <Trash2 size={15} />
-                            </button>
                           </td>
-                        )}
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+
+                          {/* Employee ID */}
+                          <td>
+                            <code
+                              className="text-xs font-mono text-gray-500 bg-gray-100 dark:bg-gray-800
+                              px-1.5 py-0.5 rounded"
+                            >
+                              {b.employeeCode}
+                            </code>
+                          </td>
+
+                          {/* Binding Type */}
+                          <td>
+                            <span
+                              className={`inline-flex items-center gap-1.5 text-xs font-medium
+                              px-2.5 py-1 rounded-full ${typeCls}`}
+                            >
+                              {typeLabel === "FaceID" && (
+                                <svg
+                                  width="12"
+                                  height="12"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2"
+                                >
+                                  <circle cx="12" cy="8" r="4" />
+                                  <path d="M8 14s-2 1-2 4h12c0-3-2-4-2-4" />
+                                  <path d="M9 10.5c0 1 .5 1.5 1.5 1.5s1.5-.5 1.5-1.5" />
+                                  <path d="M13.5 10.5c0 1 .5 1.5 1.5 1.5" />
+                                </svg>
+                              )}
+                              {typeLabel === "Fingerprint" && (
+                                <svg
+                                  width="12"
+                                  height="12"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2"
+                                >
+                                  <path d="M12 10a2 2 0 0 0-2 2c0 1.02-.1 2.51-.26 4" />
+                                  <path d="M14 13.12c0 2.38 0 6.38-1 8.88" />
+                                  <path d="M17.29 21.02c.12-.6.43-2.3.5-3.02" />
+                                  <path d="M2 12a10 10 0 0 1 18-6" />
+                                  <path d="M2 17c.7-1.5 1-2.5 1-5a9.98 9.98 0 0 1 3-7" />
+                                  <path d="M20 11.5c.2 2 .5 3 1.5 4" />
+                                  <path d="M7 13.5c1.1.5 2 .5 2.5 2.5" />
+                                </svg>
+                              )}
+                              {typeLabel === "NFC Card" && (
+                                <svg
+                                  width="12"
+                                  height="12"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2"
+                                >
+                                  <rect
+                                    x="2"
+                                    y="5"
+                                    width="20"
+                                    height="14"
+                                    rx="2"
+                                  />
+                                  <path d="M2 10h20" />
+                                </svg>
+                              )}
+                              {typeLabel}
+                            </span>
+                          </td>
+
+                          {/* Device Group */}
+                          <td>
+                            <div className="text-sm font-medium text-gray-700 dark:text-gray-200">
+                              {b.deviceName}
+                            </div>
+                            <div className="text-xs text-gray-400 font-mono">
+                              {b.deviceCode}
+                            </div>
+                          </td>
+
+                          {/* Finger */}
+                          <td className="text-sm text-gray-500">
+                            {b.fingerIndex !== null ? (
+                              (FINGER_LABELS[b.fingerIndex] ??
+                              `F${b.fingerIndex}`)
+                            ) : (
+                              <span className="text-gray-300">—</span>
+                            )}
+                          </td>
+
+                          {/* Template */}
+                          <td>
+                            <span
+                              className={`xp-badge ${b.hasTemplate ? "xp-badge-success" : "xp-badge-neutral"}`}
+                            >
+                              {b.hasTemplate ? "Stored" : "None"}
+                            </span>
+                          </td>
+
+                          {/* Last Sync */}
+                          <td className="text-sm text-gray-500">
+                            {b.lastVerifiedAt ? (
+                              new Date(b.lastVerifiedAt).toLocaleString(
+                                "en-GB",
+                                {
+                                  day: "2-digit",
+                                  month: "short",
+                                  year: "numeric",
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                },
+                              )
+                            ) : (
+                              <span className="text-gray-300">—</span>
+                            )}
+                          </td>
+
+                          {/* Status */}
+                          <td>
+                            <span
+                              className={`xp-badge ${STATUS_COLORS[b.status] ?? "xp-badge-neutral"}`}
+                            >
+                              {b.status}
+                            </span>
+                          </td>
+
+                          {/* Actions */}
+                          {canManage && (
+                            <td className="text-center">
+                              <button
+                                onClick={() => handleDelete(b)}
+                                className="p-1.5 rounded-lg text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                                title="Remove binding"
+                              >
+                                <Trash2 size={15} />
+                              </button>
+                            </td>
+                          )}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
 
               {/* Pagination */}
-              <div className="flex items-center justify-between px-5 py-3 border-t border-gray-100 dark:border-gray-700">
+              <div className="flex items-center justify-between px-1 py-3 mt-2 border-t border-gray-100 dark:border-gray-700">
                 <span className="text-sm text-gray-500">
                   Showing{" "}
                   {filtered.length === 0 ? 0 : (safePage - 1) * PAGE_SIZE + 1}–
@@ -668,6 +685,18 @@ export default function BiometricBindingsPage() {
           )}
         </div>
       </div>
+
+      {tour.visible && (
+        <TourOverlay
+          step={tour.step}
+          stepIndex={tour.stepIndex}
+          totalSteps={tour.totalSteps}
+          onNext={tour.next}
+          onPrev={tour.prev}
+          onDismiss={tour.dismiss}
+          nextStepTarget={tour.nextStep?.target}
+        />
+      )}
     </div>
   );
 }

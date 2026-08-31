@@ -10,6 +10,8 @@ import {
   DollarSign,
   Info,
   UserSearch,
+  MessageSquare,
+  BarChart3,
 } from "lucide-react";
 
 import Button from "@/components/ui/Button";
@@ -29,6 +31,8 @@ interface AiSettings {
   salaryNarrativeEnabled: boolean;
   matchScoringMaxRescoreCount: number;
   talentRediscoveryEnabled: boolean;
+  chatEnabled: boolean;
+  chatDailyLimitPerUser: number;
 }
 
 const EMPTY: AiSettings = {
@@ -39,6 +43,8 @@ const EMPTY: AiSettings = {
   salaryNarrativeEnabled: false,
   matchScoringMaxRescoreCount: 3,
   talentRediscoveryEnabled: false,
+  chatEnabled: false,
+  chatDailyLimitPerUser: 50,
 };
 
 type ToggleKey = keyof AiSettings;
@@ -101,11 +107,37 @@ const FEATURES: FeatureDef[] = [
     off: "The salary band and pay-equity numbers are still shown — they come from your payroll data, not AI. Only the written summary is hidden.",
     cost: "~$0.01 per offer",
   },
+  {
+    key: "chatEnabled",
+    icon: MessageSquare,
+    title: "Ask AI Chat",
+    on: "A chat assistant on the dashboard answers questions about your company's data and how to use XpayRoll.",
+    off: "The Ask AI chat button doesn’t appear anywhere in the app. Every screen and report works exactly the same without it.",
+    cost: "~$0.02 per message",
+  },
 ];
+
+interface AiUsageRow {
+  feature: string;
+  callCount: number;
+  totalInputTokens: number;
+  totalOutputTokens: number;
+  estimatedCostUsd: number;
+}
+
+const FEATURE_LABELS: Record<string, string> = {
+  cv_parse: "CV Parsing",
+  match_score: "AI Match Scoring",
+  interview_summary: "Interview Summaries",
+  offer_narrative: "Salary Narrative",
+  talent_rediscovery: "Talent Rediscovery",
+  ask_ai: "Ask AI Chat",
+};
 
 export default function AiFeaturesPage() {
   useRequirePermission("Settings.Company.View");
   const canManage = usePermission(Permissions.Settings.Company.Manage);
+  const canViewUsage = usePermission(Permissions.Ai.Chat.ViewUsage);
 
   const initialized = useRef(false);
   const [settings, setSettings] = useState<AiSettings>(EMPTY);
@@ -136,6 +168,26 @@ export default function AiFeaturesPage() {
     load();
   }, []);
 
+  const [usage, setUsage] = useState<AiUsageRow[]>([]);
+  const [usageLoading, setUsageLoading] = useState(false);
+
+  useEffect(() => {
+    if (!canViewUsage) return;
+    const to = new Date();
+    const from = new Date();
+    from.setDate(from.getDate() - 30);
+    const fmt = (d: Date) => d.toISOString().slice(0, 10);
+
+    setUsageLoading(true);
+    api
+      .get<AiUsageRow[]>("/ai/chat/usage", {
+        params: { from: fmt(from), to: fmt(to) },
+      })
+      .then(({ data }) => setUsage(data))
+      .catch(() => setUsage([]))
+      .finally(() => setUsageLoading(false));
+  }, [canViewUsage]);
+
   const dirty = JSON.stringify(settings) !== JSON.stringify(original);
   const anyOn = Object.values(settings).some(Boolean);
 
@@ -146,6 +198,12 @@ export default function AiFeaturesPage() {
     setSettings((s) => ({
       ...s,
       matchScoringMaxRescoreCount: Math.max(1, Math.min(20, value)),
+    }));
+
+  const setChatDailyLimit = (value: number) =>
+    setSettings((s) => ({
+      ...s,
+      chatDailyLimitPerUser: Math.max(1, Math.min(500, value)),
     }));
 
   const save = async () => {
@@ -282,6 +340,39 @@ export default function AiFeaturesPage() {
                         </span>
                       </div>
                     )}
+
+                    {f.key === "chatEnabled" && on && (
+                      <div className="mt-3 flex items-center gap-3 pt-3 border-t border-gray-100 dark:border-gray-800">
+                        <label
+                          htmlFor="chat-daily-limit"
+                          className="text-sm text-gray-600 dark:text-gray-300"
+                        >
+                          Max chat messages per user per day
+                        </label>
+                        <input
+                          id="chat-daily-limit"
+                          type="number"
+                          min={1}
+                          max={500}
+                          value={settings.chatDailyLimitPerUser}
+                          disabled={!canManage}
+                          onChange={(e) =>
+                            setChatDailyLimit(Number(e.target.value) || 1)
+                          }
+                          style={{
+                            width: "4.5rem",
+                            padding: "0.375rem 0.5rem",
+                            borderRadius: "0.5rem",
+                            border: "1px solid var(--border-color, #d1d5db)",
+                            background: "var(--input-bg, transparent)",
+                          }}
+                        />
+                        <span className="text-xs text-gray-400">
+                          Resets daily. Protects against runaway usage from a
+                          single account.
+                        </span>
+                      </div>
+                    )}
                   </div>
 
                   <div className="shrink-0 pt-1">
@@ -297,6 +388,82 @@ export default function AiFeaturesPage() {
           );
         })}
       </div>
+
+      {canViewUsage && (
+        <div className="card">
+          <div className="card-body">
+            <div className="flex items-center gap-2 mb-1">
+              <BarChart3 size={17} className="text-violet-500" />
+              <h5 className="font-semibold text-gray-900 dark:text-white text-sm">
+                Usage &amp; Cost
+              </h5>
+              <span className="text-xs text-gray-400">Last 30 days</span>
+            </div>
+
+            {usageLoading ? (
+              <div className="py-6 text-center text-sm text-gray-400">
+                Loading…
+              </div>
+            ) : usage.length === 0 ? (
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
+                No AI usage recorded in this period yet.
+              </p>
+            ) : (
+              <div className="mt-3 overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-xs text-gray-400 border-b border-gray-100 dark:border-gray-800">
+                      <th className="py-2 font-medium">Feature</th>
+                      <th className="py-2 font-medium text-right">Calls</th>
+                      <th className="py-2 font-medium text-right">Tokens</th>
+                      <th className="py-2 font-medium text-right">Est. Cost</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {usage.map((row) => (
+                      <tr
+                        key={row.feature}
+                        className="border-b border-gray-50 dark:border-gray-800/50"
+                      >
+                        <td className="py-2 text-gray-700 dark:text-gray-300">
+                          {FEATURE_LABELS[row.feature] ?? row.feature}
+                        </td>
+                        <td className="py-2 text-right text-gray-700 dark:text-gray-300">
+                          {row.callCount.toLocaleString()}
+                        </td>
+                        <td className="py-2 text-right text-gray-500 dark:text-gray-400">
+                          {(
+                            row.totalInputTokens + row.totalOutputTokens
+                          ).toLocaleString()}
+                        </td>
+                        <td className="py-2 text-right font-medium text-gray-900 dark:text-white">
+                          ${row.estimatedCostUsd.toFixed(2)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr>
+                      <td
+                        colSpan={3}
+                        className="pt-2 text-right text-xs text-gray-400"
+                      >
+                        Total estimated cost
+                      </td>
+                      <td className="pt-2 text-right font-semibold text-gray-900 dark:text-white">
+                        $
+                        {usage
+                          .reduce((sum, r) => sum + r.estimatedCostUsd, 0)
+                          .toFixed(2)}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       <p className="text-xs text-gray-400">
         Costs are approximate and billed to your organisation’s Claude API

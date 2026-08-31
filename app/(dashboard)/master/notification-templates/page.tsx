@@ -27,6 +27,9 @@ import {
 import { useRequirePermission } from "@/hooks/useRequirePermission";
 import { usePermission } from "@/hooks/usePermission";
 import { Permissions } from "@/lib/permissions";
+import { useTour } from "@/hooks/useTour";
+import TourOverlay from "@/components/onboarding/TourOverlay";
+import { NOTIFICATION_TEMPLATES_STEPS } from "@/lib/tours/notification-templates";
 
 /* ─── Types ─────────────────────────────────────────── */
 interface NotificationTemplate {
@@ -120,6 +123,10 @@ function timeAgo(dateStr: string | null) {
 
 /* ─── Page ───────────────────────────────────────────── */
 export default function NotificationTemplatesPage() {
+  const tour = useTour(
+    "admin-page-notification-templates",
+    NOTIFICATION_TEMPLATES_STEPS,
+  );
   useRequirePermission(Permissions.MasterData.NotificationTemplates.View);
   const canManage = usePermission(
     Permissions.MasterData.NotificationTemplates.Manage,
@@ -306,6 +313,7 @@ export default function NotificationTemplatesPage() {
             variant="solid"
             icon={<PlusIcon size={16} />}
             onClick={openAdd}
+            data-tour="notification-templates-add-button"
           >
             Add Template
           </Button>
@@ -408,7 +416,10 @@ export default function NotificationTemplatesPage() {
       <div className="card">
         <div className="card-body">
           {/* Filter row */}
-          <div className="flex items-center justify-between mb-4">
+          <div
+            className="flex items-center justify-between mb-4"
+            data-tour="notification-templates-filter-row"
+          >
             <div className="flex items-center gap-2">
               {/* Channel filter */}
               <div className="relative">
@@ -468,7 +479,10 @@ export default function NotificationTemplatesPage() {
               <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full" />
             </div>
           ) : (
-            <table className="table-default table-hover w-full">
+            <table
+              className="table-default table-hover w-full"
+              data-tour="notification-templates-table-card"
+            >
               <thead>
                 <tr>
                   <th>Template Code</th>
@@ -749,6 +763,18 @@ export default function NotificationTemplatesPage() {
           </Button>
         </div>
       </Dialog>
+
+      {tour.visible && (
+        <TourOverlay
+          step={tour.step}
+          stepIndex={tour.stepIndex}
+          totalSteps={tour.totalSteps}
+          onNext={tour.next}
+          onPrev={tour.prev}
+          onDismiss={tour.dismiss}
+          nextStepTarget={tour.nextStep?.target}
+        />
+      )}
     </div>
   );
 }

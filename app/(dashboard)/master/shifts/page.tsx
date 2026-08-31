@@ -22,6 +22,9 @@ import {
 import { useRequirePermission } from "@/hooks/useRequirePermission";
 import { usePermission } from "@/hooks/usePermission";
 import { Permissions } from "@/lib/permissions";
+import { useTour } from "@/hooks/useTour";
+import TourOverlay from "@/components/onboarding/TourOverlay";
+import { SHIFTS_STEPS } from "@/lib/tours/shifts";
 
 interface Shift {
   id: string;
@@ -92,6 +95,7 @@ const avatarColor = (name: string) => {
 };
 
 export default function ShiftsPage() {
+  const tour = useTour("admin-page-shifts", SHIFTS_STEPS);
   useRequirePermission(Permissions.MasterData.Shifts.View);
   const canManage = usePermission(Permissions.MasterData.Shifts.Manage);
 
@@ -263,6 +267,7 @@ export default function ShiftsPage() {
             variant="solid"
             icon={<PlusIcon size={16} />}
             onClick={openAdd}
+            data-tour="shifts-add-button"
           >
             Add Shift
           </Button>
@@ -344,7 +349,10 @@ export default function ShiftsPage() {
       <div className="card">
         <div className="card-body">
           {/* Search + filter row */}
-          <div className="flex items-center gap-3 mb-5">
+          <div
+            className="flex items-center gap-3 mb-5"
+            data-tour="shifts-filter-row"
+          >
             {/* Search */}
             <div className="relative flex-1 max-w-xs">
               <Search
@@ -393,7 +401,10 @@ export default function ShiftsPage() {
             </div>
           ) : (
             <>
-              <table className="table-default table-hover w-full">
+              <table
+                className="table-default table-hover w-full"
+                data-tour="shifts-table-card"
+              >
                 <thead>
                   <tr>
                     <th>Name</th>
@@ -698,6 +709,18 @@ export default function ShiftsPage() {
           </Button>
         </div>
       </Dialog>
+
+      {tour.visible && (
+        <TourOverlay
+          step={tour.step}
+          stepIndex={tour.stepIndex}
+          totalSteps={tour.totalSteps}
+          onNext={tour.next}
+          onPrev={tour.prev}
+          onDismiss={tour.dismiss}
+          nextStepTarget={tour.nextStep?.target}
+        />
+      )}
     </div>
   );
 }

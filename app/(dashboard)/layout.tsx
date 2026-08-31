@@ -4,7 +4,11 @@ import { Sidebar }   from '@/components/layout/Sidebar'
 import { Topbar }    from '@/components/layout/Topbar'
 import { AppFooter } from '@/components/layout/AppFooter'
 import CompanySetupGate from '@/components/company/CompanySetupGate'
+import AskAiChatButton from "@/components/ai/AskAiChatButton";
 import { useState, useEffect } from 'react'
+import { useTour } from "@/hooks/useTour";
+import TourOverlay from "@/components/onboarding/TourOverlay";
+import { GLOBAL_WELCOME_STEPS } from "@/lib/tours/globalWelcome";
 
 const PIN_KEY = "xp_sidebar_pinned";
 const EXPANDED_W = 290;
@@ -12,6 +16,7 @@ const COLLAPSED_W = 80;
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [sideW, setSideW] = useState(COLLAPSED_W);
+  const tour = useTour("admin-global-welcome", GLOBAL_WELCOME_STEPS);
 
   useEffect(() => {
     // Set initial width from stored pin state
@@ -48,6 +53,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
         </div>
       </div>
+      <AskAiChatButton />
+      {tour.visible && (
+        <TourOverlay
+          step={tour.step}
+          stepIndex={tour.stepIndex}
+          totalSteps={tour.totalSteps}
+          onNext={tour.next}
+          onPrev={tour.prev}
+          onDismiss={tour.dismiss}
+          nextStepTarget={tour.nextStep?.target}
+        />
+      )}
     </CompanySetupGate>
   );
 }

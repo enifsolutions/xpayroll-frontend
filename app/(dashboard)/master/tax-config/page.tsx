@@ -24,6 +24,9 @@ import { usePermission } from "@/hooks/usePermission";
 import { Permissions } from "@/lib/permissions";
 import TaxYearReadinessBanner from "@/components/master/TaxYearReadinessBanner";
 import { getErrorMessage } from "@/lib/apiError";
+import { useTour } from "@/hooks/useTour";
+import TourOverlay from "@/components/onboarding/TourOverlay";
+import { TAX_CONFIG_STEPS } from "@/lib/tours/tax-config";
 
 interface TaxConfig {
   id: string;
@@ -93,6 +96,7 @@ function StatCard({
 
 // ── Page ───────────────────────────────────────────────────────────────────
 export default function TaxConfigPage() {
+   const tour = useTour("admin-page-tax-config", TAX_CONFIG_STEPS);
   useRequirePermission(Permissions.MasterData.TaxConfig.View);
   const canManage = usePermission(Permissions.MasterData.TaxConfig.Manage);
 
@@ -247,6 +251,7 @@ export default function TaxConfigPage() {
             variant="solid"
             icon={<PlusIcon size={16} />}
             onClick={openAdd}
+            data-tour="tax-config-add-button"
           >
             Add Config
           </Button>
@@ -309,7 +314,10 @@ export default function TaxConfigPage() {
       <div className="card">
         <div className="card-body">
           {/* Search & filters */}
-          <div className="flex flex-col sm:flex-row gap-3 mb-5">
+          <div
+            className="flex flex-col sm:flex-row gap-3 mb-5"
+            data-tour="tax-config-filter-row"
+          >
             <div className="relative flex-1">
               <Search
                 size={15}
@@ -351,7 +359,10 @@ export default function TaxConfigPage() {
             </div>
           ) : (
             <>
-              <table className="table-default table-hover w-full">
+              <table
+                className="table-default table-hover w-full"
+                data-tour="tax-config-table-card"
+              >
                 <thead>
                   <tr>
                     <th>Name</th>
@@ -564,6 +575,17 @@ export default function TaxConfigPage() {
           </Button>
         </div>
       </Dialog>
+      {tour.visible && (
+        <TourOverlay
+          step={tour.step}
+          stepIndex={tour.stepIndex}
+          totalSteps={tour.totalSteps}
+          onNext={tour.next}
+          onPrev={tour.prev}
+          onDismiss={tour.dismiss}
+          nextStepTarget={tour.nextStep?.target}
+        />
+      )}
     </div>
   );
 }

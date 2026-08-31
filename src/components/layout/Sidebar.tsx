@@ -23,12 +23,24 @@ export function Sidebar() {
 
   const [pinned, setPinned] = useState(false);
   const [hovered, setHovered] = useState(false);
+  const [tourForced, setTourForced] = useState(false);
   const [openGroups, setOpenGroups] = useState<string[]>([]);
   const [openSubGroups, setOpenSubGroups] = useState<string[]>([]);
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Sidebar is expanded if pinned OR hovered
-  const expanded = pinned || hovered;
+  // Sidebar is expanded if pinned OR hovered OR the tour is forcing it open
+  // for a step whose target only renders when expanded (see useTour.ts's
+  // forceSidebarOpen and TourOverlay.tsx's dispatch of this event).
+  const expanded = pinned || hovered || tourForced;
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { open } = (e as CustomEvent<{ open: boolean }>).detail;
+      setTourForced(open);
+    };
+    window.addEventListener("xp:tour-sidebar-open", handler);
+    return () => window.removeEventListener("xp:tour-sidebar-open", handler);
+  }, []);
 
   // Restore pin state on mount
   useEffect(() => {
@@ -155,6 +167,7 @@ export function Sidebar() {
       style={{ width, minWidth: width, transition: "width 0.2s ease" }}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
+      data-tour="sidebar-nav"
     >
       {/* Brand */}
       <div
@@ -394,6 +407,7 @@ export function Sidebar() {
               </div>
               <button
                 onClick={handleSignOut}
+                data-tour="sidebar-logout"
                 className="text-[var(--xp-text-2)] hover:text-red-400 hover:bg-red-500/10 p-1 rounded-md transition-colors flex-shrink-0"
                 aria-label="Sign out"
               >

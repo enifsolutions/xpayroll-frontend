@@ -30,6 +30,9 @@ import {
 } from "@/types/leaveTemplate.types";
 import { History } from "lucide-react";
 import LeaveTemplateAuditDrawer from "@/components/master/LeaveTemplateAuditDrawer";
+import { useTour } from "@/hooks/useTour";
+import TourOverlay from "@/components/onboarding/TourOverlay";
+import { LEAVE_TEMPLATES_STEPS } from "@/lib/tours/leave-templates";
 
 const PAGE_SIZE = 10;
 
@@ -97,6 +100,7 @@ function StatCard({
 }
 
 export default function LeaveTemplatesPage() {
+  const tour = useTour("admin-page-leave-templates", LEAVE_TEMPLATES_STEPS);
   useRequirePermission(Permissions.MasterData.LeaveTemplate.View);
   const canCreate = usePermission(Permissions.MasterData.LeaveTemplate.Create);
   const canEdit = usePermission(Permissions.MasterData.LeaveTemplate.Edit);
@@ -339,7 +343,12 @@ export default function LeaveTemplatesPage() {
           </p>
         </div>
         {canCreate && (
-          <Button variant="solid" icon={<Plus size={16} />} onClick={openAdd}>
+          <Button
+            variant="solid"
+            icon={<Plus size={16} />}
+            onClick={openAdd}
+            data-tour="leave-templates-add-button"
+          >
             New Template
           </Button>
         )}
@@ -377,7 +386,10 @@ export default function LeaveTemplatesPage() {
       <div className="card">
         <div className="card-body">
           {/* Filters */}
-          <div className="flex flex-col sm:flex-row gap-3 mb-4">
+          <div
+            className="flex flex-col sm:flex-row gap-3 mb-4"
+            data-tour="leave-templates-filter-row"
+          >
             <div className="relative flex-1 max-w-xs">
               <Search
                 size={15}
@@ -418,7 +430,10 @@ export default function LeaveTemplatesPage() {
               No templates found.
             </div>
           ) : (
-            <table className="table-default table-hover w-full">
+            <table
+              className="table-default table-hover w-full"
+              data-tour="leave-templates-table-card"
+            >
               <thead>
                 <tr>
                   <th>Name</th>
@@ -773,6 +788,18 @@ export default function LeaveTemplatesPage() {
           setAuditTarget(null);
         }}
       />
+
+      {tour.visible && (
+        <TourOverlay
+          step={tour.step}
+          stepIndex={tour.stepIndex}
+          totalSteps={tour.totalSteps}
+          onNext={tour.next}
+          onPrev={tour.prev}
+          onDismiss={tour.dismiss}
+          nextStepTarget={tour.nextStep?.target}
+        />
+      )}
     </div>
   );
 }

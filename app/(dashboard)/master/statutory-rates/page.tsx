@@ -25,6 +25,9 @@ import { useRequirePermission } from "@/hooks/useRequirePermission";
 import { usePermission } from "@/hooks/usePermission";
 import { Permissions } from "@/lib/permissions";
 import { getErrorMessage } from "@/lib/apiError";
+import { useTour } from "@/hooks/useTour";
+import TourOverlay from "@/components/onboarding/TourOverlay";
+import { STATUTORY_RATES_STEPS } from "@/lib/tours/statutory-rates";
 
 interface StatutoryRate {
   id: string;
@@ -169,6 +172,7 @@ function StatCard({
 }
 
 export default function StatutoryRatesPage() {
+  const tour = useTour("admin-page-statutory-rates", STATUTORY_RATES_STEPS);
   useRequirePermission(Permissions.MasterData.StatutoryRates.View);
   const canManage = usePermission(Permissions.MasterData.StatutoryRates.Manage);
 
@@ -376,6 +380,7 @@ export default function StatutoryRatesPage() {
             icon={<PlusIcon size={16} />}
             onClick={openAdd}
             className="shrink-0"
+            data-tour="statutory-rates-add-button"
           >
             Add Rate
           </Button>
@@ -421,12 +426,14 @@ export default function StatutoryRatesPage() {
               <button
                 className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-600 transition-colors"
                 title="Export"
+                data-tour="statutory-rates-export-button"
               >
                 <Download size={16} />
               </button>
               <button
                 className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-600 transition-colors"
                 title="Print"
+                data-tour="statutory-rates-print-button"
               >
                 <Printer size={16} />
               </button>
@@ -434,7 +441,10 @@ export default function StatutoryRatesPage() {
           </div>
 
           {/* ── Filter row ────────────────────────────────────────────────── */}
-          <div className="flex items-center gap-3 mb-4">
+          <div
+            className="flex items-center gap-3 mb-4"
+            data-tour="statutory-rates-filter-row"
+          >
             {/* Search */}
             <div className="relative flex-1 max-w-xs">
               <Search
@@ -486,7 +496,10 @@ export default function StatutoryRatesPage() {
               <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full" />
             </div>
           ) : (
-            <table className="table-default table-hover w-full">
+            <table
+              className="table-default table-hover w-full"
+              data-tour="statutory-rates-table-card"
+            >
               <thead>
                 <tr>
                   <th>Scheme Name</th>
@@ -791,6 +804,18 @@ export default function StatutoryRatesPage() {
           </Button>
         </div>
       </Dialog>
+
+      {tour.visible && (
+        <TourOverlay
+          step={tour.step}
+          stepIndex={tour.stepIndex}
+          totalSteps={tour.totalSteps}
+          onNext={tour.next}
+          onPrev={tour.prev}
+          onDismiss={tour.dismiss}
+          nextStepTarget={tour.nextStep?.target}
+        />
+      )}
     </div>
   );
 }

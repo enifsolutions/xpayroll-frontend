@@ -16,6 +16,9 @@ import { useRequirePermission } from '@/hooks/useRequirePermission';
 import { usePermission } from '@/hooks/usePermission';
 import { Permissions } from '@/lib/permissions';
 import { useAuthStore } from "@/store/authStore";
+import { useTour } from "@/hooks/useTour";
+import TourOverlay from "@/components/onboarding/TourOverlay";
+import { DESIGNATIONS_STEPS } from "@/lib/tours/designations";
 
 interface Designation {
   id: string;
@@ -27,6 +30,7 @@ interface Designation {
   absentDeductionAfterDays: number | null;
   lateDeductionPerMinute: number | null;
   overtimeRateMultiplier: number | null;
+  maxLoanAmount: number | null;
   createdAt: string;
 }
 
@@ -45,16 +49,18 @@ interface DesignationForm {
   absentDeductionAfterDays: string;
   lateDeductionPerMinute: string;
   overtimeRateMultiplier: string;
+  maxLoanAmount: string;
 }
 
 const EMPTY: DesignationForm = {
-  title: '',
-  level: '',
-  grade: '',
+  title: "",
+  level: "",
+  grade: "",
   isActive: true,
-  absentDeductionAfterDays: '',
-  lateDeductionPerMinute: '',
-  overtimeRateMultiplier: '',
+  absentDeductionAfterDays: "",
+  lateDeductionPerMinute: "",
+  overtimeRateMultiplier: "",
+  maxLoanAmount: "",
 };
 const PAGE_SIZE = 10;
 
@@ -122,6 +128,7 @@ function StatCard({ icon, iconBg, label, value, sub, loading }: StatCardProps) {
 }
 
 export default function DesignationsPage() {
+  const tour = useTour("admin-page-designations", DESIGNATIONS_STEPS);
   useRequirePermission(Permissions.MasterData.Designations.View);
   const canManage = usePermission(Permissions.MasterData.Designations.Manage);
   const userId = useAuthStore((s) => s.user?.userId);
@@ -146,7 +153,7 @@ export default function DesignationsPage() {
       setStatsLoading(true);
       const res = await api.get<DesignationStats>("/designations/stats");
       setStats(res.data);
-    } catch (e:any) {
+    } catch (e: any) {
       showError(
         "Load failed",
         e?.response?.data?.error ?? "Failed to load designations.",
@@ -217,6 +224,7 @@ export default function DesignationsPage() {
       absentDeductionAfterDays: d.absentDeductionAfterDays?.toString() ?? "",
       lateDeductionPerMinute: d.lateDeductionPerMinute?.toString() ?? "",
       overtimeRateMultiplier: d.overtimeRateMultiplier?.toString() ?? "",
+      maxLoanAmount: d.maxLoanAmount?.toString() ?? "",
     });
     setDialogOpen(true);
   };
@@ -240,6 +248,9 @@ export default function DesignationsPage() {
           : null,
         overtimeRateMultiplier: form.overtimeRateMultiplier
           ? parseFloat(form.overtimeRateMultiplier)
+          : null,
+        maxLoanAmount: form.maxLoanAmount
+          ? parseFloat(form.maxLoanAmount)
           : null,
         userId,
       });
@@ -314,6 +325,7 @@ export default function DesignationsPage() {
             variant="default"
             icon={<Download size={15} />}
             onClick={handleExport}
+            data-tour="designations-export-button"
           >
             Export CSV
           </Button>
@@ -322,6 +334,7 @@ export default function DesignationsPage() {
               variant="solid"
               icon={<PlusIcon size={16} />}
               onClick={openAdd}
+              data-tour="designations-add-button"
             >
               Add Designation
             </Button>
@@ -366,7 +379,10 @@ export default function DesignationsPage() {
 
       <div className="card">
         <div className="card-body">
-          <div className="flex items-center gap-3 mb-4">
+          <div
+            className="flex items-center gap-3 mb-4"
+            data-tour="designations-filter-row"
+          >
             <div className="relative flex-1 max-w-sm">
               <Search
                 size={15}
@@ -404,7 +420,10 @@ export default function DesignationsPage() {
             </div>
           ) : (
             <>
-              <table className="table-default table-hover w-full">
+              <table
+                className="table-default table-hover w-full"
+                data-tour="designations-table-card"
+              >
                 <thead>
                   <tr>
                     <th>Designation</th>
@@ -598,7 +617,9 @@ export default function DesignationsPage() {
                   type="number"
                   placeholder="Company default"
                   value={form.absentDeductionAfterDays}
-                  onChange={(e) => set("absentDeductionAfterDays", e.target.value)}
+                  onChange={(e) =>
+                    set("absentDeductionAfterDays", e.target.value)
+                  }
                 />
               </div>
               <div>
@@ -608,7 +629,9 @@ export default function DesignationsPage() {
                   step="0.01"
                   placeholder="Company default"
                   value={form.lateDeductionPerMinute}
-                  onChange={(e) => set("lateDeductionPerMinute", e.target.value)}
+                  onChange={(e) =>
+                    set("lateDeductionPerMinute", e.target.value)
+                  }
                 />
               </div>
               <div>
@@ -618,9 +641,35 @@ export default function DesignationsPage() {
                   step="0.1"
                   placeholder="Company default"
                   value={form.overtimeRateMultiplier}
-                  onChange={(e) => set("overtimeRateMultiplier", e.target.value)}
+                  onChange={(e) =>
+                    set("overtimeRateMultiplier", e.target.value)
+                  }
                 />
               </div>
+            </div>
+          </div>
+
+          <div>
+            <p className="text-xs font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-3">
+              Loan Cap
+            </p>
+            <p className="text-xs text-gray-400 mb-3">
+              Optional combined limit across every loan an employee in this
+              designation can hold at once (loans excluded via a loan type's
+              "counts toward designation cap" setting don't count toward this —
+              they only need to clear normal DSR eligibility). Leave blank for
+              no designation-level cap.
+            </p>
+            <div className="w-1/3">
+              <label className="form-label">
+                Max Combined Loan Amount (Rs.)
+              </label>
+              <Input
+                type="number"
+                placeholder="No cap"
+                value={form.maxLoanAmount}
+                onChange={(e) => set("maxLoanAmount", e.target.value)}
+              />
             </div>
           </div>
 
@@ -641,6 +690,18 @@ export default function DesignationsPage() {
           </Button>
         </div>
       </Dialog>
+
+      {tour.visible && (
+        <TourOverlay
+          step={tour.step}
+          stepIndex={tour.stepIndex}
+          totalSteps={tour.totalSteps}
+          onNext={tour.next}
+          onPrev={tour.prev}
+          onDismiss={tour.dismiss}
+          nextStepTarget={tour.nextStep?.target}
+        />
+      )}
     </div>
   );
 }

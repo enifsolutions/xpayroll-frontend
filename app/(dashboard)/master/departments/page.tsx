@@ -24,6 +24,12 @@ import Switcher from "@/components/ui/Switcher";
 import { showSuccess, showError } from "@/lib/toast";
 import api from "@/lib/axios";
 import { useAuthStore } from "@/store/authStore";
+import { useRequirePermission } from "@/hooks/useRequirePermission";
+import { usePermission } from "@/hooks/usePermission";
+import { Permissions } from "@/lib/permissions";
+import { useTour } from "@/hooks/useTour";
+import TourOverlay from "@/components/onboarding/TourOverlay";
+import { DEPARTMENTS_STEPS } from "@/lib/tours/departments";
 
 interface Department {
   id: string;
@@ -217,6 +223,9 @@ function HierarchyTree({ departments }: { departments: Department[] }) {
 }
 
 export default function DepartmentsPage() {
+    useRequirePermission("MasterData.Departments.View");
+    const canManage = usePermission(Permissions.MasterData.Departments.Manage);
+    const tour = useTour("admin-page-departments", DEPARTMENTS_STEPS);
   const userId = useAuthStore((s) => s.user?.userId);
   const initialized = useRef(false);
 
@@ -434,6 +443,7 @@ export default function DepartmentsPage() {
             onClick={handleExportCsv}
             loading={exporting}
             icon={<Download size={15} />}
+            data-tour="departments-export-button"
           >
             Export CSV
           </Button>
@@ -442,17 +452,21 @@ export default function DepartmentsPage() {
             size="sm"
             onClick={() => setHierarchyOpen(true)}
             icon={<Network size={15} />}
+            data-tour="departments-view-hierarchy-button"
           >
             View Hierarchy
           </Button>
-          <Button
-            variant="solid"
-            size="sm"
-            onClick={openAdd}
-            icon={<Plus size={15} />}
-          >
-            Add Department
-          </Button>
+          {canManage && (
+            <Button
+              variant="solid"
+              size="sm"
+              onClick={openAdd}
+              icon={<Plus size={15} />}
+              data-tour="departments-add-button"
+            >
+              Add Department
+            </Button>
+          )}
         </div>
       </div>
 
@@ -489,7 +503,10 @@ export default function DepartmentsPage() {
 
       <div className="card">
         <div className="card-body">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-5">
+          <div
+            className="flex flex-col sm:flex-row sm:items-center gap-3 mb-5"
+            data-tour="departments-filter-row"
+          >
             <div className="relative flex-1 max-w-xs">
               <Input
                 placeholder="Search by name or code…"
@@ -575,7 +592,10 @@ export default function DepartmentsPage() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="table-default table-hover w-full">
+              <table
+                className="table-default table-hover w-full"
+                data-tour="departments-table-card"
+              >
                 <thead>
                   <tr>
                     <th>Department</th>
@@ -651,20 +671,24 @@ export default function DepartmentsPage() {
 
                       <td>
                         <div className="flex items-center justify-end gap-1">
-                          <button
-                            onClick={() => openEdit(d)}
-                            className="p-1.5 rounded-lg hover:bg-violet-50 dark:hover:bg-violet-900/20 text-violet-500 transition-colors"
-                            title="Edit"
-                          >
-                            <Pencil size={15} />
-                          </button>
-                          <button
-                            onClick={() => setDeleteId(d.id)}
-                            className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-red-500 transition-colors"
-                            title="Delete"
-                          >
-                            <Trash2 size={15} />
-                          </button>
+                          {canManage && (
+                            <button
+                              onClick={() => openEdit(d)}
+                              className="p-1.5 rounded-lg hover:bg-violet-50 dark:hover:bg-violet-900/20 text-violet-500 transition-colors"
+                              title="Edit"
+                            >
+                              <Pencil size={15} />
+                            </button>
+                          )}
+                          {canManage && (
+                            <button
+                              onClick={() => setDeleteId(d.id)}
+                              className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-red-500 transition-colors"
+                              title="Delete"
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -939,6 +963,18 @@ export default function DepartmentsPage() {
             )}
           </div>
         </div>
+      )}
+
+      {tour.visible && (
+        <TourOverlay
+          step={tour.step}
+          stepIndex={tour.stepIndex}
+          totalSteps={tour.totalSteps}
+          onNext={tour.next}
+          onPrev={tour.prev}
+          onDismiss={tour.dismiss}
+          nextStepTarget={tour.nextStep?.target}
+        />
       )}
     </div>
   );

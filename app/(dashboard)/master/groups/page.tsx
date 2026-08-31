@@ -20,6 +20,9 @@ import api from '@/lib/axios'
 import { usePermission } from '@/hooks/usePermission'
 import { Permissions } from '@/lib/permissions'
 import { useAuthStore } from "@/store/authStore";
+import { useTour } from "@/hooks/useTour";
+import TourOverlay from "@/components/onboarding/TourOverlay";
+import { GROUPS_STEPS } from "@/lib/tours/groups";
 
 interface Group {
   id: string; name: string; code: string; description?: string | null;
@@ -105,6 +108,7 @@ function Pagination({ total, page, onChange }: { total: number; page: number; on
 
 // ── Main page ────────────────────────────────────────────────────────────────
 export default function GroupsPage() {
+  const tour = useTour("admin-page-groups", GROUPS_STEPS);
   const userId = useAuthStore((s) => s.user?.userId);
   useRequirePermission(Permissions.MasterData.Groups.View);
   const canManage = usePermission(Permissions.MasterData.Groups.Manage);
@@ -296,6 +300,7 @@ export default function GroupsPage() {
             variant="solid"
             icon={<PlusIcon size={16} />}
             onClick={openAdd}
+            data-tour="groups-add-button"
           >
             Add Group
           </Button>
@@ -348,79 +353,82 @@ export default function GroupsPage() {
         ))}
       </div>
 
-      {/* ── Filter bar ── */}
-      <div className="card mb-4">
-        <div className="card-body py-3">
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="relative flex-1 min-w-[180px]">
-              <Search
-                size={14}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-              />
-              <input
-                className="input w-full pl-8 h-9 text-sm"
-                placeholder="Search name or code…"
-                value={search}
-                onChange={(e) => {
-                  setSearch(e.target.value);
-                  resetPage();
-                }}
-              />
-            </div>
-            <select
-              className="input h-9 text-sm w-36"
-              value={filterStatus}
-              onChange={(e) => {
-                setFilterStatus(e.target.value as any);
-                resetPage();
-              }}
-            >
-              <option value="all">All Status</option>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-            </select>
-            <select
-              className="input h-9 text-sm w-44"
-              value={filterDept}
-              onChange={(e) => {
-                setFilterDept(e.target.value);
-                resetPage();
-              }}
-            >
-              <option value="">All Departments</option>
-              {departments.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.name}
-                </option>
-              ))}
-            </select>
-            {(search || filterStatus !== "all" || filterDept) && (
-              <button
-                className="text-sm text-primary hover:underline"
-                onClick={() => {
-                  setSearch("");
-                  setFilterStatus("all");
-                  setFilterDept("");
-                  resetPage();
-                }}
-              >
-                Clear
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-
       {/* ── Table ── */}
       <div className="card">
         <div className="card-body">
+          {/* ── Filter bar ── */}
+          <div
+            className="flex items-center gap-3 mb-4 flex-wrap"
+            data-tour="groups-filter-row"
+          >
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="relative flex-1 min-w-[180px]">
+                <Search
+                  size={14}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                />
+                <input
+                  className="input w-full pl-8 h-9 text-sm"
+                  placeholder="Search name or code…"
+                  value={search}
+                  onChange={(e) => {
+                    setSearch(e.target.value);
+                    resetPage();
+                  }}
+                />
+              </div>
+              <select
+                className="input h-9 text-sm w-36"
+                value={filterStatus}
+                onChange={(e) => {
+                  setFilterStatus(e.target.value as any);
+                  resetPage();
+                }}
+              >
+                <option value="all">All Status</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </select>
+              <select
+                className="input h-9 text-sm w-44"
+                value={filterDept}
+                onChange={(e) => {
+                  setFilterDept(e.target.value);
+                  resetPage();
+                }}
+              >
+                <option value="">All Departments</option>
+                {departments.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.name}
+                  </option>
+                ))}
+              </select>
+              {(search || filterStatus !== "all" || filterDept) && (
+                <button
+                  className="text-sm text-primary hover:underline"
+                  onClick={() => {
+                    setSearch("");
+                    setFilterStatus("all");
+                    setFilterDept("");
+                    resetPage();
+                  }}
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+          </div>
           {loading ? (
             <div className="flex justify-center py-12">
               <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full" />
             </div>
           ) : (
             <>
-              <table className="table-default table-hover w-full">
+              <table
+                className="table-default table-hover w-full"
+                data-tour="groups-table-card"
+              >
                 <thead>
                   <tr>
                     <th>GROUP</th>
@@ -623,6 +631,18 @@ export default function GroupsPage() {
           setDeleteTarget(null);
         }}
       />
+
+      {tour.visible && (
+        <TourOverlay
+          step={tour.step}
+          stepIndex={tour.stepIndex}
+          totalSteps={tour.totalSteps}
+          onNext={tour.next}
+          onPrev={tour.prev}
+          onDismiss={tour.dismiss}
+          nextStepTarget={tour.nextStep?.target}
+        />
+      )}
     </>
   );
 }

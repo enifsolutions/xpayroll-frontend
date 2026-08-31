@@ -1240,53 +1240,97 @@ export default function DashboardPage() {
     const layout = buildLayout(prefs.order, prefs.visible, prefs.sizes)
 
     return (
-        <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
-            {/* Welcome banner */}
-            <div className="relative overflow-hidden bg-gradient-to-br from-indigo-600 via-indigo-700 to-violet-800 dark:from-indigo-950 dark:via-indigo-900 dark:to-violet-950 px-8 py-8">
-                <div className="absolute -top-10 -right-10 w-64 h-64 rounded-full bg-white/5"/>
-                <div className="absolute top-4 right-32 w-32 h-32 rounded-full bg-white/5"/>
-                <div className="absolute -bottom-16 right-10 w-48 h-48 rounded-full bg-white/5"/>
-                <div className="relative flex items-center justify-between">
-                    <div>
-                        <p className="text-indigo-200 text-sm mb-1">{greeting} 👋</p>
-                        <h2 className="text-white font-bold text-2xl">Welcome back</h2>
-                        <p className="text-indigo-300 text-sm mt-1">{now.toLocaleDateString('en-LK',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}</p>
-                        {!loading&&summary&&summary.pendingLeaveRequests>0&&(
-                            <div onClick={()=>router.push('/transactions/leave-requests')} className="mt-3 inline-flex items-center gap-2 bg-white/15 hover:bg-white/20 text-white text-xs px-3 py-1.5 rounded-full cursor-pointer transition-colors">
-                                <Bell size={13}/>You have <strong>{summary.pendingLeaveRequests}</strong> pending leave {summary.pendingLeaveRequests===1?'request':'requests'}<ChevronRight size={12}/>
-                            </div>
-                        )}
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <button onClick={load} disabled={loading} className="bg-white/15 hover:bg-white/25 text-white text-xs px-4 py-2 rounded-xl transition-colors font-medium">{loading?'Loading…':'Refresh'}</button>
-                        <button onClick={()=>setShowSettings(true)} className="bg-white/15 hover:bg-white/25 text-white text-xs px-4 py-2 rounded-xl transition-colors font-medium flex items-center gap-1.5"><Settings size={13}/> Widgets</button>
-                    </div>
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+        {/* Welcome banner */}
+        <div className="relative overflow-hidden bg-gradient-to-br from-indigo-600 via-indigo-700 to-violet-800 dark:from-indigo-950 dark:via-indigo-900 dark:to-violet-950 px-8 py-8">
+          <div className="absolute -top-10 -right-10 w-64 h-64 rounded-full bg-white/5" />
+          <div className="absolute top-4 right-32 w-32 h-32 rounded-full bg-white/5" />
+          <div className="absolute -bottom-16 right-10 w-48 h-48 rounded-full bg-white/5" />
+          <div className="relative flex items-center justify-between">
+            <div>
+              <p className="text-indigo-200 text-sm mb-1">{greeting} 👋</p>
+              <h2 className="text-white font-bold text-2xl">Welcome back</h2>
+              <p className="text-indigo-300 text-sm mt-1">
+                {now.toLocaleDateString("en-LK", {
+                  weekday: "long",
+                  day: "numeric",
+                  month: "long",
+                  year: "numeric",
+                })}
+              </p>
+              {!loading && summary && summary.pendingLeaveRequests > 0 && (
+                <div
+                  onClick={() => router.push("/transactions/leave-requests")}
+                  className="mt-3 inline-flex items-center gap-2 bg-white/15 hover:bg-white/20 text-white text-xs px-3 py-1.5 rounded-full cursor-pointer transition-colors"
+                >
+                  <Bell size={13} />
+                  You have <strong>{summary.pendingLeaveRequests}</strong>{" "}
+                  pending leave{" "}
+                  {summary.pendingLeaveRequests === 1 ? "request" : "requests"}
+                  <ChevronRight size={12} />
                 </div>
+              )}
             </div>
-
-            {/* Widget grid */}
-            <div className="p-6 space-y-4">
-                {layout.map((row,ri)=>(
-                    <div key={ri} className="grid grid-cols-12 gap-4 items-stretch">
-                        {row.map(({id,cols})=>(
-                            <div key={id} className={`${colsClass(cols)} h-full`}>
-                                <DragWrap id={id} onStart={handleDragStart} onEnter={handleDragEnter} onEnd={handleDragEnd}>
-                                    {grip=>renderContent(id,grip)}
-                                </DragWrap>
-                            </div>
-                        ))}
-                    </div>
-                ))}
-                {layout.length===0&&(
-                    <div className="text-center py-24 text-gray-400">
-                        <EyeOff size={44} className="mx-auto mb-3 opacity-30"/>
-                        <p className="text-sm font-medium">All widgets are hidden</p>
-                        <button onClick={()=>setShowSettings(true)} className="btn btn-default btn-sm mt-4">Manage Widgets</button>
-                    </div>
-                )}
+            <div className="flex items-center gap-2">
+              <button
+                data-tour="refresh-button"
+                onClick={load}
+                disabled={loading}
+                className="bg-white/15 hover:bg-white/25 text-white text-xs px-4 py-2 rounded-xl transition-colors font-medium"
+              >
+                {loading ? "Loading…" : "Refresh"}
+              </button>
+              <button
+                data-tour="widgets-button"
+                onClick={() => setShowSettings(true)}
+                className="bg-white/15 hover:bg-white/25 text-white text-xs px-4 py-2 rounded-xl transition-colors font-medium flex items-center gap-1.5"
+              >
+                <Settings size={13} /> Widgets
+              </button>
             </div>
-
-            {showSettings&&<SettingsPanel prefs={prefs} onToggle={toggleWidget} onResize={resizeWidget} onClose={()=>setShowSettings(false)}/>}
+          </div>
         </div>
-    )
+
+        {/* Widget grid */}
+        <div className="p-6 space-y-4">
+          {layout.map((row, ri) => (
+            <div key={ri} className="grid grid-cols-12 gap-4 items-stretch">
+              {row.map(({ id, cols }) => (
+                <div key={id} className={`${colsClass(cols)} h-full`}>
+                  <DragWrap
+                    id={id}
+                    onStart={handleDragStart}
+                    onEnter={handleDragEnter}
+                    onEnd={handleDragEnd}
+                  >
+                    {(grip) => renderContent(id, grip)}
+                  </DragWrap>
+                </div>
+              ))}
+            </div>
+          ))}
+          {layout.length === 0 && (
+            <div className="text-center py-24 text-gray-400">
+              <EyeOff size={44} className="mx-auto mb-3 opacity-30" />
+              <p className="text-sm font-medium">All widgets are hidden</p>
+              <button
+                onClick={() => setShowSettings(true)}
+                className="btn btn-default btn-sm mt-4"
+              >
+                Manage Widgets
+              </button>
+            </div>
+          )}
+        </div>
+
+        {showSettings && (
+          <SettingsPanel
+            prefs={prefs}
+            onToggle={toggleWidget}
+            onResize={resizeWidget}
+            onClose={() => setShowSettings(false)}
+          />
+        )}
+      </div>
+    );
 }

@@ -23,6 +23,9 @@ import { useRequirePermission } from "@/hooks/useRequirePermission";
 import { usePermission } from "@/hooks/usePermission";
 import { Permissions } from "@/lib/permissions";
 import { useAuthStore } from "@/store/authStore";
+import { useTour } from "@/hooks/useTour";
+import TourOverlay from "@/components/onboarding/TourOverlay";
+import { LEAVE_TYPES_STEPS } from "@/lib/tours/leave-types";
 
 interface LeaveType {
   id: string;
@@ -113,6 +116,7 @@ const initials = (name: string) =>
     .toUpperCase();
 
 export default function LeaveTypesPage() {
+  const tour = useTour("admin-page-leave-types", LEAVE_TYPES_STEPS);
   useRequirePermission(Permissions.MasterData.LeaveTypes.View);
   const canManage = usePermission(Permissions.MasterData.LeaveTypes.Manage);
   const userId = useAuthStore((s) => s.user?.userId);
@@ -290,6 +294,7 @@ export default function LeaveTypesPage() {
             variant="solid"
             icon={<PlusIcon size={16} />}
             onClick={openAdd}
+            data-tour="leave-types-add-button"
           >
             Add Leave Type
           </Button>
@@ -367,7 +372,10 @@ export default function LeaveTypesPage() {
       <div className="card">
         <div className="card-body">
           {/* Search + filter row */}
-          <div className="flex items-center gap-3 mb-5">
+          <div
+            className="flex items-center gap-3 mb-5"
+            data-tour="leave-types-filter-row"
+          >
             <div className="relative flex-1 max-w-xs">
               <Search
                 size={15}
@@ -413,7 +421,10 @@ export default function LeaveTypesPage() {
             </div>
           ) : (
             <>
-              <table className="table-default table-hover w-full">
+              <table
+                className="table-default table-hover w-full"
+                data-tour="leave-types-table-card"
+              >
                 <thead>
                   <tr>
                     <th>Name</th>
@@ -766,6 +777,18 @@ export default function LeaveTypesPage() {
           </Button>
         </div>
       </Dialog>
+
+      {tour.visible && (
+        <TourOverlay
+          step={tour.step}
+          stepIndex={tour.stepIndex}
+          totalSteps={tour.totalSteps}
+          onNext={tour.next}
+          onPrev={tour.prev}
+          onDismiss={tour.dismiss}
+          nextStepTarget={tour.nextStep?.target}
+        />
+      )}
     </div>
   );
 }

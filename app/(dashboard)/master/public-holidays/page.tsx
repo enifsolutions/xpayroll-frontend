@@ -17,11 +17,16 @@ import {
   AlertCircle,
   ChevronLeft,
   ChevronRight,
+  Download,
+  RefreshCw,
 } from "lucide-react";
 import { useRequirePermission } from "@/hooks/useRequirePermission";
 import { usePermission } from "@/hooks/usePermission";
 import { Permissions } from "@/lib/permissions";
 import { useAuthStore } from "@/store/authStore";
+import { useTour } from "@/hooks/useTour";
+import TourOverlay from "@/components/onboarding/TourOverlay";
+import { PUBLIC_HOLIDAYS_STEPS } from "@/lib/tours/public-holidays";
 
 interface PublicHoliday {
   id: string;
@@ -128,6 +133,7 @@ function parseIcs(
 }
 
 export default function PublicHolidaysPage() {
+  const tour = useTour("admin-page-public-holidays", PUBLIC_HOLIDAYS_STEPS);
   useRequirePermission(Permissions.MasterData.PublicHolidays.View);
   const canManage = usePermission(Permissions.MasterData.PublicHolidays.Manage);
   const userId = useAuthStore((s) => s.user?.userId);
@@ -363,15 +369,35 @@ export default function PublicHolidaysPage() {
   return (
     <div>
       {/* Header */}
-      <div className="mb-6">
-        <p className="text-xs font-semibold text-primary uppercase tracking-widest mb-1">
-          Global Settings
-        </p>
-        <h3 className="h3">Public Holidays</h3>
-        <p className="text-gray-500 dark:text-gray-400 mt-1">
-          Manage company-wide public holidays used in payroll and leave
-          calculations for the upcoming fiscal year.
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="h3">Public Holidays</h3>
+          <p className="text-gray-500 dark:text-gray-400 mt-1 text-sm">
+            Manage company-wide public holidays used in payroll and leave
+            calculations for the upcoming fiscal year.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            //onClick={loadAll}
+            className="p-2 rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+            data-tour="public-holidays-refresh-button"
+            title="Refresh all"
+          >
+            <RefreshCw size={15} />
+          </button>
+
+          {canManage && (
+            <Button
+              variant="solid"
+              icon={<PlusIcon size={16} />}
+              onClick={openAdd}
+              data-tour="public-holidays-add-button"
+            >
+              Add Holiday
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Stat cards */}
@@ -511,7 +537,10 @@ export default function PublicHolidaysPage() {
       <div className="card">
         <div className="card-body">
           {/* Toolbar */}
-          <div className="flex items-center justify-between mb-4">
+          <div
+            className="flex items-center justify-between mb-4"
+            data-tour="public-holidays-filter-row"
+          >
             <div className="flex items-center gap-2">
               <h6 className="font-semibold heading-text">Holiday Schedule</h6>
               <span className="xp-badge xp-badge-info">{yearFilter} List</span>
@@ -553,17 +582,10 @@ export default function PublicHolidaysPage() {
                   <button
                     onClick={() => fileInputRef.current?.click()}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-gray-600 dark:text-gray-300 text-sm font-medium"
+                    data-tour="public-holidays-import-button"
                   >
                     <Upload size={14} /> Import .ics
                   </button>
-                  <Button
-                    variant="solid"
-                    icon={<PlusIcon size={15} />}
-                    onClick={openAdd}
-                    size="sm"
-                  >
-                    Add Holiday
-                  </Button>
                 </>
               )}
             </div>
@@ -576,7 +598,10 @@ export default function PublicHolidaysPage() {
             </div>
           ) : (
             <>
-              <table className="table-default table-hover w-full">
+              <table
+                className="table-default table-hover w-full"
+                data-tour="public-holidays-table-card"
+              >
                 <thead>
                   <tr>
                     <th>Date</th>
@@ -928,6 +953,18 @@ export default function PublicHolidaysPage() {
           </div>
         </div>
       </Dialog>
+
+      {tour.visible && (
+        <TourOverlay
+          step={tour.step}
+          stepIndex={tour.stepIndex}
+          totalSteps={tour.totalSteps}
+          onNext={tour.next}
+          onPrev={tour.prev}
+          onDismiss={tour.dismiss}
+          nextStepTarget={tour.nextStep?.target}
+        />
+      )}
     </div>
   );
 }

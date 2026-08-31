@@ -20,6 +20,9 @@ import api from '@/lib/axios'
 import { usePermission } from '@/hooks/usePermission'
 import { Permissions } from '@/lib/permissions'
 import { useAuthStore } from "@/store/authStore";
+import { useTour } from "@/hooks/useTour";
+import TourOverlay from "@/components/onboarding/TourOverlay";
+import { CREWS_STEPS } from "@/lib/tours/crews";
 
 interface Crew {
   id: string; name: string; code: string; description?: string | null;
@@ -46,6 +49,7 @@ const EMPTY: CrewForm = {
 const PAGE_SIZE = 10;
 
 export default function CrewsPage() {
+  const tour = useTour("admin-page-crews", CREWS_STEPS);
   const userId = useAuthStore((s) => s.user?.userId);
   useRequirePermission(Permissions.MasterData.Crews.View);
   const canManage = usePermission(Permissions.MasterData.Crews.Manage);
@@ -263,6 +267,7 @@ export default function CrewsPage() {
             variant="solid"
             icon={<PlusIcon size={16} />}
             onClick={openAdd}
+            data-tour="crews-add-button"
           >
             Add Crew
           </Button>
@@ -315,10 +320,14 @@ export default function CrewsPage() {
         ))}
       </div>
 
-      {/* Filter Bar */}
-      <div className="card mb-4">
+      {/* Table */}
+      <div className="card">
         <div className="card-body">
-          <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+          {/* Filter Bar */}
+          <div
+            className="flex items-center gap-3 mb-4 flex-wrap"
+            data-tour="crews-filter-row"
+          >
             <div className="relative flex-1 min-w-0">
               <Search
                 size={15}
@@ -357,19 +366,17 @@ export default function CrewsPage() {
               {search || statusFilter || deptFilter ? " (filtered)" : ""}
             </span>
           </div>
-        </div>
-      </div>
 
-      {/* Table */}
-      <div className="card">
-        <div className="card-body">
           {loading ? (
             <div className="flex justify-center py-12">
               <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full" />
             </div>
           ) : (
             <>
-              <table className="table-default table-hover w-full">
+              <table
+                className="table-default table-hover w-full"
+                data-tour="crews-table-card"
+              >
                 <thead>
                   <tr>
                     <th>Code</th>
@@ -614,6 +621,18 @@ export default function CrewsPage() {
           setDeleteTarget(null);
         }}
       />
+
+      {tour.visible && (
+        <TourOverlay
+          step={tour.step}
+          stepIndex={tour.stepIndex}
+          totalSteps={tour.totalSteps}
+          onNext={tour.next}
+          onPrev={tour.prev}
+          onDismiss={tour.dismiss}
+          nextStepTarget={tour.nextStep?.target}
+        />
+      )}
     </>
   );
 }

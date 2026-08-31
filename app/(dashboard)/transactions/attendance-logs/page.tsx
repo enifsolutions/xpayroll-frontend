@@ -27,6 +27,7 @@ import { showSuccess, showError } from "@/lib/toast";
 import Dialog from "@/components/ui/Dialog";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
+import Switcher from "@/components/ui/Switcher";
 import type {
   AttendanceLog,
   AttendanceLogForm,
@@ -101,9 +102,13 @@ const emptyForm = (): AttendanceLogForm => ({
   breakMinutes: "0",
   isLate: false,
   lateMinutes: "0",
+  preOtMinutes: "0",
+  postOtMinutes: "0",
+  earlyLeaveMinutes: "0",
   status: "Present",
   adjustmentReason: "",
   notes: "",
+  manualOverride: false,
 });
 
 // Pagination helper
@@ -581,11 +586,15 @@ export default function AttendanceLogsPage() {
         breakMinutes: parseFloat(form.breakMinutes) || 0,
         isLate: form.isLate,
         lateMinutes: parseInt(form.lateMinutes) || 0,
+        preOtMinutes: parseInt(form.preOtMinutes) || 0,
+        postOtMinutes: parseInt(form.postOtMinutes) || 0,
+        earlyLeaveMinutes: parseInt(form.earlyLeaveMinutes) || 0,
         status: form.status,
         isAdjusted: !!editing,
         adjustmentReason: form.adjustmentReason || null,
         notes: form.notes || null,
         userId,
+        manualOverride: form.manualOverride,
       });
       setDialogOpen(false);
       await load();
@@ -1227,6 +1236,23 @@ export default function AttendanceLogsPage() {
                                 +{item.overtimeHours}h OT
                               </div>
                             )}
+                            {(item.preOtMinutes > 0 ||
+                              item.postOtMinutes > 0) && (
+                              <div className="text-xs text-amber-500 tabular-nums">
+                                {item.preOtMinutes > 0 &&
+                                  `${item.preOtMinutes}m pre`}
+                                {item.preOtMinutes > 0 &&
+                                  item.postOtMinutes > 0 &&
+                                  " / "}
+                                {item.postOtMinutes > 0 &&
+                                  `${item.postOtMinutes}m post`}
+                              </div>
+                            )}
+                            {item.earlyLeaveMinutes > 0 && (
+                              <div className="text-xs text-rose-500 tabular-nums">
+                                {item.earlyLeaveMinutes}m early leave
+                              </div>
+                            )}
                           </td>
                           <td>
                             <span className={statusBadge(item.status)}>
@@ -1546,6 +1572,27 @@ export default function AttendanceLogsPage() {
           </div>
 
           <div>
+            <label className="form-label">Pre OT (minutes)</label>
+            <div className="input input-md bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 cursor-not-allowed">
+              {form.preOtMinutes}m
+            </div>
+          </div>
+
+          <div>
+            <label className="form-label">Post OT (minutes)</label>
+            <div className="input input-md bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 cursor-not-allowed">
+              {form.postOtMinutes}m
+            </div>
+          </div>
+
+          <div>
+            <label className="form-label">Early Leave (minutes)</label>
+            <div className="input input-md bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 cursor-not-allowed">
+              {form.earlyLeaveMinutes}m
+            </div>
+          </div>
+
+          <div>
             <label className="form-label">Late Minutes</label>
             <div className="input input-md bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 cursor-not-allowed">
               {form.lateMinutes}m
@@ -1563,6 +1610,22 @@ export default function AttendanceLogsPage() {
               {form.isLate ? "Late" : "On Time"}
             </span>
             <label className="form-label mb-0">Late Status</label>
+          </div>
+
+          <div className="col-span-2 flex items-center gap-3 p-2.5 rounded-lg bg-gray-50 dark:bg-gray-800/50 mt-2">
+            <span className="text-sm font-medium flex-1">
+              Manual Override
+              <span className="block text-xs text-gray-400 font-normal">
+                Type exact values instead of using the calculated Pre/Post OT,
+                Late, and Hours figures above. Requires a reason.
+              </span>
+            </span>
+            <Switcher
+              checked={form.manualOverride}
+              onChange={(val) =>
+                setForm((f) => ({ ...f, manualOverride: val }))
+              }
+            />
           </div>
         </div>
 
