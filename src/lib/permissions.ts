@@ -128,6 +128,13 @@ export const Permissions = {
       Request: "HR.EmployeeContract.Request",
       Approve: "HR.EmployeeContract.Approve",
     },
+    Grievance: {
+      View: "HR.Grievance.View",
+      Add: "HR.Grievance.Add",
+      Manage: "HR.Grievance.Manage",
+      ViewConfidential: "HR.Grievance.ViewConfidential",
+      Delete: "HR.Grievance.Delete",
+    },
   },
   Payroll: {
     PayrollRun: {
@@ -175,6 +182,20 @@ export const Permissions = {
       Cancel: "Leave.Request.Cancel",
       Revoke: "Leave.Request.Revoke",
     },
+    ShortLeave: {
+      View: "Leave.ShortLeave.View",
+      Apply: "Leave.ShortLeave.Apply",
+      Cancel: "Leave.ShortLeave.Cancel",
+    },
+  },
+  Approval: {
+    Leave: { ApproveHr: "Approval.Leave.ApproveHr" },
+    ShortLeave: { ApproveHr: "Approval.ShortLeave.ApproveHr" },
+    OtRequest: { ApproveHr: "Approval.OtRequest.ApproveHr" },
+    AttendanceAdjustment: {
+      ApproveHr: "Approval.AttendanceAdjustment.ApproveHr",
+    },
+    ProfileChange: { ApproveHr: "Approval.ProfileChange.ApproveHr" },
   },
   SystemAdmin: {
     Alerts: {
@@ -196,6 +217,18 @@ export const Permissions = {
       View: "Settings.Company.View",
       Manage: "Settings.Company.Manage",
       Create: "Settings.Company.Create",
+    },
+    ShortLeavePolicy: {
+      View: "Settings.ShortLeavePolicy.View",
+      Manage: "Settings.ShortLeavePolicy.Manage",
+    },
+    GrievanceConfig: {
+      View: "Settings.GrievanceConfig.View",
+      Manage: "Settings.GrievanceConfig.Manage",
+    },
+    WorkPattern: {
+      View: "Settings.WorkPattern.View",
+      Manage: "Settings.WorkPattern.Manage",
     },
   },
   Attendance: {

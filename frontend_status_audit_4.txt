@@ -1,0 +1,129 @@
+##### Status words across app/ #####
+
+##### Employee list: status rendering + filters #####
+316:    <Field label="Status">
+319:        value={f.status}
+320:        onChange={onChange("status")}
+446:  // filters
+448:  const [statusFilter, setStatusFilter] = useState("");
+449:  const [typeFilter, setTypeFilter] = useState("");
+450:  const [branchFilter, setBranchFilter] = useState("");
+531:      active: items.filter((e) => e.status === "Active").length,
+532:      inactive: items.filter((e) => e.status !== "Active").length,
+533:      fullTime: items.filter((e) => e.employmentType === "FullTime").length,
+538:  /* ── filtered + paginated ──────────────────────────────────────────────── */
+540:  const filtered = useMemo(() => {
+542:    return items.filter((e) => {
+543:      if (statusFilter && e.status !== statusFilter) return false;
+544:      if (typeFilter && e.employmentType !== typeFilter) return false;
+545:      if (branchFilter && String(e.branchId) !== branchFilter) return false;
+561:  }, [items, search, statusFilter, typeFilter, branchFilter]);
+563:  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+564:  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+573:      : departments.filter(
+631:          .filter((b: any) => b.isActive)
+636:          .filter((d: any) => d.isActive)
+645:          .filter((d: any) => d.isActive)
+653:          .filter((t: any) => t.isActive)
+917:          status: form1.status,
+955:          const failed = results.filter((r) => r.status === "rejected").length;
+1002:          status: form1.status,
+1020:      if (err?.response?.status === 404 && createdId) {
+1114:      status: item.status ?? "Active",
+1125:    setDependents(depRes.status === "fulfilled" ? depRes.value.data : []);
+1126:    setTransport(transRes.status === "fulfilled" ? transRes.value.data : null);
+1127:    setDocuments(docRes.status === "fulfilled" ? docRes.value.data : []);
+1128:    setQualifications(qualRes.status === "fulfilled" ? qualRes.value.data : []);
+1254:        status: editForm.status,
+1424:          {/* ── Filters ─────────────────────────────────────────────────────── */}
+1427:            data-tour="employee-filters-panel"
+1446:              value={statusFilter}
+1448:                setStatusFilter(e.target.value);
+1452:              <option value="">All Statuses</option>
+1461:              value={typeFilter}
+1463:                setTypeFilter(e.target.value);
+1476:              value={branchFilter}
+1478:                setBranchFilter(e.target.value);
+1490:              {filtered.length} result{filtered.length !== 1 ? "s" : ""}
+1508:                      <th>Status</th>
+1582:                              className={`xp-badge ${STATUS_COLORS[item.status] ?? "xp-badge-neutral"}`}
+1584:                              {item.status}
+1632:                total={filtered.length}
+
+##### Employee record: status field #####
+app/(dashboard)/employees/[id]/overview/page.tsx:51:  status: string;
+app/(dashboard)/employees/[id]/overview/page.tsx:195:        if (depRes.status === "fulfilled")
+app/(dashboard)/employees/[id]/overview/page.tsx:197:        if (transRes.status === "fulfilled")
+app/(dashboard)/employees/[id]/overview/page.tsx:199:        if (docRes.status === "fulfilled")
+app/(dashboard)/employees/[id]/overview/page.tsx:201:        if (qualRes.status === "fulfilled")
+app/(dashboard)/employees/[id]/overview/page.tsx:204:        if (empRes.status === "fulfilled") setEmployee(empRes.value.data);
+app/(dashboard)/employees/[id]/overview/page.tsx:205:        if (contractRes.status === "fulfilled")
+app/(dashboard)/employees/[id]/overview/page.tsx:207:        if (shiftRes.status === "fulfilled") {
+app/(dashboard)/employees/[id]/overview/page.tsx:211:        if (leaveRes.status === "fulfilled")
+
+##### Shift assignments: error handling #####
+11:import { showSuccess, showError } from '@/lib/toast'
+22:import { getErrorMessage } from "@/lib/apiError";
+41:  const [error,         setError]         = useState('')
+59:    } catch (err) {
+60:      showError(
+62:          getErrorMessage(err, "Could not load shift assignments."),
+128:    } catch (e: unknown) {
+129:      showError(
+131:        getErrorMessage(e, "Could not save shift assignment."),
+156:    } catch (err){
+157:      showError(
+159:          getErrorMessage(err, "Could not remove shift assignment."),
+356:            {error && <p className="text-error text-sm">{error}</p>}
+375:        message={
+
+##### Login: error handling #####
+331:  const [error, setError] = useState("");
+338:  const [forgotError, setForgotError] = useState("");
+371:    setError("");
+389:    } catch (err) {
+390:      const axiosErr = err as import("axios").AxiosError<{ error?: string }>;
+391:      setError(
+392:        axiosErr.response?.data?.error ?? "Login failed. Please try again.",
+401:    setForgotError("");
+403:      setForgotError("Email is required.");
+410:    } catch {
+411:      setForgotError("Something went wrong. Please try again.");
+726:                            setError("");
+788:                  {error && (
+811:                      {error}
+893:                  {forgotError && (
+916:                      {forgotError}
+958:                      setForgotError("");
+
+##### Dashboard: employee counts #####
+26:    totalEmployees: number; activeEmployees: number; newThisMonth: number; onProbation: number
+30:    lastRunNetPay: number; lastRunEmployeeCount: number
+31:    activeLoans: number; totalOutstanding: number
+35:interface ContractExpiry      { employeeId: string; employeeCode: string; fullName: string; contractType: string; endDate: string; daysLeft: number }
+36:interface CalendarEvent       { eventDate: string; eventType: 'holiday'|'leave'; title: string; employeeId: string|null; fullName: string|null; isOptional: boolean }
+37:interface DeptHeadcount       { departmentId: string; departmentName: string; total: number; active: number }
+38:interface BranchHeadcount     { branchId: string; branchName: string; isHead: boolean; total: number; active: number }
+39:interface UpcomingBirthday    { employeeId: string; employeeCode: string; fullName: string; department: string; birthdayDate: string; daysAway: number }
+40:interface WorkAnniversary     { employeeId: string; employeeCode: string; fullName: string; department: string; joinDate: string; years: number; daysAway: number }
+43:interface RecruitmentSummary { openRequisitionsCount: number; activePipelineCount: number; offersPendingCount: number; hiresThisMonthCount: number; avgMatchScore: number | null; avgTimeToHireDays: number | null }
+47:interface ReqAgingRow        { requisitionCode: string; title: string; department: string; branch: string; status: string; createdDate: string; openedDate: string | null; daysOpen: number; headcount: number; headcountFilled: number; headcountRemaining: number; targetStartDate: string | null }
+53:interface RecentHire         { applicationId: string; candidateName: string; requisitionTitle: string; hiredEmployeeId: string; hiredAt: string }
+59:    'dept-headcount','branch-headcount','birthdays','anniversaries',
+77:    'dept-headcount':    'Department Headcount',
+78:    'branch-headcount':  'Branch Headcount',
+104:    'dept-headcount':    'half',
+105:    'branch-headcount':  'half',
+208:    <span {...p} className="cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-400 select-none touch-none shrink-0"><GripVertical size={15} /></span>
+249:        { label:'Total Employees', value:fmt(d?.totalEmployees??0),   sub:`${d?.activeEmployees??0} active`,                                    icon:<Users size={20}/>,       color:'from-indigo-500 to-indigo-600', light:'bg-indigo-50 text-indigo-600',  href:'/employees' },
+250:        { label:'Present Today',   value:fmt(d?.presentToday??0),     sub:d?`${Math.round(((d.presentToday)/(d.activeEmployees||1))*100)}% workforce`:'', icon:<CalendarCheck size={20}/>, color:'from-emerald-500 to-emerald-600', light:'bg-emerald-50 text-emerald-600', href:'/transactions/attendance-logs' },
+253:        { label:'Active Loans',    value:fmt(d?.activeLoans??0),      sub:`${fmtS(d?.totalOutstanding??0)} outstanding`,                        icon:<CreditCard size={20}/>,  color:'from-rose-400 to-pink-600',     light:'bg-rose-50 text-rose-500',     href:null },
+254:        { label:'New This Month',  value:fmt(d?.newThisMonth??0),     sub:`${d?.onProbation??0} on probation`,                                  icon:<UserPlus size={20}/>,    color:'from-sky-400 to-cyan-500',      light:'bg-sky-50 text-sky-500',       href:'/employees' },
+278:    const total    = d?.activeEmployees||1
+362:                                <span className="text-xs text-gray-400">Employees covered</span>
+363:                                <span className="font-semibold text-gray-800 dark:text-white text-sm">{fmt(d.lastRunEmployeeCount)}</span>
+383:                            <p className="text-xs text-rose-200 mt-1">Across all active loans</p>
+387:                            <div><p className="text-xs text-gray-400">Active Loans</p><p className="text-lg font-bold text-gray-800 dark:text-white">{fmt(d?.activeLoans??0)}</p></div>
+487:                            <Line type="monotone" dataKey="presentCt" name="Present" stroke="#10b981" strokeWidth={2.5} dot={false} activeDot={{r:4}}/>
+488:                            <Line type="monotone" dataKey="absentCt"  name="Absent"  stroke="#f87171" strokeWidth={2}   dot={false} activeDot={{r:4}}/>
+489:                            <Line type="monotone" dataKey="lateCt"    name="Late"    stroke="#fbbf24" strokeWidth={2}   dot={false} activeDot={{r:4}}/>

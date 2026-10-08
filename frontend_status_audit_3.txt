@@ -1,0 +1,10 @@
+##### Pages calling the employees API #####
+
+##### Pages calling shift assignments #####
+
+##### Login pages #####
+
+##### How errors are read (data.message vs data.error) #####
+data?.message:        0 places
+data?.error:          0 places
+src/lib/apiError.ts:3:export function getErrorMessage(

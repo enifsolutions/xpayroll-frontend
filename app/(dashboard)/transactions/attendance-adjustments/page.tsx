@@ -22,7 +22,7 @@ import Input from "@/components/ui/Input";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import type { AttendanceAdjustmentRequest } from "@/types/attendance-log.types";
 
-const STATUSES = ["Pending", "Approved", "Rejected"];
+const STATUSES = ["Pending", "SupervisorApproved", "Approved", "Rejected"];
 
 /* ── Avatar helpers (same pattern as Employees page) ── */
 const AVATAR_COLORS = [
@@ -117,7 +117,7 @@ function StatCard({ label, value, icon, iconBg, sub }: StatCardProps) {
 
 export default function AttendanceAdjustmentsPage() {
   useRequirePermission("Attendance.Adjustment.View");
-  const canApprove = usePermission("Attendance.Adjustment.Approve");
+  const canApprove = usePermission("Approval.AttendanceAdjustment.ApproveHr");
   const userId = useAuthStore((s) => s.user?.userId);
 
   const initialized = useRef(false);
@@ -234,6 +234,7 @@ export default function AttendanceAdjustmentsPage() {
   const statusBadge = (status: string) => {
     const map: Record<string, string> = {
       Pending: "xp-badge xp-badge-warning",
+      SupervisorApproved: "xp-badge xp-badge-info",
       Approved: "xp-badge xp-badge-success",
       Rejected: "xp-badge xp-badge-danger",
     };
@@ -464,7 +465,7 @@ export default function AttendanceAdjustmentsPage() {
                           >
                             <Eye size={15} />
                           </button>
-                          {canApprove && item.status === "Pending" && (
+                          {canApprove && (item.status === "Pending" || item.status === "SupervisorApproved") && (
                             <>
                               <button
                                 className="p-1.5 rounded-lg hover:bg-green-50 dark:hover:bg-green-900/20 text-green-500"
@@ -625,7 +626,7 @@ export default function AttendanceAdjustmentsPage() {
             )}
 
             {/* Review notes + actions for pending */}
-            {canApprove && selected.status === "Pending" && (
+            {canApprove && (selected.status === "Pending" || selected.status === "SupervisorApproved") && (
               <>
                 <div className="mb-4">
                   <label className="form-label">

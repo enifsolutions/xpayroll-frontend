@@ -319,7 +319,9 @@ const EmploymentFields = ({
         value={f.status}
         onChange={onChange("status")}
       >
-        {EMPLOYEE_STATUSES.map((s) => (
+        {EMPLOYEE_STATUSES.filter(
+          (s) => s !== "Onboarding" || f.status === "Onboarding",
+        ).map((s) => (
           <option key={s} value={s}>
             {s}
           </option>
@@ -525,11 +527,15 @@ export default function EmployeesPage() {
 
   /* ── computed stats ────────────────────────────────────────────────────── */
 
+  const LIVE = ["Active", "Probation", "OnLeave"];
   const stats = useMemo(
     () => ({
       total: items.length,
-      active: items.filter((e) => e.status === "Active").length,
-      inactive: items.filter((e) => e.status !== "Active").length,
+      active: items.filter((e) => LIVE.includes(e.status)).length,
+      onboarding: items.filter((e) => e.status === "Onboarding").length,
+      inactive: items.filter(
+        (e) => !LIVE.includes(e.status) && e.status !== "Onboarding",
+      ).length,
       fullTime: items.filter((e) => e.employmentType === "FullTime").length,
     }),
     [items],

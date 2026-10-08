@@ -1,0 +1,336 @@
+
+===== app/(dashboard)/employees/[id]/overview/page.tsx =====
+65-  isActive: boolean
+66-}
+67-
+68:interface ShiftAssignment {
+69:  shiftName: string;
+70:  shiftCode: string;
+71-  attendancePolicyName: string;
+72-  effectiveFrom: string;
+73-  effectiveTo: string | null;
+74-  isActive: boolean;
+75-}
+76-
+--
+146-
+147-  const [employee,       setEmployee]       = useState<Employee | null>(null)
+148-  const [contract,       setContract]       = useState<Contract | null>(null)
+149:  const [activeShift,    setActiveShift]    = useState<ShiftAssignment | null>(null)
+150-  const [leaveBalances,  setLeaveBalances]  = useState<LeaveBalance[]>([])
+151-  const [loading,        setLoading]        = useState(true)
+152-
+153-  const [dependents, setDependents] = useState<EmployeeDependent[]>([]);
+154-  const [transport, setTransport] = useState<EmployeeTransport | null>(null);
+155-  const [documents, setDocuments] = useState<EmployeeDocument[]>([]);
+--
+168-      const [
+169-        empRes,
+170-        contractRes,
+171:        shiftRes,
+172-        leaveRes,
+173-        depRes,
+174-        transRes,
+175-        docRes,
+176-        qualRes,
+177-      ] = await Promise.allSettled([
+--
+179-        api.get<Contract[]>(
+180-          `/employees/contracts?employeeId=${employeeId}&isActive=true`,
+181-        ),
+182:        api.get<ShiftAssignment[]>(
+183:          `shift-assignments?employeeId=${employeeId}`,
+184-        ),
+185-        api.get<LeaveBalance[]>(
+186-          `employee-leave-balances/${employeeId}?year=${CURRENT_YEAR}`,
+187-        ),
+188-        api.get<EmployeeDependent[]>(`employee-dependents/${employeeId}`),
+189-        api.get<EmployeeTransport>(`employee-transport/${employeeId}`),
+--
+205-        if (empRes.status === "fulfilled") setEmployee(empRes.value.data);
+206-        if (contractRes.status === "fulfilled")
+207-          setContract(contractRes.value.data?.[0] ?? null);
+208:                if (shiftRes.status === "fulfilled") {
+209-                  const today = new Date().toLocaleDateString("en-CA");
+210-                  const current =
+211:                    shiftRes.value.data.find(
+212-                      (s) =>
+213-                        s.isActive &&
+214-                        s.effectiveFrom.slice(0, 10) <= today &&
+215-                        (!s.effectiveTo || s.effectiveTo.slice(0, 10) >= today),
+216-                    ) ?? null;
+217:                  setActiveShift(current);
+218-                }
+219-        if (leaveRes.status === "fulfilled")
+220-          setLeaveBalances(leaveRes.value.data);
+221-
+222-        
+223-    } finally {
+--
+258-            </p>
+259-            <p className="text-sm text-amber-700 dark:text-amber-400">
+260-              Left out of attendance, payroll and the portal until activated.
+261:              Assign a shift covering the join date, then set Status to Active
+262-              or Probation.
+263-            </p>
+264-          </div>
+265-          <button
+266-            onClick={() =>
+267:              router.push(`/employees/${employeeId}/shift-assignments`)
+268-            }
+269-            className="btn btn-solid btn-sm shrink-0"
+270-          >
+271:            Assign shift
+272-          </button>
+273-        </div>
+274-      )}
+275-      <ProfileCompletion
+276-        employee={employee as any}
+277-        dependents={dependents}
+--
+300-          color={totalLeaveRemaining < 3 ? "red" : "yellow"}
+301-        />
+302-        <StatCard
+303:          label="Active Shift"
+304:          value={activeShift?.shiftCode ?? "—"}
+305:          sub={activeShift?.shiftName ?? "No shift assigned"}
+306-          color="primary"
+307-        />
+308-      </div>
+309-
+310-      {/* ── Main grid ── */}
+311-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+
+===== app/(dashboard)/employees/[id]/layout.tsx =====
+20-
+21-const TABS = [
+22-  { label: 'Overview',          href: 'overview' },
+23:  { label: 'Shift Assignments', href: 'shift-assignments' },
+24-  { label: 'Benefits',          href: 'benefits' },
+25-  { label: 'Deductions',        href: 'deductions' },
+26-  { label: 'Leave Balances',    href: 'leave-balances' },
+27-  { label: 'Tax Profile',       href: 'tax-profile' },
+28-  { label: 'Loans',             href: 'loans' },
+29-  { label: 'Biometric',         href: 'biometric' },
+
+===== app/(dashboard)/transactions/attendance-logs/page.tsx =====
+92-
+93-const emptyForm = (): AttendanceLogForm => ({
+94-  employeeId: "",
+95:  shiftId: "",
+96-  workDate: "",
+97-  checkIn: "",
+98-  checkOut: "",
+99-  source: "ManualHR",
+100-  hoursWorked: "0",
+101-  overtimeHours: "0",
+--
+149-  const [empSearch, setEmpSearch] = useState("");
+150-  const [empLoading, setEmpLoading] = useState(false);
+151-
+152:  const [shiftStart, setShiftStart] = useState<string | null>(null);
+153-  const [graceMinutes, setGraceMinutes] = useState<number>(0);
+154-
+155-  const [genLogs, setGenLogs] = useState<AttendanceGenerationLog[]>([]);
+156-  const [genLoading, setGenLoading] = useState(false);
+157-  const [genRunning, setGenRunning] = useState(false);
+158-  const [genDialogOpen, setGenDialogOpen] = useState(false);
+--
+222-    checkIn: string,
+223-    checkOut: string,
+224-    breakMins: string,
+225:    currentShiftStart: string | null,
+226-    currentGrace: number,
+227-  ) => {
+228-    if (!checkIn || !checkOut || !form.workDate) {
+229-      setForm((f) => ({
+230-        ...f,
+231-        hoursWorked: "0",
+--
+254-    const otHours = Math.max(0, workedHours - 8);
+255-    let lateMins = 0;
+256-    let isLate = false;
+257:    if (currentShiftStart) {
+258-      const checkInTime = new Date(`${form.workDate}T${checkIn}`);
+259:      const [sh, sm] = currentShiftStart.split(":").map(Number);
+260:      const shiftDate = new Date(`${form.workDate}T${checkIn}`);
+261:      shiftDate.setHours(sh, sm, 0, 0);
+262:      const diffMins = (checkInTime.getTime() - shiftDate.getTime()) / 60000;
+263-      lateMins = Math.max(0, Math.floor(diffMins - currentGrace));
+264-      isLate = lateMins > 0;
+265-    }
+266-    setForm((f) => ({
+267-      ...f,
+268-      hoursWorked: workedHours.toFixed(2),
+--
+337-    }
+338-  };
+339-
+340:  const loadEmployeeShift = async (
+341-    employeeId: string,
+342-  ): Promise<{ start: string | null; grace: number }> => {
+343-    try {
+344:      const res = await api.get(`/shift-assignments?employeeId=${employeeId}`);
+345-      const active = res.data?.find(
+346-        (s: {
+347-          isActive: boolean;
+348:          shiftId: string;
+349-          attendancePolicyId: string;
+350-        }) => s.isActive,
+351-      );
+352-      if (!active) {
+353:        setShiftStart(null);
+354-        setGraceMinutes(0);
+355-        return { start: null, grace: 0 };
+356-      }
+357:      const [shiftRes, policyRes] = await Promise.all([
+358:        api.get(`/shift?id=${active.shiftId}`),
+359-        active.attendancePolicyId
+360-          ? api.get(`/attendance-policies?id=${active.attendancePolicyId}`)
+361-          : Promise.resolve(null),
+362-      ]);
+363:      const shift = Array.isArray(shiftRes.data)
+364:        ? shiftRes.data[0]
+365:        : shiftRes.data;
+366-      const policy = policyRes
+367-        ? Array.isArray(policyRes.data)
+368-          ? policyRes.data[0]
+369-          : policyRes.data
+370-        : null;
+371:      const start = shift?.expectedStart ?? null;
+372-      const grace = policy?.lateGraceMinutes ?? 0;
+373:      setShiftStart(start);
+374-      setGraceMinutes(grace);
+375-      return { start, grace };
+376-    } catch {
+377:      setShiftStart(null);
+378-      setGraceMinutes(0);
+379-      return { start: null, grace: 0 };
+380-    }
+381-  };
+382-
+383-  const loadPendingCount = async () => {
+--
+400-
+401-  // ── Dialog open ───────────────────────────────────────────────────────
+402-  const openAdd = () => {
+403:    setShiftStart(null);
+404-    setGraceMinutes(0);
+405-    setEditing(null);
+406-    setForm(emptyForm());
+407-    setEmpSearch("");
+408-    setError("");
+409-    setDialogOpen(true);
+--
+414-    setEditing(item);
+415-    setEmpSearch("");
+416-    setError("");
+417:    const { start, grace } = await loadEmployeeShift(item.employeeId);
+418-    const checkIn = item.checkIn
+419-      ? new Date(item.checkIn).toLocaleTimeString("en-GB", {
+420-          hour: "2-digit",
+421-          minute: "2-digit",
+422-        })
+423-      : "";
+--
+443-        if (start) {
+444-          const checkInTime = new Date(`${item.workDate}T${checkIn}`);
+445-          const [sh, sm] = start.split(":").map(Number);
+446:          const shiftDate = new Date(`${item.workDate}T${checkIn}`);
+447:          shiftDate.setHours(sh, sm, 0, 0);
+448-          const diffMins =
+449:            (checkInTime.getTime() - shiftDate.getTime()) / 60000;
+450-          const lateMins = Math.max(0, Math.floor(diffMins - grace));
+451-          lateMinutes = String(lateMins);
+452-          isLate = lateMins > 0;
+453-        }
+454-      }
+455-    }
+456-    setForm({
+457-      employeeId: item.employeeId,
+458:      shiftId: item.shiftId ?? "",
+459-      workDate: item.workDate,
+460-      checkIn,
+461-      checkOut,
+462-      source: item.source,
+463-      hoursWorked,
+464-      overtimeHours,
+--
+576-        action: editing ? "UPDATE" : "ADD",
+577-        id: editing ? editing.id : null,
+578-        employeeId: form.employeeId,
+579:        shiftId: form.shiftId || null,
+580-        workDate: form.workDate,
+581-        checkIn: toUTC(form.checkIn, form.workDate),
+582-        checkOut: toUTC(form.checkOut, form.workDate),
+583-        source: form.source,
+584-        hoursWorked: parseFloat(form.hoursWorked) || 0,
+585-        overtimeHours: parseFloat(form.overtimeHours) || 0,
+--
+1411-                  <div className="mt-1 text-sm text-primary font-medium">
+1412-                    ✓ {selectedEmployee.firstName} {selectedEmployee.lastName} (
+1413-                    {selectedEmployee.employeeCode})
+1414:                    {shiftStart && (
+1415-                      <span className="ml-2 text-gray-400 text-xs font-normal">
+1416:                        Shift: {shiftStart}
+1417-                      </span>
+1418-                    )}
+1419-                  </div>
+1420-                )}
+1421-                {empSearch && !form.employeeId && (
+1422-                  <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+--
+1436-                          onClick={async () => {
+1437-                            setForm((f) => ({ ...f, employeeId: e.id }));
+1438-                            setEmpSearch(`${e.firstName} ${e.lastName}`);
+1439:                            await loadEmployeeShift(e.id);
+1440-                          }}
+1441-                        >
+1442-                          <span className="font-medium">
+1443-                            {e.firstName} {e.lastName}
+1444-                          </span>
+1445-                          <span className="text-gray-400 ml-2">
+--
+1498-                  e.target.value,
+1499-                  form.checkOut,
+1500-                  form.breakMinutes,
+1501:                  shiftStart,
+1502-                  graceMinutes,
+1503-                );
+1504-              }}
+1505-            />
+1506-          </div>
+1507-
+--
+1516-                  form.checkIn,
+1517-                  e.target.value,
+1518-                  form.breakMinutes,
+1519:                  shiftStart,
+1520-                  graceMinutes,
+1521-                );
+1522-              }}
+1523-            />
+1524-          </div>
+1525-
+--
+1550-                  form.checkIn,
+1551-                  form.checkOut,
+1552-                  e.target.value,
+1553:                  shiftStart,
+1554-                  graceMinutes,
+1555-                );
+1556-              }}
+1557-            />
+1558-          </div>
+1559-
+--
+1677-        <h5 className="mb-1 font-semibold">Generate Daily Attendance</h5>
+1678-        <p className="text-sm text-gray-500 mb-4">
+1679-          Automatically creates attendance records for all active employees
+1680:          based on biometric data, leave records, and shift schedules.
+1681-        </p>
+1682-        <div className="flex gap-3 items-end mb-6">
+1683-          <div className="flex-1">
+1684-            <label className="form-label">Date to Generate</label>
+1685-            <Input
+1686-              type="date"

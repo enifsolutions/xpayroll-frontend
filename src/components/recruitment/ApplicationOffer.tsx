@@ -9,6 +9,7 @@ import api from "@/lib/axios";
 import { Permissions } from "@/lib/permissions";
 import { useRequirePermission } from "@/hooks/useRequirePermission";
 import { usePermission } from "@/hooks/usePermission";
+import { getErrorMessage } from "@/lib/apiError";
 import {
   FileText,
   Pencil,
@@ -902,7 +903,6 @@ function ConvertToEmployeeDialog({
 }) {
   const [employeeCode, setEmployeeCode] = useState("");
   const [leaveTemplateId, setLeaveTemplateId] = useState("");
-  const [status, setStatus] = useState<"Active" | "Probation">("Probation");
   const [leaveTemplates, setLeaveTemplates] = useState<Lookup[]>([]);
   const [converting, setConverting] = useState(false);
 
@@ -934,15 +934,17 @@ function ConvertToEmployeeDialog({
         offerId: offer.id,
         employeeCode: employeeCode.trim(),
         leaveTemplateId,
-        status,
       });
-      showSuccess("Converted", "Employee record created.");
+      showSuccess(
+        "Converted",
+        "Employee created as Onboarding. Assign a shift, then activate them.",
+      );
       onConverted();
       onClose();
     } catch (err: any) {
       showError(
         "Conversion failed",
-        err?.response?.data?.message ?? "Could not convert to employee.",
+        getErrorMessage(err, "Could not convert to employee."),
       );
     } finally {
       setConverting(false);
@@ -986,24 +988,10 @@ function ConvertToEmployeeDialog({
             ))}
           </select>
         </div>
-        <div>
-          <label className="form-label">Starting Status</label>
-          <div className="flex gap-2">
-            {(["Probation", "Active"] as const).map((s) => (
-              <button
-                key={s}
-                onClick={() => setStatus(s)}
-                className={`px-3 py-1.5 rounded-lg text-sm border ${
-                  status === s
-                    ? "border-blue-500 bg-blue-50 dark:bg-blue-900/30 text-blue-600"
-                    : "border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300"
-                }`}
-              >
-                {s}
-              </button>
-            ))}
-          </div>
-        </div>
+        <p className="text-xs text-gray-500 dark:text-gray-400">
+          The employee starts as <strong>Onboarding</strong>. Assign a shift on
+          their record, then set them to Active or Probation.
+        </p>
       </div>
 
       <div className="flex justify-end gap-2 mt-6">

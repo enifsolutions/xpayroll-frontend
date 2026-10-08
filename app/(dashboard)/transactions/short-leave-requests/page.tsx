@@ -1,21 +1,25 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Eye, Plus, Download, SlidersHorizontal, Info } from "lucide-react";
+import {
+  Eye,
+  Plus,
+  Download,
+  SlidersHorizontal,
+  Info,
+  CheckCircle,
+  XCircle,
+} from "lucide-react";
 import api from "@/lib/axios";
 import { useRequirePermission } from "@/hooks/useRequirePermission";
 import { usePermission } from "@/hooks/usePermission";
 import { showError } from "@/lib/toast";
-import { statusBadgeClass, statusLabel } from "@/utils/leaveRequestUtils";
-import type { LeaveRequest } from "@/types/leaveRequest.types";
+import { statusLabel, formatTimeRange } from "@/utils/shortLeaveRequestUtils";
+import type { ShortLeaveRequest } from "@/types/shortLeaveRequest.types";
 import Button from "@/components/ui/Button";
-import LeaveRequestDetailDialog from "./LeaveRequestDetailDialog";
-import ApplyLeaveDialog from "./ApplyLeaveDialog";
+import ShortLeaveRequestDetailDialog from "./ShortLeaveRequestDetailDialog";
+import ApplyShortLeaveDialog from "./ApplyShortLeaveDialog";
 
-/* TODO: replace with real ApplyLeaveDialog once built */
-
-
-/* ── Avatar helpers (same pattern as Employees page) ── */
 const AVATAR_COLORS = [
   "bg-blue-500",
   "bg-violet-500",
@@ -38,7 +42,6 @@ function initials(name: string) {
     : name.slice(0, 2).toUpperCase();
 }
 
-/* ── Status config ── */
 const STATUS_FILTERS = [
   { label: "All Status", value: "" },
   { label: "Pending", value: "Pending" },
@@ -87,20 +90,13 @@ function statusDotBadge(status: string) {
       );
     default:
       return (
-        <span className="xp-badge xp-badge-neutral">{statusLabel(status)}</span>
+        <span className="xp-badge xp-badge-neutral">
+          {statusLabel(status as any)}
+        </span>
       );
   }
 }
 
-function formatDateRange(from: string, to: string) {
-  const f = new Date(from);
-  const t = new Date(to);
-  const opts: Intl.DateTimeFormatOptions = { month: "short", day: "numeric" };
-  const year = f.getFullYear();
-  return `${f.toLocaleDateString("en-GB", opts)} — ${t.toLocaleDateString("en-GB", { ...opts, year: "numeric" })}`;
-}
-
-/* ── KPI Card ── */
 interface KpiCardProps {
   label: string;
   value: string | number;
@@ -109,12 +105,21 @@ interface KpiCardProps {
   icon: React.ReactNode;
   iconBg: string;
 }
-function KpiCard({ label, value, badge, badgeColor = "text-emerald-600", icon, iconBg }: KpiCardProps) {
+function KpiCard({
+  label,
+  value,
+  badge,
+  badgeColor = "text-emerald-600",
+  icon,
+  iconBg,
+}: KpiCardProps) {
   return (
     <div className="card">
       <div className="card-body flex flex-col gap-2">
         <div className="flex items-start justify-between">
-          <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${iconBg}`}>
+          <div
+            className={`w-10 h-10 rounded-xl flex items-center justify-center ${iconBg}`}
+          >
             {icon}
           </div>
           {badge && (
@@ -130,90 +135,68 @@ function KpiCard({ label, value, badge, badgeColor = "text-emerald-600", icon, i
   );
 }
 
-/* ── Pagination ── */
 const PAGE_SIZE = 10;
 function paginationPages(current: number, total: number): (number | "...")[] {
   if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
   const pages: (number | "...")[] = [1];
   if (current > 3) pages.push("...");
-  for (let i = Math.max(2, current - 1); i <= Math.min(total - 1, current + 1); i++) pages.push(i);
+  for (
+    let i = Math.max(2, current - 1);
+    i <= Math.min(total - 1, current + 1);
+    i++
+  )
+    pages.push(i);
   if (current < total - 2) pages.push("...");
   pages.push(total);
   return pages;
 }
 
-/* ════════════════════════════════════════════════════ */
-export default function LeaveRequestsPage() {
-  useRequirePermission("Leave.Request.View");
-  const canApply = usePermission("Leave.Request.Apply");
-  const canApprove = usePermission("Approval.Leave.ApproveHr");
+export default function ShortLeaveRequestsPage() {
+  useRequirePermission("Leave.ShortLeave.View");
+  const canApply = usePermission("Leave.ShortLeave.Apply");
+  const canApprove = usePermission("Approval.ShortLeave.ApproveHr");
 
   const initialized = useRef(false);
 
-  const [items, setItems] = useState<LeaveRequest[]>([]);
+  const [items, setItems] = useState<ShortLeaveRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("");
-  const [yearFilter, setYearFilter] = useState(
-    new Date().getFullYear().toString(),
-  );
   const [employeeSearch, setEmployeeSearch] = useState("");
-
-  /* KPIs derived from loaded data */
-  const [kpis, setKpis] = useState({
-    total: 0,
-    approved: 0,
-    pending: 0,
-    rejected: 0,
-    totalChange: "+0%",
-    approvedCount: 0,
-    approvedLabel: "0 Approved",
-  });
-
-  /* Pagination */
   const [page, setPage] = useState(1);
 
-  /* Dialogs */
   const [detailDialog, setDetailDialog] = useState(false);
-  const [detailItem, setDetailItem] = useState<LeaveRequest | null>(null);
+  const [detailItem, setDetailItem] = useState<ShortLeaveRequest | null>(null);
   const [applyDialog, setApplyDialog] = useState(false);
 
   async function load() {
     setLoading(true);
     try {
-      const params: Record<string, string> = { year: yearFilter };
+      const params: Record<string, string> = {};
       if (statusFilter) params.status = statusFilter;
 
-      const res = await api.get("/leave-requests", { params });
-      const mapped: LeaveRequest[] = res.data.map((r: LeaveRequest) => ({
+      const res = await api.get("/short-leave-requests", { params });
+      const mapped: ShortLeaveRequest[] = res.data.map((r: any) => ({
         ...r,
         id: String(r.id),
         employeeId: String(r.employeeId),
-        profilePictureUrl: r.profilePictureUrl ?? null,
+        appliedBy: r.appliedBy != null ? String(r.appliedBy) : null,
+        supervisorApprovedBy:
+          r.supervisorApprovedBy != null
+            ? String(r.supervisorApprovedBy)
+            : null,
+        approvedBy: r.approvedBy != null ? String(r.approvedBy) : null,
+        convertedLeaveRequestId:
+          r.convertedLeaveRequestId != null
+            ? String(r.convertedLeaveRequestId)
+            : null,
       }));
       setItems(mapped);
       setPage(1);
-
-      /* Compute KPIs */
-      const approved = mapped.filter((x) => x.status === "Approved").length;
-      const pending = mapped.filter(
-        (x) => x.status === "Pending" || x.status === "SupervisorApproved",
-      ).length;
-      const rejected = mapped.filter((x) => x.status === "Rejected").length;
-      const successRate =
-        mapped.length > 0
-          ? ((approved / mapped.length) * 100).toFixed(1)
-          : "0.0";
-      setKpis({
-        total: mapped.length,
-        approved,
-        pending,
-        rejected,
-        totalChange: "+12% vs last mo",
-        approvedCount: approved,
-        approvedLabel: `${approved} Approved`,
-      });
-    } catch (err:any){
-      showError("Load failed", err?.response?.data?.error ?? "Could not load leave requests.");
+    } catch (err: any) {
+      showError(
+        "Load failed",
+        err?.response?.data?.error ?? "Could not load short leave requests.",
+      );
     } finally {
       setLoading(false);
     }
@@ -228,14 +211,13 @@ export default function LeaveRequestsPage() {
 
   useEffect(() => {
     load();
-  }, [statusFilter, yearFilter]);
+  }, [statusFilter]);
 
-  function openDetail(item: LeaveRequest) {
+  function openDetail(item: ShortLeaveRequest) {
     setDetailItem(item);
     setDetailDialog(true);
   }
 
-  /* Employee search filter (client-side by name or code) */
   const filteredItems = employeeSearch.trim()
     ? items.filter(
         (x) =>
@@ -244,35 +226,27 @@ export default function LeaveRequestsPage() {
       )
     : items;
 
-  /* Pagination slice */
   const totalPages = Math.max(1, Math.ceil(filteredItems.length / PAGE_SIZE));
   const pageItems = filteredItems.slice(
     (page - 1) * PAGE_SIZE,
     page * PAGE_SIZE,
   );
 
-  const currentYear = new Date().getFullYear();
-  const years = Array.from({ length: 4 }, (_, i) =>
-    (currentYear - i).toString(),
-  );
-
-  /* Success rate for KPI */
-  const successRate =
-    items.length > 0
-      ? (
-          (items.filter((x) => x.status === "Approved").length / items.length) *
-          100
-        ).toFixed(1)
-      : "0.0";
+  const pending = items.filter(
+    (x) => x.status === "Pending" || x.status === "SupervisorApproved",
+  ).length;
+  const approved = items.filter((x) => x.status === "Approved").length;
+  const rejected = items.filter((x) => x.status === "Rejected").length;
+  const converted = items.filter((x) => x.convertedLeaveRequestId).length;
 
   return (
     <div>
-      {/* ── Header ── */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h3 className="mb-1">Leave Applications</h3>
+          <h3 className="mb-1">Short Leave Requests</h3>
           <p className="text-sm text-gray-500">
-            Review and manage employee leave requests across your organization.
+            Review and manage employee short leave requests across your
+            organization.
           </p>
         </div>
         {canApply && (
@@ -282,18 +256,15 @@ export default function LeaveRequestsPage() {
             icon={<Plus size={16} />}
             onClick={() => setApplyDialog(true)}
           >
-            Apply for Leave
+            Apply for Short Leave
           </Button>
         )}
       </div>
 
-      {/* ── KPI Cards ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <KpiCard
-          label="Total Applications"
+          label="Total Requests"
           value={items.length}
-          badge={kpis.totalChange}
-          badgeColor="text-blue-500"
           iconBg="bg-blue-500"
           icon={
             <svg
@@ -306,37 +277,14 @@ export default function LeaveRequestsPage() {
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-              />
-            </svg>
-          }
-        />
-        <KpiCard
-          label="Success Rate"
-          value={`${successRate}%`}
-          badge={kpis.approvedLabel}
-          badgeColor="text-emerald-500"
-          iconBg="bg-emerald-500"
-          icon={
-            <svg
-              className="w-5 h-5 text-white"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={2}
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
               />
             </svg>
           }
         />
         <KpiCard
           label="Pending Review"
-          value={kpis.pending}
-          badge="Avg 24h response"
+          value={pending}
           badgeColor="text-amber-500"
           iconBg="bg-amber-500"
           icon={
@@ -356,11 +304,10 @@ export default function LeaveRequestsPage() {
           }
         />
         <KpiCard
-          label="Declined"
-          value={kpis.rejected}
-          badge="-4% decrease"
-          badgeColor="text-rose-500"
-          iconBg="bg-rose-500"
+          label="Approved"
+          value={approved}
+          badgeColor="text-emerald-500"
+          iconBg="bg-emerald-500"
           icon={
             <svg
               className="w-5 h-5 text-white"
@@ -372,36 +319,38 @@ export default function LeaveRequestsPage() {
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"
+                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
+            </svg>
+          }
+        />
+        <KpiCard
+          label="Converted to Half-Day"
+          value={converted}
+          badge="Over quota/duration"
+          badgeColor="text-violet-500"
+          iconBg="bg-violet-500"
+          icon={
+            <svg
+              className="w-5 h-5 text-white"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M8 7h12m0 0l-4-4m4 4l-4 4M16 17H4m0 0l4 4m-4-4l4-4"
               />
             </svg>
           }
         />
       </div>
 
-      {/* ── Filters ── */}
       <div className="card mb-4">
         <div className="card-body py-3">
           <div className="flex flex-wrap items-center gap-3">
-            {/* Fiscal Year */}
-            <div className="flex flex-col gap-0.5">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">
-                Fiscal Year
-              </span>
-              <select
-                className="input w-28"
-                value={yearFilter}
-                onChange={(e) => setYearFilter(e.target.value)}
-              >
-                {years.map((y) => (
-                  <option key={y} value={y}>
-                    {y}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Employee Search */}
             <div className="flex flex-col gap-0.5">
               <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">
                 Employee
@@ -430,7 +379,6 @@ export default function LeaveRequestsPage() {
               </div>
             </div>
 
-            {/* Status */}
             <div className="flex flex-col gap-0.5">
               <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">
                 Status
@@ -462,7 +410,6 @@ export default function LeaveRequestsPage() {
         </div>
       </div>
 
-      {/* ── Table ── */}
       <div className="card">
         <div className="card-body p-0">
           {loading ? (
@@ -475,8 +422,8 @@ export default function LeaveRequestsPage() {
                 <thead>
                   <tr>
                     <th>Employee</th>
-                    <th>Leave Type</th>
-                    <th>Date Range</th>
+                    <th>Date</th>
+                    <th>Time Window</th>
                     <th>Duration</th>
                     <th>Status</th>
                     <th>Applied On</th>
@@ -490,13 +437,12 @@ export default function LeaveRequestsPage() {
                         colSpan={7}
                         className="text-center py-10 text-gray-400"
                       >
-                        No leave requests found.
+                        No short leave requests found.
                       </td>
                     </tr>
                   ) : (
                     pageItems.map((item) => (
                       <tr key={item.id}>
-                        {/* Employee */}
                         <td>
                           <div className="flex items-center gap-3">
                             {item.profilePictureUrl ? (
@@ -528,83 +474,71 @@ export default function LeaveRequestsPage() {
                                 {item.employeeName}
                               </div>
                               <div className="text-xs text-gray-400">
-                                {item.employeeCode} · {item.department}
+                                {item.employeeCode}
+                                {item.department ? ` · ${item.department}` : ""}
                               </div>
                             </div>
                           </div>
                         </td>
-
-                        {/* Leave Type */}
-                        <td className="text-sm">{item.leaveTypeName}</td>
-
-                        {/* Date Range */}
                         <td className="text-sm whitespace-nowrap">
-                          {formatDateRange(item.fromDate, item.toDate)}
+                          {new Date(item.leaveDate).toLocaleDateString(
+                            "en-GB",
+                            { day: "numeric", month: "short", year: "numeric" },
+                          )}
                         </td>
-
-                        {/* Duration */}
+                        <td className="text-sm whitespace-nowrap">
+                          {formatTimeRange(item.fromTime, item.toTime)}
+                        </td>
                         <td>
                           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
-                            {item.days} {item.days === 1 ? "Day" : "Days"}
+                            {item.minutes} min
                           </span>
+                          {item.convertedLeaveRequestId && (
+                            <span className="ml-1.5 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-violet-50 text-violet-600 border border-violet-200">
+                              Converted
+                            </span>
+                          )}
                         </td>
-
-                        {/* Status */}
                         <td>{statusDotBadge(item.status)}</td>
-
-                        {/* Applied On */}
                         <td className="text-sm text-gray-500">
                           {new Date(item.createdAt).toLocaleDateString(
                             "en-GB",
-                            {
-                              day: "numeric",
-                              month: "short",
-                              year: "numeric",
-                            },
+                            { day: "numeric", month: "short", year: "numeric" },
                           )}
                         </td>
-
-                        {/* Actions */}
                         <td>
                           <div className="flex items-center gap-1">
-                            {canApprove &&
-                            (item.status === "Pending" ||
-                              item.status === "SupervisorApproved") ? (
-                              <button
-                                onClick={() => openDetail(item)}
-                                className="btn btn-primary btn-sm text-xs px-3 py-1"
-                              >
-                                Review
-                              </button>
-                            ) : item.status === "Rejected" ? (
-                              <button
-                                onClick={() => openDetail(item)}
-                                className="p-1.5 rounded-lg hover:bg-gray-100 text-blue-500"
-                                title="View details"
-                              >
+                            <button
+                              className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500"
+                              onClick={() => openDetail(item)}
+                              title="View details"
+                            >
+                              {item.status === "Rejected" ? (
                                 <Info size={15} />
-                              </button>
-                            ) : (
-                              <button
-                                onClick={() => openDetail(item)}
-                                className="p-1.5 rounded-lg hover:bg-gray-100 text-blue-500"
-                                title="View details"
-                              >
+                              ) : (
                                 <Eye size={15} />
-                              </button>
-                            )}
-                            {/* Kebab menu placeholder */}
-                            <button className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400">
-                              <svg
-                                className="w-4 h-4"
-                                fill="currentColor"
-                                viewBox="0 0 24 24"
-                              >
-                                <circle cx="12" cy="5" r="1.5" />
-                                <circle cx="12" cy="12" r="1.5" />
-                                <circle cx="12" cy="19" r="1.5" />
-                              </svg>
+                              )}
                             </button>
+                            {canApprove &&
+                              (item.status === "Pending" ||
+                                item.status === "SupervisorApproved") && (
+                                <>
+                                  <button
+                                    className="p-1.5 rounded-lg hover:bg-green-50 dark:hover:bg-green-900/20 text-green-500"
+                                    onClick={() => openDetail(item)}
+                                    title="Approve"
+                                  >
+                                    <CheckCircle size={15} />
+                                  </button>
+                                  <button
+                                    className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-red-400"
+                                    onClick={() => openDetail(item)}
+                                    title="Reject"
+                                  >
+                                    <XCircle size={15} />
+                                  </button>
+                                </>
+                              )}
                           </div>
                         </td>
                       </tr>
@@ -613,7 +547,6 @@ export default function LeaveRequestsPage() {
                 </tbody>
               </table>
 
-              {/* ── Pagination ── */}
               {filteredItems.length > 0 && (
                 <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100">
                   <p className="text-sm text-gray-500">
@@ -671,8 +604,7 @@ export default function LeaveRequestsPage() {
         </div>
       </div>
 
-      {/* ── Detail Dialog ── */}
-      <LeaveRequestDetailDialog
+      <ShortLeaveRequestDetailDialog
         item={detailItem}
         isOpen={detailDialog}
         onClose={() => setDetailDialog(false)}
@@ -682,9 +614,8 @@ export default function LeaveRequestsPage() {
         }}
       />
 
-      {/* ── Apply Leave Dialog (if component exists) ── */}
       {applyDialog && (
-        <ApplyLeaveDialog
+        <ApplyShortLeaveDialog
           isOpen={applyDialog}
           onClose={() => setApplyDialog(false)}
           onDone={() => {

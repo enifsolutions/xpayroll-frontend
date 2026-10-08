@@ -28,7 +28,18 @@ import { useTour } from "@/hooks/useTour";
 import TourOverlay from "@/components/onboarding/TourOverlay";
 import { PUBLIC_HOLIDAYS_STEPS } from "@/lib/tours/public-holidays";
 
-interface PublicHoliday {
+// A date belongs to several gazette sets at once — 1 May 2026 is Public,
+// Bank, Mercantile and Poya simultaneously. Hence four flags, not one type.
+interface HolidayCategories {
+  isPublic: boolean;
+  isBank: boolean;
+  isMercantile: boolean;
+  isPoya: boolean;
+}
+
+type CategoryKey = keyof HolidayCategories;
+
+interface PublicHoliday extends HolidayCategories {
   id: string;
   name: string;
   description?: string;
@@ -37,14 +48,14 @@ interface PublicHoliday {
   createdAt: string;
 }
 
-interface PublicHolidayForm {
+interface PublicHolidayForm extends HolidayCategories {
   name: string;
   description: string;
   holidayDate: string;
   isOptional: boolean;
 }
 
-interface IcsHoliday {
+interface IcsHoliday extends HolidayCategories {
   name: string;
   description: string;
   holidayDate: string;
@@ -58,7 +69,35 @@ const EMPTY: PublicHolidayForm = {
   description: "",
   holidayDate: "",
   isOptional: false,
+  isPublic: true,
+  isBank: true,
+  isMercantile: false,
+  isPoya: false,
 };
+
+const CATEGORIES: { key: CategoryKey; label: string; hint: string }[] = [
+  {
+    key: "isPublic",
+    label: "Public",
+    hint: "Government offices",
+  },
+  {
+    key: "isBank",
+    label: "Bank",
+    hint: "Banks and financial institutions",
+  },
+  {
+    key: "isMercantile",
+    label: "Mercantile",
+    hint: "Private sector statutory — 2.0× the daily rate if worked",
+  },
+  {
+    key: "isPoya",
+    label: "Poya",
+    hint: "Full moon day — 1.5× the daily rate if worked",
+  },
+];
+
 const PAGE_SIZE = 10;
 const MONTHS_SHORT = [
   "Jan",
@@ -132,6 +171,84 @@ function parseIcs(
   return results.sort((a, b) => a.holidayDate.localeCompare(b.holidayDate));
 }
 
+// Some calendars tag the gazette set in the summary, e.g.
+// "Thai Pongal Day (Public / Bank / Mercantile)". Others give nothing.
+function inferCategories(rawName: string): HolidayCategories {
+  const tag = rawName.match(/\(([^)]*)\)\s*$/)?.[1] ?? "";
+  const tagged = /public|bank|mercantile/i.test(tag);
+  return {
+    isPublic: tagged ? /public/i.test(tag) : true,
+    isBank: tagged ? /bank/i.test(tag) : true,
+    isPoya: /poya/i.test(rawName),
+    isMercantile: tagged
+      ? /mercantile/i.test(tag)
+      : isMercantileByName(rawName),
+  };
+}
+
+// Strips a country prefix ("Sri Lanka: Duruthu Full Moon Poya") and a
+// trailing category tag, so neither ends up stored as part of the name.
+function cleanName(rawName: string) {
+  return rawName
+    .replace(/^[A-Za-z .]{2,20}:\s*/, "")
+    .replace(/\s*\([^)]*(public|bank|mercantile)[^)]*\)\s*$/i, "")
+    .trim();
+}
+
+// s.7(1) caps declared mercantile holidays at nine. A file claiming more has
+// an untrustworthy tag, so fall back to matching the eight declared holidays
+// by name rather than leaving every row blank.
+const MAX_MERCANTILE = 9;
+
+function applyCategoryGuards(
+  rows: HolidayCategories[],
+  names: string[],
+) {
+  const tagged = rows.filter((r) => r.isMercantile).length;
+  const poya = rows.filter((r) => r.isPoya).length;
+  const overTagged = tagged > MAX_MERCANTILE;
+
+  const out = overTagged
+    ? rows.map((r, i) => ({ ...r, isMercantile: isMercantileByName(names[i]) }))
+    : rows;
+
+  return {
+    rows: out,
+    tagged,
+    matched: out.filter((r) => r.isMercantile).length,
+    poya,
+    overTagged,
+    poyaShort: poya > 0 && poya < 12,
+  };
+}
+
+// The eight mercantile holidays declared under s.7 of the Shop and Office
+// Employees Act (Order in Gazette 945/1). The list is fixed; only the dates
+// move. Names vary between publishers, so match loosely.
+const MERCANTILE_PATTERNS: RegExp[] = [
+  /thai\s*pongal/i,
+  /national\s*day|independence\s*day/i,
+  /(day\s*(prior|before)|eve).*new\s*year/i,
+  /^(?!.*(prior|before|eve)).*sinhala\s*(and|&)\s*tamil\s*new\s*year/i,
+  /may\s*day|labou?r\s*day/i,
+  /day\s*(following|after).*vesak/i,
+  /milad|holy\s*prophet/i,
+  /christmas/i,
+];
+
+function isMercantileByName(name: string) {
+  return MERCANTILE_PATTERNS.some((re) => re.test(name));
+}
+
+function categoryBadges(h: HolidayCategories) {
+  const out: { label: string; cls: string }[] = [];
+  if (h.isMercantile) out.push({ label: "Mercantile", cls: "xp-badge-success" });
+  if (h.isPoya) out.push({ label: "Poya", cls: "xp-badge-primary" });
+  if (h.isPublic) out.push({ label: "Public", cls: "xp-badge-default" });
+  if (h.isBank) out.push({ label: "Bank", cls: "xp-badge-default" });
+  return out;
+}
+
 export default function PublicHolidaysPage() {
   const tour = useTour("admin-page-public-holidays", PUBLIC_HOLIDAYS_STEPS);
   useRequirePermission(Permissions.MasterData.PublicHolidays.View);
@@ -156,6 +273,8 @@ export default function PublicHolidaysPage() {
   const [icsHolidays, setIcsHolidays] = useState<IcsHoliday[]>([]);
   const [icsFileName, setIcsFileName] = useState("");
   const [importing, setImporting] = useState(false);
+
+  const [icsWarnings, setIcsWarnings] = useState<string[]>([]);
 
   const load = async (year?: number) => {
     try {
@@ -196,6 +315,7 @@ export default function PublicHolidaysPage() {
     setError("");
     setDialogOpen(true);
   };
+
   const openEdit = (item: PublicHoliday) => {
     setEditing(item);
     setForm({
@@ -203,6 +323,10 @@ export default function PublicHolidaysPage() {
       description: item.description ?? "",
       holidayDate: item.holidayDate,
       isOptional: item.isOptional,
+      isPublic: item.isPublic,
+      isBank: item.isBank,
+      isMercantile: item.isMercantile,
+      isPoya: item.isPoya,
     });
     setError("");
     setDialogOpen(true);
@@ -215,6 +339,10 @@ export default function PublicHolidaysPage() {
     }
     if (!form.holidayDate) {
       setError("Date is required.");
+      return;
+    }
+    if (!form.isPublic && !form.isBank && !form.isMercantile && !form.isPoya) {
+      setError("Select at least one category.");
       return;
     }
     if (!userId) {
@@ -231,6 +359,10 @@ export default function PublicHolidaysPage() {
         description: form.description.trim() || null,
         holidayDate: form.holidayDate,
         isOptional: form.isOptional,
+        isPublic: form.isPublic,
+        isBank: form.isBank,
+        isMercantile: form.isMercantile,
+        isPoya: form.isPoya,
         userId,
       });
       setDialogOpen(false);
@@ -278,23 +410,44 @@ export default function PublicHolidaysPage() {
     const reader = new FileReader();
     reader.onload = (e) => {
       const text = e.target?.result as string;
-      const parsed = parseIcs(text);
+            const parsed = parseIcs(text);
       if (parsed.length === 0) {
         showError(
           "No events found",
-          "The .ics file contained no VEVENT entries.",
+          "The calendar contained no VEVENT entries.",
         );
         return;
       }
+
+            const guarded = applyCategoryGuards(
+              parsed.map((h) => inferCategories(h.name)),
+              parsed.map((h) => h.name),
+            );
+
       const existingDates = new Set(items.map((i) => i.holidayDate));
       setIcsHolidays(
-        parsed.map((h) => ({
-          ...h,
+        parsed.map((h, i) => ({
+          name: cleanName(h.name),
+          description: h.description,
+          holidayDate: h.holidayDate,
+          ...guarded.rows[i],
           isOptional: false,
           selected: !existingDates.has(h.holidayDate),
           duplicate: existingDates.has(h.holidayDate),
         })),
       );
+
+      setIcsWarnings(
+        [
+          guarded.overTagged
+            ? `${guarded.tagged} events were tagged Mercantile — the Act allows at most ${MAX_MERCANTILE}. The tag was ignored and ${guarded.matched} matched against the declared list by name. Check them.`
+            : null,
+          guarded.poyaShort
+            ? `Only ${guarded.poya} Poya days found. 2026 has 13 because of the extra lunar month — a missing Poya shifts every later name by one.`
+            : null,
+        ].filter(Boolean) as string[],
+      );
+
       setIcsStep("preview");
       setIcsDialogOpen(true);
     };
@@ -313,26 +466,39 @@ export default function PublicHolidaysPage() {
     }
     setImporting(true);
     try {
-      const res = await api.post<{ imported: number }>(
-        "/PublicHolidays/batch-import",
-        {
-          holidays: toImport.map((h) => ({
-            name: h.name,
-            description: h.description || null,
-            holidayDate: h.holidayDate,
-            isOptional: h.isOptional,
-          })),
-          year: yearFilter,
-          userId,
-        },
-      );
+      const res = await api.post<{
+        imported: number;
+        submitted: number;
+        skipped: number;
+      }>("/PublicHolidays/batch-import", {
+        holidays: toImport.map((h) => ({
+          name: h.name,
+          description: h.description || null,
+          holidayDate: h.holidayDate,
+          isOptional: h.isOptional,
+          isPublic: h.isPublic,
+          isBank: h.isBank,
+          isMercantile: h.isMercantile,
+          isPoya: h.isPoya,
+        })),
+        year: yearFilter,
+        userId,
+      });
       setIcsDialogOpen(false);
       setIcsStep("idle");
       await load(yearFilter);
-      showSuccess(
-        "Import complete",
-        `${res.data.imported} holiday${res.data.imported !== 1 ? "s" : ""} imported successfully.`,
-      );
+
+      if (res.data.skipped > 0) {
+        showError(
+          "Partially imported",
+          `${res.data.imported} of ${res.data.submitted} imported. ${res.data.skipped} skipped — a holiday already exists on those dates.`,
+        );
+      } else {
+        showSuccess(
+          "Import complete",
+          `${res.data.imported} holiday${res.data.imported !== 1 ? "s" : ""} imported successfully.`,
+        );
+      }
     } catch (err: any) {
       showError(
         "Import failed",
@@ -346,6 +512,10 @@ export default function PublicHolidaysPage() {
   const toggleIcsSelect = (i: number) =>
     setIcsHolidays((prev) =>
       prev.map((h, idx) => (idx === i ? { ...h, selected: !h.selected } : h)),
+    );
+  const toggleIcsCategory = (i: number, key: CategoryKey) =>
+    setIcsHolidays((prev) =>
+      prev.map((h, idx) => (idx === i ? { ...h, [key]: !h[key] } : h)),
     );
   const toggleAllIcs = (val: boolean) =>
     setIcsHolidays((prev) =>
@@ -379,7 +549,7 @@ export default function PublicHolidaysPage() {
         </div>
         <div className="flex items-center gap-2">
           <button
-            //onClick={loadAll}
+            onClick={() => load(yearFilter)}
             className="p-2 rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
             data-tour="public-holidays-refresh-button"
             title="Refresh all"
@@ -607,14 +777,15 @@ export default function PublicHolidaysPage() {
                     <th>Date</th>
                     <th>Day</th>
                     <th>Holiday Name</th>
-                    <th>Type</th>
+                    <th>Categories</th>
+                    <th>Observance</th>
                     <th className="w-24 text-center">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {paged.length === 0 ? (
                     <tr>
-                      <td colSpan={5}>
+                      <td colSpan={6}>
                         <div className="flex flex-col items-center py-14 text-gray-400">
                           <div className="w-14 h-14 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-3">
                             <CalendarX size={24} />
@@ -666,6 +837,18 @@ export default function PublicHolidaysPage() {
                                 {item.description}
                               </p>
                             )}
+                          </td>
+                          <td>
+                            <div className="flex flex-wrap gap-1">
+                              {categoryBadges(item).map((b) => (
+                                <span
+                                  key={b.label}
+                                  className={`xp-badge ${b.cls}`}
+                                >
+                                  {b.label}
+                                </span>
+                              ))}
+                            </div>
                           </td>
                           <td>
                             <span
@@ -796,11 +979,51 @@ export default function PublicHolidaysPage() {
               }
             />
           </div>
+          <div>
+            <label className="form-label">
+              Categories <span className="text-error">*</span>
+            </label>
+            <p className="text-xs text-gray-400 mb-2">
+              A date can belong to several sets. Vesak Poya is Public, Bank,
+              Mercantile and Poya at once.
+            </p>
+            <div className="space-y-2">
+              {CATEGORIES.map((c) => (
+                <label
+                  key={c.key}
+                  className={`flex items-start gap-3 px-3 py-2 rounded-lg border cursor-pointer transition-colors ${
+                    form[c.key]
+                      ? "border-primary bg-primary/5"
+                      : "border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800"
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={form[c.key]}
+                    onChange={() =>
+                      setForm((f) => ({ ...f, [c.key]: !f[c.key] }))
+                    }
+                    className="mt-0.5 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer"
+                  />
+                  <span>
+                    <span
+                      className={`block text-sm font-medium ${form[c.key] ? "text-primary" : ""}`}
+                    >
+                      {c.label}
+                    </span>
+                    <span className="block text-xs text-gray-400 mt-0.5">
+                      {c.hint}
+                    </span>
+                  </span>
+                </label>
+              ))}
+            </div>
+          </div>
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium">Optional Holiday</p>
               <p className="text-xs text-gray-500 mt-0.5">
-                Employees can choose whether to take this day off
+                Not observed — treated as a normal working day in payroll
               </p>
             </div>
             <Switcher
@@ -826,7 +1049,7 @@ export default function PublicHolidaysPage() {
         onClose={closeIcsDialog}
         onRequestClose={closeIcsDialog}
       >
-        <div style={{ width: "680px" }}>
+        <div className="w-full">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h5 className="h5">Import from Calendar</h5>
@@ -877,6 +1100,25 @@ export default function PublicHolidaysPage() {
             </div>
           </div>
 
+          {icsWarnings.length > 0 && (
+            <div className="mb-3 p-3 rounded-lg border border-orange-200 bg-orange-50 dark:border-orange-900/40 dark:bg-orange-900/20">
+              {icsWarnings.map((w, i) => (
+                <p
+                  key={i}
+                  className="text-xs text-orange-700 dark:text-orange-300 flex items-start gap-1.5"
+                >
+                  <AlertCircle size={13} className="mt-0.5 flex-shrink-0" />
+                  <span>{w}</span>
+                </p>
+              ))}
+            </div>
+          )}
+
+          <p className="text-xs text-gray-400 mb-2">
+            Categories are read from the event name where the calendar provides
+            them. Check every row before importing.
+          </p>
+
           {/* Preview table */}
           <div className="max-h-96 overflow-y-auto border border-gray-200 dark:border-gray-700 rounded-lg">
             <table className="w-full text-sm">
@@ -888,6 +1130,9 @@ export default function PublicHolidaysPage() {
                   </th>
                   <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
                     Name
+                  </th>
+                  <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                    Categories
                   </th>
                   <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
                     Status
@@ -919,6 +1164,32 @@ export default function PublicHolidaysPage() {
                           {h.description}
                         </p>
                       )}
+                    </td>
+                    <td className="px-3 py-2.5">
+                      <div className="flex flex-wrap gap-x-3 gap-y-1">
+                        {CATEGORIES.map((c) => (
+                          <label
+                            key={c.key}
+                            className="flex items-center gap-1 text-xs cursor-pointer"
+                            title={c.hint}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={h[c.key]}
+                              disabled={h.duplicate}
+                              onChange={() => toggleIcsCategory(i, c.key)}
+                              className="rounded border-gray-300 text-primary focus:ring-primary cursor-pointer"
+                            />
+                            <span
+                              className={
+                                h[c.key] ? "text-primary" : "text-gray-400"
+                              }
+                            >
+                              {c.label}
+                            </span>
+                          </label>
+                        ))}
+                      </div>
                     </td>
                     <td className="px-3 py-2.5">
                       {h.duplicate ? (

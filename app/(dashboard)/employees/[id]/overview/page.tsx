@@ -66,11 +66,12 @@ interface Contract {
 }
 
 interface ShiftAssignment {
-  shiftName: string
-  shiftCode: string
-  attendancePolicyName: string
-  effectiveFrom: string
-  isActive: boolean
+  shiftName: string;
+  shiftCode: string;
+  attendancePolicyName: string;
+  effectiveFrom: string;
+  effectiveTo: string | null;
+  isActive: boolean;
 }
 
 interface LeaveBalance {
@@ -204,10 +205,17 @@ export default function OverviewPage() {
         if (empRes.status === "fulfilled") setEmployee(empRes.value.data);
         if (contractRes.status === "fulfilled")
           setContract(contractRes.value.data?.[0] ?? null);
-        if (shiftRes.status === "fulfilled") {
-          const active = shiftRes.value.data.find((s) => s.isActive) ?? null;
-          setActiveShift(active);
-        }
+                if (shiftRes.status === "fulfilled") {
+                  const today = new Date().toLocaleDateString("en-CA");
+                  const current =
+                    shiftRes.value.data.find(
+                      (s) =>
+                        s.isActive &&
+                        s.effectiveFrom.slice(0, 10) <= today &&
+                        (!s.effectiveTo || s.effectiveTo.slice(0, 10) >= today),
+                    ) ?? null;
+                  setActiveShift(current);
+                }
         if (leaveRes.status === "fulfilled")
           setLeaveBalances(leaveRes.value.data);
 
@@ -242,6 +250,28 @@ export default function OverviewPage() {
 
   return (
     <div className="space-y-5">
+      {employee.status === "Onboarding" && (
+        <div className="flex flex-col gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 sm:flex-row sm:items-center sm:justify-between dark:border-amber-800 dark:bg-amber-900/20">
+          <div>
+            <p className="font-semibold text-amber-800 dark:text-amber-300">
+              Not live yet: Onboarding
+            </p>
+            <p className="text-sm text-amber-700 dark:text-amber-400">
+              Left out of attendance, payroll and the portal until activated.
+              Assign a shift covering the join date, then set Status to Active
+              or Probation.
+            </p>
+          </div>
+          <button
+            onClick={() =>
+              router.push(`/employees/${employeeId}/shift-assignments`)
+            }
+            className="btn btn-solid btn-sm shrink-0"
+          >
+            Assign shift
+          </button>
+        </div>
+      )}
       <ProfileCompletion
         employee={employee as any}
         dependents={dependents}

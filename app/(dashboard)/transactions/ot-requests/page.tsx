@@ -23,7 +23,7 @@ import Input from "@/components/ui/Input";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import type { OtRequest } from "@/types/ot-request.types";
 
-const STATUSES = ["Pending", "Approved", "Rejected"];
+const STATUSES = ["Pending", "SupervisorApproved", "Approved", "Rejected"];
 
 /* ── Avatar helpers (same pattern as Adjustments page) ── */
 const AVATAR_COLORS = [
@@ -130,7 +130,7 @@ function fmtMinutes(mins: number): string {
 
 export default function OtRequestsPage() {
   useRequirePermission("Attendance.Ot.View");
-  const canApprove = usePermission("Attendance.Ot.Approve");
+  const canApprove = usePermission("Approval.OtRequest.ApproveHr");
   const userId = useAuthStore((s) => s.user?.userId);
 
   const initialized = useRef(false);
@@ -255,6 +255,7 @@ export default function OtRequestsPage() {
   const statusBadge = (status: string) => {
     const map: Record<string, string> = {
       Pending: "xp-badge xp-badge-warning",
+      SupervisorApproved: "xp-badge xp-badge-info",
       Approved: "xp-badge xp-badge-success",
       Rejected: "xp-badge xp-badge-danger",
     };
@@ -477,7 +478,7 @@ export default function OtRequestsPage() {
                             >
                               <Eye size={15} />
                             </button>
-                            {canApprove && item.status === "Pending" && (
+                            {canApprove && (item.status === "Pending" || item.status === "SupervisorApproved") && (
                               <>
                                 <button
                                   className="p-1.5 rounded-lg hover:bg-green-50 dark:hover:bg-green-900/20 text-green-500"
@@ -613,7 +614,7 @@ export default function OtRequestsPage() {
               </div>
             )}
 
-            {canApprove && selected.status === "Pending" && (
+            {canApprove && (selected.status === "Pending" || selected.status === "SupervisorApproved") && (
               <>
                 <div className="mb-4">
                   <label className="form-label">

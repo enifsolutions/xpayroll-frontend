@@ -344,10 +344,10 @@ export default function AttendanceLogsPage() {
       const res = await api.get(`/shift-assignments?employeeId=${employeeId}`);
       const active = res.data?.find(
         (s: {
-          isActive: boolean;
+          isCurrent: boolean;
           shiftId: string;
           attendancePolicyId: string;
-        }) => s.isActive,
+        }) => s.isCurrent,
       );
       if (!active) {
         setShiftStart(null);
@@ -465,9 +465,13 @@ export default function AttendanceLogsPage() {
       breakMinutes: String(item.breakMinutes),
       isLate,
       lateMinutes,
+      preOtMinutes: String(item.preOtMinutes ?? 0),
+      postOtMinutes: String(item.postOtMinutes ?? 0),
+      earlyLeaveMinutes: String(item.earlyLeaveMinutes ?? 0),
       status: item.status,
       adjustmentReason: item.adjustmentReason ?? "",
       notes: item.notes ?? "",
+      manualOverride: false,
     });
     setDialogOpen(true);
     if (employees.length === 0) loadEmployees();

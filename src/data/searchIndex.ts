@@ -525,6 +525,23 @@ export const searchIndex: SearchItem[] = [
     icon: "Clock",
   },
   {
+    id: "master-work-patterns",
+    title: "Work Patterns",
+    description: "Define which weekdays are full, half or off days",
+    href: "/master/work-patterns",
+    category: "Master Data",
+    keywords: [
+      "work pattern",
+      "working days",
+      "saturday",
+      "half day",
+      "weekend",
+      "mon-fri",
+      "week",
+    ],
+    icon: "CalendarDays",
+  },
+  {
     id: "master-statutory-rates",
     title: "Statutory Rates",
     description: "EPF, ETF and other statutory contribution rates",

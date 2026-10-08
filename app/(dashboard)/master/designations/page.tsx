@@ -19,6 +19,7 @@ import { useAuthStore } from "@/store/authStore";
 import { useTour } from "@/hooks/useTour";
 import TourOverlay from "@/components/onboarding/TourOverlay";
 import { DESIGNATIONS_STEPS } from "@/lib/tours/designations";
+import { ja } from "zod/v4/locales";
 
 interface Designation {
   id: string;

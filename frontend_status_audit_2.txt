@@ -1,0 +1,134 @@
+##### Status words anywhere (quoted or not) #####
+
+##### Employee pages and components #####
+src/components/employee/EmployeePhotoUpload.tsx
+src/components/employees/CvUploadButton.tsx
+src/components/employees/DependentsTab.tsx
+src/components/employees/DocumentsTab.tsx
+src/components/employees/ProfileCompletion.tsx
+src/components/employees/QualificationsTab.tsx
+src/components/employees/TransportTab.tsx
+src/lib/tours/employeesPage.ts
+src/types/employee-extended.types.ts
+
+##### Headcount report columns #####
+
+##### Login error display #####
+
+##### Convert-offer dialog (ApplicationOffer.tsx 895-1010) #####
+  offer,
+  onClose,
+  onConverted,
+}: {
+  offer: Offer;
+  onClose: () => void;
+  onConverted: () => void;
+}) {
+  const [employeeCode, setEmployeeCode] = useState("");
+  const [leaveTemplateId, setLeaveTemplateId] = useState("");
+  const [status, setStatus] = useState<"Active" | "Probation">("Probation");
+  const [leaveTemplates, setLeaveTemplates] = useState<Lookup[]>([]);
+  const [converting, setConverting] = useState(false);
+
+  useEffect(() => {
+    // TODO CONFIRM: real leave templates list endpoint
+    api
+      .get("/leave-templates")
+      .then((res) =>
+        setLeaveTemplates(
+          (res.data ?? []).map((x: any) => ({ id: x.id, name: x.name })),
+        ),
+      )
+      .catch(() => setLeaveTemplates([]));
+  }, []);
+
+  async function handleConvert() {
+    if (!employeeCode.trim()) {
+      showError("Missing employee code", "Enter an employee code.");
+      return;
+    }
+    if (!leaveTemplateId) {
+      showError("Missing leave template", "Select a leave template.");
+      return;
+    }
+
+    try {
+      setConverting(true);
+      await api.post("/offers/convert-to-employee", {
+        offerId: offer.id,
+        employeeCode: employeeCode.trim(),
+        leaveTemplateId,
+        status,
+      });
+      showSuccess("Converted", "Employee record created.");
+      onConverted();
+      onClose();
+    } catch (err: any) {
+      showError(
+        "Conversion failed",
+        err?.response?.data?.message ?? "Could not convert to employee.",
+      );
+    } finally {
+      setConverting(false);
+    }
+  }
+
+  return (
+    <Dialog
+      isOpen={true}
+      onClose={onClose}
+      onRequestClose={onClose}
+      width={460}
+    >
+      <h5>Convert to Employee</h5>
+      <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 mb-4">
+        Creates a new employee record for {offer.candidateName} from this
+        accepted offer.
+      </p>
+
+      <div className="space-y-4">
+        <div>
+          <label className="form-label">Employee Code</label>
+          <Input
+            value={employeeCode}
+            onChange={(e) => setEmployeeCode(e.target.value)}
+            placeholder="e.g. EMP-2026-0042"
+          />
+        </div>
+        <div>
+          <label className="form-label">Leave Template</label>
+          <select
+            className="input w-full"
+            value={leaveTemplateId}
+            onChange={(e) => setLeaveTemplateId(e.target.value)}
+          >
+            <option value="">— Select —</option>
+            {leaveTemplates.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="form-label">Starting Status</label>
+          <div className="flex gap-2">
+            {(["Probation", "Active"] as const).map((s) => (
+              <button
+                key={s}
+                onClick={() => setStatus(s)}
+                className={`px-3 py-1.5 rounded-lg text-sm border ${
+                  status === s
+                    ? "border-blue-500 bg-blue-50 dark:bg-blue-900/30 text-blue-600"
+                    : "border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300"
+                }`}
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="flex justify-end gap-2 mt-6">
+        <Button variant="plain" onClick={onClose}>

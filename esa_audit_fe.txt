@@ -1,0 +1,10 @@
+src/components/company/CompanySetupGate.tsx.20260712_104100.bak:32:  financialYearStart: string;
+src/components/company/CompanySetupGate.tsx.20260712_104100.bak:48:  financialYearStart: '01-01',
+src/components/company/CompanySetupGate.tsx.20260712_104100.bak:154:        financialYearStart: form.financialYearStart,
+src/components/company/CompanySetupGate.tsx.20260712_104100.bak:277:                    value={form.financialYearStart}
+src/components/company/CompanySetupGate.tsx.20260712_104100.bak:278:                    onChange={(e) => setField('financialYearStart', e.target.value)}
+src/components/company/CompanySetupGate.tsx:27:  financialYearStart: string;
+src/components/company/CompanySetupGate.tsx:43:  financialYearStart: '01-01',
+src/components/company/CompanySetupGate.tsx:178:        financialYearStart: form.financialYearStart,
+src/components/company/CompanySetupGate.tsx:317:                    value={form.financialYearStart}
+src/components/company/CompanySetupGate.tsx:318:                    onChange={(e) => setField('financialYearStart', e.target.value)}

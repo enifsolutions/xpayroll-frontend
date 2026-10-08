@@ -165,7 +165,15 @@ export interface ContractForm {
 }
 
 export const EMPLOYMENT_TYPES = ['FullTime', 'PartTime', 'Contract', 'Intern', 'Freelance']
-export const EMPLOYEE_STATUSES = ['Active', 'Probation', 'OnLeave', 'Suspended', 'Resigned', 'Terminated']
+export const EMPLOYEE_STATUSES = [
+  "Onboarding",
+  "Active",
+  "Probation",
+  "OnLeave",
+  "Suspended",
+  "Resigned",
+  "Terminated",
+];
 export const GENDERS = ['Male', 'Female', 'Other', 'PreferNotToSay']
 export const PAYROLL_BASES = ['Fixed', 'Hourly', 'Daily']
 export const CONTRACT_TYPES = ['Permanent', 'Fixed-Term', 'Probation', 'Part-Time', 'Internship']
@@ -213,10 +221,11 @@ export const EMPTY_CONTRACT: ContractForm = {
 }
 
 export const STATUS_COLORS: Record<string, string> = {
-  Active:     'xp-badge-success',
-  Probation:  'xp-badge-info',
-  OnLeave:    'xp-badge-warning',
-  Suspended:  'xp-badge-warning',
-  Resigned:   'xp-badge-neutral',
-  Terminated: 'xp-badge-danger',
-}
+  Onboarding: "xp-badge-info",
+  Active: "xp-badge-success",
+  Probation: "xp-badge-info",
+  OnLeave: "xp-badge-warning",
+  Suspended: "xp-badge-warning",
+  Resigned: "xp-badge-neutral",
+  Terminated: "xp-badge-danger",
+};

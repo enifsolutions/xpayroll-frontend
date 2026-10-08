@@ -25,8 +25,6 @@ import { Permissions } from "@/lib/permissions";
 import { useTour } from "@/hooks/useTour";
 import TourOverlay from "@/components/onboarding/TourOverlay";
 import { SHIFTS_STEPS } from "@/lib/tours/shifts";
-import { getErrorMessage } from "@/lib/apiError";
-import { summariseWeek } from "@/lib/workPattern";
 
 interface Shift {
   id: string;
@@ -40,18 +38,6 @@ interface Shift {
   isActive: boolean;
   createdAt: string;
   updatedAt: string | null;
-  workPatternId: string | null;     // null = organisation default
-  workPatternCode: string | null;
-  workPatternName: string | null;
-}
-
-interface PatternOption {
-  id: string;
-  code: string;
-  name: string;
-  dayFractions: number[];
-  isDefault: boolean;
-  isActive: boolean;
 }
 
 interface ShiftForm {
@@ -63,7 +49,6 @@ interface ShiftForm {
   workingHoursPerDay: string;
   isNightShift: boolean;
   isActive: boolean;
-  workPatternId: string;            // '' = organisation default
 }
 
 const EMPTY: ShiftForm = {
@@ -75,7 +60,6 @@ const EMPTY: ShiftForm = {
   workingHoursPerDay: '8',
   isNightShift: false,
   isActive: true,
-  workPatternId: '',
 };
 
 const PAGE_SIZE = 10;
@@ -116,7 +100,6 @@ export default function ShiftsPage() {
   const canManage = usePermission(Permissions.MasterData.Shifts.Manage);
 
   const [items, setItems] = useState<Shift[]>([]);
-  const [patterns, setPatterns] = useState<PatternOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Shift | null>(null);
@@ -148,21 +131,10 @@ export default function ShiftsPage() {
     }
   };
 
-  // Patterns feed the dropdown only; a failure here must not block the shifts page.
-  const loadPatterns = async () => {
-    try {
-      const res = await api.get<PatternOption[]>("/work-patterns");
-      setPatterns(res.data);
-    } catch {
-      setPatterns([]);
-    }
-  };
-
   useEffect(() => {
     if (initialized.current) return;
     initialized.current = true;
     load();
-    loadPatterns();
   }, []);
 
   // Stats
@@ -224,7 +196,6 @@ export default function ShiftsPage() {
       workingHoursPerDay: String(item.workingHoursPerDay),
       isNightShift: item.isNightShift,
       isActive: item.isActive,
-      workPatternId: item.workPatternId ?? '',
     });
     setError("");
     setDialogOpen(true);
@@ -253,14 +224,15 @@ export default function ShiftsPage() {
         workingHoursPerDay: parseFloat(form.workingHoursPerDay) || 8,
         isNightShift: form.isNightShift,
         isActive: form.isActive,
-        // null = follow the organisation default pattern
-        workPatternId: form.workPatternId || null,
       });
       setDialogOpen(false);
       await load();
       showSuccess(editing ? "Shift updated" : "Shift created", form.name);
-    } catch (err) {
-      showError("Failed to save", getErrorMessage(err, "Could not save shift."));
+    } catch (err: any) {
+      showError(
+        "Failed to save",
+        err?.response?.data?.error ?? "Could not save shift.",
+      );
     } finally {
       setSaving(false);
     }
@@ -272,8 +244,11 @@ export default function ShiftsPage() {
       await api.post("/Shift/save", { action: "DELETE", id: item.id });
       await load();
       showSuccess("Shift deleted", item.name);
-    } catch (err) {
-      showError("Delete failed", getErrorMessage(err, "Could not delete shift."));
+    } catch (err: any) {
+      showError(
+        "Delete failed",
+        err?.response?.data?.error ?? "Could not delete shift.",
+      );
     }
   };
 
@@ -437,7 +412,6 @@ export default function ShiftsPage() {
                     <th>Timing</th>
                     <th>Break</th>
                     <th>Working Hours</th>
-                    <th>Work Pattern</th>
                     <th>Type</th>
                     <th>Status</th>
                     {canManage && <th className="w-24 text-center">Actions</th>}
@@ -447,7 +421,7 @@ export default function ShiftsPage() {
                   {paginated.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={canManage ? 9 : 8}
+                        colSpan={canManage ? 8 : 7}
                         className="text-center py-8 text-gray-400"
                       >
                         No shifts found
@@ -501,15 +475,6 @@ export default function ShiftsPage() {
                           {/* Working hours */}
                           <td className="text-sm">
                             {Number(item.workingHoursPerDay).toFixed(1)} hrs
-                          </td>
-
-                          {/* Work pattern */}
-                          <td className="text-sm">
-                            {item.workPatternName ? (
-                              <span className="heading-text">{item.workPatternName}</span>
-                            ) : (
-                              <span className="text-gray-400">Organisation default</span>
-                            )}
                           </td>
 
                           {/* Type badge */}
@@ -710,30 +675,6 @@ export default function ShiftsPage() {
                 }
               />
             </div>
-          </div>
-
-          {/* Work pattern */}
-          <div>
-            <label className="form-label">Work Pattern</label>
-            <select
-              className="input w-full"
-              value={form.workPatternId}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, workPatternId: e.target.value }))
-              }
-            >
-              <option value="">Organisation default</option>
-              {patterns
-                .filter((p) => p.isActive || p.id === form.workPatternId)
-                .map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name} — {summariseWeek(p.dayFractions)}
-                  </option>
-                ))}
-            </select>
-            <p className="text-xs text-gray-400 mt-1">
-              Decides which weekdays count as working days for this shift.
-            </p>
           </div>
 
           {/* Toggles */}

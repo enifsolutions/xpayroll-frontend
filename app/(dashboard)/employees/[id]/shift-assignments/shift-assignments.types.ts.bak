@@ -8,26 +8,14 @@ export interface ShiftAssignment {
   attendancePolicyName: string
   effectiveFrom: string   // ISO date string
   effectiveTo: string | null
-  isActive: boolean        // "not cancelled" — NOT "current"
+  isActive: boolean
   createdAt: string
-  workPatternId: string | null    // per-employee override; null = use the shift's pattern
-  workPatternCode: string | null
-  workPatternName: string | null
-  isCurrent: boolean       // decided by dates on the server
 }
 
 export interface ShiftOption {
   id: string
   name: string
   code: string
-}
-
-export interface PatternOption {
-  id: string
-  code: string
-  name: string
-  dayFractions: number[]
-  isActive: boolean
 }
 
 export interface PolicyOption {
@@ -41,7 +29,6 @@ export interface ShiftAssignmentForm {
   effectiveFrom: string
   effectiveTo: string
   isActive: boolean
-  workPatternId: string    // '' = no override
 }
 
 export const defaultForm = (): ShiftAssignmentForm => ({
@@ -50,5 +37,4 @@ export const defaultForm = (): ShiftAssignmentForm => ({
   effectiveFrom: '',
   effectiveTo: '',
   isActive: true,
-  workPatternId: '',
 })

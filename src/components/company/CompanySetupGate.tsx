@@ -97,6 +97,79 @@ function StyledSelect({
   );
 }
 
+// ── Financial year start picker ───────────────────────────────────────────────
+// The database only accepts 'MM-DD' (chk_financial_year_start_format) and
+// rejects 02-29, so the picker offers real months and only the days that exist
+// in a non-leap year. It can never produce a value the database refuses.
+const MONTHS = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+];
+const DAYS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]; // Feb = 28 on purpose
+
+function parseFyStart(v: string): { month: number; day: number } {
+  const m = /^(\d{2})-(\d{2})$/.exec(v);
+  const month = m ? Number(m[1]) : 1;
+  const day = m ? Number(m[2]) : 1;
+  if (month < 1 || month > 12) return { month: 1, day: 1 };
+  return { month, day: Math.min(Math.max(day, 1), DAYS_IN_MONTH[month - 1]) };
+}
+
+function fyEndLabel(month: number, day: number): string {
+  // The year ends the day before the next one starts.
+  if (month === 1 && day === 1) return '31 December';
+  const endMonth = day === 1 ? (month === 1 ? 12 : month - 1) : month;
+  const endDay = day === 1 ? DAYS_IN_MONTH[endMonth - 1] : day - 1;
+  return `${endDay} ${MONTHS[endMonth - 1]}`;
+}
+
+function FinancialYearStartPicker({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const { month, day } = parseFyStart(value);
+  const emit = (m: number, d: number) => {
+    const safeDay = Math.min(d, DAYS_IN_MONTH[m - 1]);
+    onChange(`${String(m).padStart(2, '0')}-${String(safeDay).padStart(2, '0')}`);
+  };
+  return (
+    <div>
+      <div className="grid grid-cols-2 gap-3">
+        <select
+          value={month}
+          onChange={(e) => emit(Number(e.target.value), day)}
+          className={fieldClass}
+          aria-label="Financial year start month"
+        >
+          {MONTHS.map((name, i) => (
+            <option key={name} value={i + 1}>
+              {name}
+            </option>
+          ))}
+        </select>
+        <select
+          value={day}
+          onChange={(e) => emit(month, Number(e.target.value))}
+          className={fieldClass}
+          aria-label="Financial year start day"
+        >
+          {Array.from({ length: DAYS_IN_MONTH[month - 1] }, (_, i) => i + 1).map((d) => (
+            <option key={d} value={d}>
+              {d}
+            </option>
+          ))}
+        </select>
+      </div>
+      <p className="text-xs text-slate-400 mt-2">
+        Financial year runs {day} {MONTHS[month - 1]} to {fyEndLabel(month, day)}. Most companies use 1 January or 1 April.
+      </p>
+    </div>
+  );
+}
+
 // ── Minimal chrome for the gate screens (the real Topbar/Sidebar don't render
 // until setup is complete, so this stands in as a lightweight header/footer)
 function GateHeader() {
@@ -312,12 +385,10 @@ export default function CompanySetupGate({ children }: { children: React.ReactNo
                     options={CYCLES}
                   />
                 </StyledField>
-                <StyledField label="Financial Year Start (MM-DD)">
-                  <StyledInput
+                <StyledField label="Financial Year Start">
+                  <FinancialYearStartPicker
                     value={form.financialYearStart}
-                    onChange={(e) => setField('financialYearStart', e.target.value)}
-                    placeholder="01-01"
-                    maxLength={5}
+                    onChange={(v) => setField('financialYearStart', v)}
                   />
                 </StyledField>
               </div>

@@ -1,0 +1,161 @@
+##### STATUS_COLORS definition #####
+
+##### Form status field (app/(dashboard)/employees/page.tsx 305-340) #####
+        className="input w-full"
+        value={f.employmentType}
+        onChange={onChange("employmentType")}
+      >
+        {EMPLOYMENT_TYPES.map((t) => (
+          <option key={t} value={t}>
+            {t}
+          </option>
+        ))}
+      </select>
+    </Field>
+    <Field label="Status">
+      <select
+        className="input w-full"
+        value={f.status}
+        onChange={onChange("status")}
+      >
+        {EMPLOYEE_STATUSES.map((s) => (
+          <option key={s} value={s}>
+            {s}
+          </option>
+        ))}
+      </select>
+    </Field>
+    <Field label="TIN Number">
+      <Input
+        placeholder="Tax Identification Number"
+        value={f.tinNumber ?? ""}
+        onChange={onChange("tinNumber")}
+      />
+    </Field>
+    <Field label="Crew">
+      <select
+        className="input w-full"
+        value={f.crewId}
+        onChange={onChange("crewId")}
+
+##### Filter options (app/(dashboard)/employees/page.tsx 1440-1460) #####
+                  resetPage();
+                }}
+              />
+            </div>
+            <select
+              className="input w-40"
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(e.target.value);
+                resetPage();
+              }}
+            >
+              <option value="">All Statuses</option>
+              {EMPLOYEE_STATUSES.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+            <select
+              className="input w-44"
+
+##### Summary stats (app/(dashboard)/employees/page.tsx 525-537) #####
+
+  /* ── computed stats ────────────────────────────────────────────────────── */
+
+  const stats = useMemo(
+    () => ({
+      total: items.length,
+      active: items.filter((e) => e.status === "Active").length,
+      inactive: items.filter((e) => e.status !== "Active").length,
+      fullTime: items.filter((e) => e.employmentType === "FullTime").length,
+    }),
+    [items],
+  );
+
+
+##### Employee save error handling #####
+94-  try {
+95-    localStorage.setItem(EMPLOYEE_WIZARD_DRAFT_KEY, JSON.stringify(draft));
+96:  } catch {
+97-    // localStorage unavailable — draft resume just won't work, non-critical
+98-  }
+99-}
+100-
+101-function loadWizardDraft(): EmployeeWizardDraft | null {
+102-  try {
+103-    const raw = localStorage.getItem(EMPLOYEE_WIZARD_DRAFT_KEY);
+104-    return raw ? (JSON.parse(raw) as EmployeeWizardDraft) : null;
+105:  } catch {
+106-    return null;
+107-  }
+108-}
+109-
+110-function clearWizardDraft() {
+111-  try {
+112-    localStorage.removeItem(EMPLOYEE_WIZARD_DRAFT_KEY);
+113:  } catch {
+114-    // ignore
+115-  }
+116-}
+117-
+118-const AVATAR_COLORS = [
+119-  'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300',
+--
+654-          .map((t: any) => ({ id: String(t.id), name: t.name, code: t.code })),
+655-      );
+656:    } catch (err: any) {
+657-      showError("Load failed", getErrorMessage(err, "Could not load data."));
+658-    } finally {
+659-      setLoading(false);
+660-    }
+661-  };
+662-
+--
+691-          showError("Duplicate National ID", message);
+692-        }
+693:      } catch {
+694-        // fail silent — the save-time server check still protects data integrity
+695-      } finally {
+696-        setNicChecking(false);
+697-      }
+698-    }, 500);
+699-
+--
+723-          showError("Duplicate National ID", message);
+724-        }
+725:      } catch {
+726-        // fail silent
+727-      } finally {
+728-        setEditNicChecking(false);
+729-      }
+730-    }, 500);
+731-
+--
+755-          overtimeRateMultiplier: String(data.overtimeRateMultiplier),
+756-        }));
+757:      } catch {
+758-        // silent — Step 2 keeps its last-resolved or default values
+759-      }
+760-    }, 300);
+761-    return () => clearTimeout(timer);
+762-  }, [form1.branchId, form1.departmentId, form1.designationId, wizardStep]);
+763-
+--
+876-    // resolved right around the moment of creation leaving a stale flag
+877-    // behind, incorrectly blocking a legitimate later Next/Update. The
+878:    // backend's own duplicate check still catches a genuine conflict.
+879-    if (!createdId && nicError) {
+880-      showError("Duplicate National ID", nicError);
+881-      return;
+882-    }
+883-    setWizardSaving(true);
+884-    try {
+--
+966-          try {
+967-            await consumeCvParse(parseLogId, Number(employeeId));
+968:          } catch {
+
+##### Overview: where status / header is shown #####

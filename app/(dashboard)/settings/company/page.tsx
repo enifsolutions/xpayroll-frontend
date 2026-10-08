@@ -5,6 +5,7 @@ import {
   Building2,
   Settings2,
   CalendarDays,
+  Clock3,
   Bell,
   Activity,
   Save,
@@ -13,10 +14,17 @@ import {
   ChevronRight,
   ShieldAlert,
   Rocket,
+  Megaphone,
+  Plus,
+  Pencil,
+  Trash2,
+  ShieldCheck,
+  Search,
 } from "lucide-react";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import Switcher from "@/components/ui/Switcher";
+import Dialog from "@/components/ui/Dialog";
 import { useRequirePermission } from "@/hooks/useRequirePermission";
 import { usePermission } from "@/hooks/usePermission";
 import { Permissions } from "@/lib/permissions";
@@ -43,6 +51,7 @@ interface CompanySettings {
   isActive: boolean;
   // Payroll & HR
   payrollCycleType: string;
+  approvalChainType: string;
   financialYearStart: string;
   attendanceDeductionEnabled: boolean;
   dsrLimitPercent: number;
@@ -105,12 +114,29 @@ const EMPTY_CREATE_FORM: CreateCompanyForm = {
   financialYearStart: "01-01",
 };
 
-type TabKey = "profile" | "payroll" | "leave" | "notifications" | "system";
+type TabKey =
+  | "profile"
+  | "payroll"
+  | "leave"
+  | "shortLeave"
+  | "grievance"
+  | "notifications"
+  | "system";
 
 const TABS: { key: TabKey; label: string; icon: React.ReactNode }[] = [
   { key: "profile", label: "Company Profile", icon: <Building2 size={16} /> },
   { key: "payroll", label: "Payroll & HR", icon: <Settings2 size={16} /> },
   { key: "leave", label: "Leave Policy", icon: <CalendarDays size={16} /> },
+  {
+    key: "shortLeave",
+    label: "Short Leave Policy",
+    icon: <Clock3 size={16} />,
+  },
+  {
+    key: "grievance",
+    label: "Grievance Settings",
+    icon: <Megaphone size={16} />,
+  },
   { key: "notifications", label: "Notifications", icon: <Bell size={16} /> },
   { key: "system", label: "System Status", icon: <Activity size={16} /> },
 ];
@@ -143,6 +169,10 @@ const TIMEZONES = [
 
 const CURRENCIES = ["LKR", "USD", "EUR", "GBP", "AUD", "SGD", "INR", "AED"];
 const CYCLES = ["Monthly", "BiMonthly", "Weekly"];
+const APPROVAL_CHAIN_TYPES = [
+  { value: "DirectToHR", label: "Direct to HR" },
+  { value: "SupervisorThenHR", label: "Supervisor, then HR" },
+];
 const DEDUCTION_SOURCES = ["Company", "Branch", "Department", "Designation"];
 
 // ── Page ──────────────────────────────────────────────────────────────────────
@@ -150,6 +180,12 @@ export default function CompanySettingsPage() {
   useRequirePermission(Permissions.Settings.Company.View);
   const canManage = usePermission(Permissions.Settings.Company.Manage);
   const canCreate = usePermission(Permissions.Settings.Company.Create);
+  const canManageShortLeave = usePermission(
+    Permissions.Settings.ShortLeavePolicy.Manage,
+  );
+  const canManageGrievance = usePermission(
+    Permissions.Settings.GrievanceConfig.Manage,
+  );
   const userId = useAuthStore((s) => s.user?.userId);
   const initialized = useRef(false);
 
@@ -202,6 +238,7 @@ export default function CompanySettingsPage() {
         website: d.website ?? "",
         isActive: d.isActive ?? true,
         payrollCycleType: d.payrollCycleType ?? "Monthly",
+        approvalChainType: d.approvalChainType ?? "DirectToHR",
         financialYearStart: d.financialYearStart ?? "01-01",
         attendanceDeductionEnabled: d.attendanceDeductionEnabled ?? true,
         dsrLimitPercent: d.dsrLimitPercent ?? 40,
@@ -226,7 +263,7 @@ export default function CompanySettingsPage() {
         createdAt: d.createdAt ?? "",
         updatedAt: d.updatedAt ?? null,
       });
-    } catch (err:any){
+    } catch (err: any) {
       showError(
         "Load Failed",
         err?.response?.data?.error ?? "Failed to load company settings.",
@@ -331,6 +368,7 @@ export default function CompanySettingsPage() {
         countryCode: data.countryCode,
         timezone: data.timezone,
         payrollCycleType: data.payrollCycleType,
+        approvalChainType: data.approvalChainType,
         address: data.address,
         phone: data.phone,
         email: data.email,
@@ -571,6 +609,8 @@ export default function CompanySettingsPage() {
     );
 
   const isSystem = activeTab === "system";
+  const hasOwnSaveFlow =
+    activeTab === "shortLeave" || activeTab === "grievance";
 
   return (
     <div>
@@ -583,7 +623,7 @@ export default function CompanySettingsPage() {
             preferences.
           </p>
         </div>
-        {canManage && !isSystem && (
+        {canManage && !isSystem && !hasOwnSaveFlow && (
           <Button
             variant="solid"
             icon={<Save size={15} />}
@@ -641,6 +681,12 @@ export default function CompanySettingsPage() {
             )}
             {activeTab === "leave" && (
               <LeaveTab data={data} set={set} canManage={canManage} />
+            )}
+            {activeTab === "shortLeave" && (
+              <ShortLeaveTab canManage={canManageShortLeave} />
+            )}
+            {activeTab === "grievance" && (
+              <GrievanceSettingsTab canManage={canManageGrievance} />
             )}
             {activeTab === "notifications" && (
               <NotificationsTab data={data} set={set} canManage={canManage} />
@@ -962,6 +1008,25 @@ function PayrollTab({
         </Field>
       </div>
 
+      <SectionTitle>Approval Workflow</SectionTitle>
+      <div className="grid grid-cols-2 gap-4">
+        <SelectField
+          label="Leave & Attendance Approval Chain"
+          value={data.approvalChainType}
+          onChange={(v) => set("approvalChainType", v)}
+          options={APPROVAL_CHAIN_TYPES}
+          disabled={!canManage}
+        />
+      </div>
+      <p className="text-xs text-gray-500 dark:text-gray-400 -mt-2">
+        Governs Leave, Short Leave, Overtime, Attendance Adjustment, and Profile
+        Change requests. <strong>Direct to HR</strong> sends every request
+        straight to HR for final approval. <strong>Supervisor, then HR</strong>{" "}
+        requires the employee's manager (or the nearest active manager up the
+        chain) to approve first; requests from employees with no manager go
+        straight to HR.
+      </p>
+
       <SectionTitle>Attendance & Deductions</SectionTitle>
       <ToggleRow
         label="Attendance-Based Deductions"
@@ -1193,6 +1258,982 @@ function LeaveTab({
             <span className="text-sm text-gray-500">days (0 = unlimited)</span>
           </div>
         </Field>
+      )}
+    </div>
+  );
+}
+
+// ── Tab: Short Leave Policy ────────────────────────────────────────────────────
+interface ShortLeavePolicyForm {
+  moduleEnabled: boolean;
+  monthlyQuota: number;
+  maxDurationMinutes: number;
+  minDurationMinutes: number;
+  allowedWindows: string;
+  overquotaBehavior: string;
+  overdurationBehavior: string;
+  halfdayLeaveTypeId: string | null;
+  advanceNoticeDays: number;
+  allowBackdated: boolean;
+  countTowardLateSuppression: boolean;
+  midmonthJoinQuotaBehavior: string;
+  midmonthProrateBasis: string | null;
+}
+
+const EMPTY_SHORT_LEAVE_POLICY: ShortLeavePolicyForm = {
+  moduleEnabled: true,
+  monthlyQuota: 2,
+  maxDurationMinutes: 90,
+  minDurationMinutes: 15,
+  allowedWindows: "Anytime",
+  overquotaBehavior: "ConvertHalfDay",
+  overdurationBehavior: "ConvertHalfDay",
+  halfdayLeaveTypeId: null,
+  advanceNoticeDays: 0,
+  allowBackdated: true,
+  countTowardLateSuppression: true,
+  midmonthJoinQuotaBehavior: "Full",
+  midmonthProrateBasis: null,
+};
+
+function ShortLeaveTab({ canManage }: { canManage: boolean }) {
+  const initialized = useRef(false);
+  const [form, setForm] = useState<ShortLeavePolicyForm>(EMPTY_SHORT_LEAVE_POLICY);
+  const [original, setOriginal] = useState<ShortLeavePolicyForm>(EMPTY_SHORT_LEAVE_POLICY);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [leaveTypes, setLeaveTypes] = useState<{ id: string; name: string }[]>([]);
+  const [meta, setMeta] = useState<{ updatedAt: string | null; updatedByName: string | null }>({
+    updatedAt: null,
+    updatedByName: null,
+  });
+
+  useEffect(() => {
+    if (initialized.current) return;
+    initialized.current = true;
+    load();
+  }, []);
+
+  async function load() {
+    setLoading(true);
+    try {
+      const [policyRes, ltRes] = await Promise.all([
+        axios.get("/short-leave-policy"),
+        axios.get("/leave-types"),
+      ]);
+      const p = policyRes.data;
+      const loaded: ShortLeavePolicyForm = {
+        moduleEnabled: p.moduleEnabled,
+        monthlyQuota: p.monthlyQuota,
+        maxDurationMinutes: p.maxDurationMinutes,
+        minDurationMinutes: p.minDurationMinutes,
+        allowedWindows: p.allowedWindows,
+        overquotaBehavior: p.overquotaBehavior,
+        overdurationBehavior: p.overdurationBehavior,
+        halfdayLeaveTypeId: p.halfdayLeaveTypeId ? String(p.halfdayLeaveTypeId) : null,
+        advanceNoticeDays: p.advanceNoticeDays,
+        allowBackdated: p.allowBackdated,
+        countTowardLateSuppression: p.countTowardLateSuppression,
+        midmonthJoinQuotaBehavior: p.midmonthJoinQuotaBehavior,
+        midmonthProrateBasis: p.midmonthProrateBasis,
+      };
+      setForm(loaded);
+      setOriginal(loaded);
+      setMeta({ updatedAt: p.updatedAt, updatedByName: p.updatedByName });
+      setLeaveTypes(ltRes.data.map((x: any) => ({ id: String(x.id), name: x.name })));
+    } catch (err: any) {
+      showError("Load failed", err?.response?.data?.error ?? "Could not load short leave policy.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function set<K extends keyof ShortLeavePolicyForm>(key: K, value: ShortLeavePolicyForm[K]) {
+    setForm((f) => ({ ...f, [key]: value }));
+  }
+
+  const dirty = JSON.stringify(form) !== JSON.stringify(original);
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      await axios.post("/short-leave-policy/save", {
+        moduleEnabled: form.moduleEnabled,
+        monthlyQuota: form.monthlyQuota,
+        maxDurationMinutes: form.maxDurationMinutes,
+        minDurationMinutes: form.minDurationMinutes,
+        allowedWindows: form.allowedWindows,
+        overquotaBehavior: form.overquotaBehavior,
+        overdurationBehavior: form.overdurationBehavior,
+        halfdayLeaveTypeId: form.halfdayLeaveTypeId || null,
+        advanceNoticeDays: form.advanceNoticeDays,
+        allowBackdated: form.allowBackdated,
+        countTowardLateSuppression: form.countTowardLateSuppression,
+        midmonthJoinQuotaBehavior: form.midmonthJoinQuotaBehavior,
+        midmonthProrateBasis: form.midmonthJoinQuotaBehavior === "Prorated" ? form.midmonthProrateBasis : null,
+        updatedBy: 0,
+      });
+      showSuccess("Policy saved", "Short leave policy updated successfully.");
+      await load();
+    } catch (err: any) {
+      showError("Save failed", err?.response?.data?.error ?? "Could not save short leave policy.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="space-y-4 animate-pulse">
+        {[...Array(5)].map((_, i) => (
+          <div key={i} className="h-10 rounded bg-gray-200 dark:bg-gray-700" />
+        ))}
+      </div>
+    );
+  }
+
+  const showHalfdayType =
+    form.overquotaBehavior === "ConvertHalfDay" || form.overdurationBehavior === "ConvertHalfDay";
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-start justify-between">
+        <div>
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            Governs quota, duration limits, and conversion behavior for short leave requests. Applies
+            company-wide and takes effect immediately for new requests.
+          </p>
+          {meta.updatedAt && (
+            <p className="text-xs text-gray-400 mt-1">
+              Last updated {new Date(meta.updatedAt).toLocaleString()}
+              {meta.updatedByName ? ` by ${meta.updatedByName}` : ""}
+            </p>
+          )}
+        </div>
+        {canManage && (
+          <Button variant="solid" size="sm" loading={saving} disabled={!dirty} onClick={handleSave}>
+            {dirty ? "Save Changes" : "Saved"}
+          </Button>
+        )}
+      </div>
+
+      <SectionTitle>Module</SectionTitle>
+      <ToggleRow
+        label="Short Leave Module"
+        description="When off, no new short leave requests can be submitted. Existing requests remain visible."
+        checked={form.moduleEnabled}
+        onChange={(v) => set("moduleEnabled", v)}
+        disabled={!canManage}
+      />
+
+      <SectionTitle>Quota &amp; Duration</SectionTitle>
+      <div className="grid grid-cols-3 gap-4">
+        <Field label="Monthly Quota (requests)">
+          <Input
+            type="number"
+            value={String(form.monthlyQuota)}
+            onChange={(e) => set("monthlyQuota", Math.max(1, Number(e.target.value) || 1))}
+            disabled={!canManage}
+            min={1}
+          />
+        </Field>
+        <Field label="Max Duration (minutes)">
+          <Input
+            type="number"
+            value={String(form.maxDurationMinutes)}
+            onChange={(e) => set("maxDurationMinutes", Math.max(1, Number(e.target.value) || 1))}
+            disabled={!canManage}
+            min={1}
+          />
+        </Field>
+        <Field label="Min Duration (minutes)">
+          <Input
+            type="number"
+            value={String(form.minDurationMinutes)}
+            onChange={(e) => set("minDurationMinutes", Math.max(1, Number(e.target.value) || 1))}
+            disabled={!canManage}
+            min={1}
+          />
+        </Field>
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <SelectField
+          label="Allowed Time Windows"
+          value={form.allowedWindows}
+          onChange={(v) => set("allowedWindows", v)}
+          options={[
+            { value: "Anytime", label: "Anytime" },
+            { value: "StartOrEndOfShift", label: "Start or End of Shift" },
+          ]}
+          disabled={!canManage}
+        />
+      </div>
+
+      <SectionTitle>Over-Limit Behavior</SectionTitle>
+      <p className="text-xs text-gray-500 dark:text-gray-400 -mt-2 mb-2">
+        What happens when a request exceeds the monthly quota or maximum duration.
+      </p>
+      <div className="grid grid-cols-2 gap-4">
+        <SelectField
+          label="Over Monthly Quota"
+          value={form.overquotaBehavior}
+          onChange={(v) => set("overquotaBehavior", v)}
+          options={[
+            { value: "Block", label: "Block the request" },
+            { value: "ConvertHalfDay", label: "Convert to half-day leave" },
+            { value: "ConvertNoPay", label: "Convert to no-pay leave" },
+          ]}
+          disabled={!canManage}
+        />
+        <SelectField
+          label="Over Maximum Duration"
+          value={form.overdurationBehavior}
+          onChange={(v) => set("overdurationBehavior", v)}
+          options={[
+            { value: "Block", label: "Block the request" },
+            { value: "ConvertHalfDay", label: "Convert to half-day leave" },
+            { value: "ConvertNoPay", label: "Convert to no-pay leave" },
+          ]}
+          disabled={!canManage}
+        />
+      </div>
+      {showHalfdayType && (
+        <div className="grid grid-cols-2 gap-4">
+          <SelectField
+            label="Half-Day Conversion Leave Type"
+            value={form.halfdayLeaveTypeId ?? ""}
+            onChange={(v) => set("halfdayLeaveTypeId", v || null)}
+            options={[
+              { value: "", label: "— Not set —" },
+              ...leaveTypes.map((lt) => ({ value: lt.id, label: lt.name })),
+            ]}
+            disabled={!canManage}
+          />
+        </div>
+      )}
+
+      <SectionTitle>Timing &amp; Attendance</SectionTitle>
+      <div className="grid grid-cols-2 gap-4">
+        <Field label="Advance Notice (days)">
+          <Input
+            type="number"
+            value={String(form.advanceNoticeDays)}
+            onChange={(e) => set("advanceNoticeDays", Math.max(0, Number(e.target.value) || 0))}
+            disabled={!canManage}
+            min={0}
+          />
+        </Field>
+      </div>
+      <ToggleRow
+        label="Allow Backdated Requests"
+        description="Permit HR to submit a short leave for a date that has already passed."
+        checked={form.allowBackdated}
+        onChange={(v) => set("allowBackdated", v)}
+        disabled={!canManage}
+      />
+      <ToggleRow
+        label="Count Toward Late/Early Suppression"
+        description="An approved short leave covering the start or end of a shift reduces (but does not erase) recorded late-arrival or early-departure minutes for that day."
+        checked={form.countTowardLateSuppression}
+        onChange={(v) => set("countTowardLateSuppression", v)}
+        disabled={!canManage}
+      />
+
+      <SectionTitle>Mid-Month Joiners</SectionTitle>
+      <p className="text-xs text-gray-500 dark:text-gray-400 -mt-2 mb-2">
+        How the monthly quota applies to an employee who joins partway through a month.
+      </p>
+      <div className="grid grid-cols-2 gap-4">
+        <SelectField
+          label="Quota for Joining Month"
+          value={form.midmonthJoinQuotaBehavior}
+          onChange={(v) => {
+            set("midmonthJoinQuotaBehavior", v);
+            if (v === "Full") set("midmonthProrateBasis", null);
+          }}
+          options={[
+            { value: "Full", label: "Full quota" },
+            { value: "Prorated", label: "Prorated" },
+          ]}
+          disabled={!canManage}
+        />
+        {form.midmonthJoinQuotaBehavior === "Prorated" && (
+          <SelectField
+            label="Proration Basis"
+            value={form.midmonthProrateBasis ?? ""}
+            onChange={(v) => set("midmonthProrateBasis", v || null)}
+            options={[
+              { value: "", label: "— Select —" },
+              { value: "CalendarDays", label: "Calendar days remaining" },
+              { value: "WorkingDays", label: "Working days remaining" },
+            ]}
+            disabled={!canManage}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Tab: Grievance Settings ─────────────────────────────────────────────────────
+interface GrievanceCategoryRow {
+  id: string;
+  name: string;
+  isActive: boolean;
+  sortOrder: number;
+  defaultSeverity: string;
+  defaultAssigneeUserId: string | null;
+  defaultAssigneeName: string | null;
+  forceConfidential: boolean;
+  acknowledgeSlaHours: number | null;
+  resolveSlaDays: number | null;
+  escalationUserId: string | null;
+  escalationUserName: string | null;
+  escalationAfterDays: number | null;
+  caseCount: number;
+}
+
+interface GrievancePolicyForm {
+  moduleEnabled: boolean;
+  allowAnonymous: boolean;
+  allowEmployeeWithdraw: boolean;
+  requireResolutionNotes: boolean;
+  satisfactionCaptureEnabled: boolean;
+  autoCloseAfterDays: number | null;
+  slaWarningThresholdPct: number;
+  notifyOnAssigned: boolean;
+  notifyOnStatusChange: boolean;
+  notifyOnSlaWarning: boolean;
+  notifyOnSlaBreach: boolean;
+  updatedAt: string | null;
+  updatedByName: string | null;
+}
+
+interface GrievanceUserOption {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+}
+
+const GRIEVANCE_SEVERITIES = ["Low", "Medium", "High", "Critical"];
+
+// Search-and-select picker against /users, same interaction shape as the
+// employee picker in ApplyShortLeaveDialog. No shared UserPicker component
+// exists in this codebase yet, so it's local to this tab.
+function GrievanceUserPickerField({
+  label,
+  users,
+  value,
+  onChange,
+  disabled,
+  helperText,
+}: {
+  label: string;
+  users: GrievanceUserOption[];
+  value: string | null;
+  onChange: (id: string | null) => void;
+  disabled?: boolean;
+  helperText?: string;
+}) {
+  const [search, setSearch] = useState("");
+  const selected = users.find((u) => u.id === value) ?? null;
+  const filtered = search.trim()
+    ? users.filter(
+        (u) =>
+          `${u.firstName} ${u.lastName}`.toLowerCase().includes(search.toLowerCase()) ||
+          u.email.toLowerCase().includes(search.toLowerCase()),
+      )
+    : users;
+
+  return (
+    <div>
+      <label className="form-label">{label}</label>
+      {selected ? (
+        <div className="flex items-center justify-between rounded-lg border border-gray-200 dark:border-gray-700 px-3 py-2">
+          <div>
+            <p className="text-sm font-medium">
+              {selected.firstName} {selected.lastName}
+            </p>
+            <p className="text-xs text-gray-400">{selected.email}</p>
+          </div>
+          {!disabled && (
+            <button type="button" onClick={() => onChange(null)} className="text-gray-400 hover:text-red-500">
+              <X size={14} />
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="relative">
+          <div className="relative">
+            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+            <input
+              type="text"
+              className="input pl-8 w-full"
+              placeholder="Search by name or email…"
+              value={search}
+              disabled={disabled}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+          {search && (
+            <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+              {filtered.length === 0 ? (
+                <div className="p-3 text-sm text-gray-400">No users found</div>
+              ) : (
+                filtered.slice(0, 10).map((u) => (
+                  <button
+                    key={u.id}
+                    type="button"
+                    className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-700"
+                    onClick={() => {
+                      onChange(u.id);
+                      setSearch("");
+                    }}
+                  >
+                    {u.firstName} {u.lastName} <span className="text-gray-400">({u.email})</span>
+                  </button>
+                ))
+              )}
+            </div>
+          )}
+        </div>
+      )}
+      {helperText && <p className="text-xs text-gray-400 mt-1">{helperText}</p>}
+    </div>
+  );
+}
+
+const EMPTY_CATEGORY_FORM = {
+  name: "",
+  isActive: true,
+  sortOrder: 0,
+  defaultSeverity: "Medium",
+  defaultAssigneeUserId: null as string | null,
+  forceConfidential: false,
+  acknowledgeSlaHours: null as number | null,
+  resolveSlaDays: null as number | null,
+  escalationUserId: null as string | null,
+  escalationAfterDays: null as number | null,
+};
+
+function GrievanceCategoryDialog({
+  isOpen,
+  onClose,
+  onSaved,
+  category,
+  users,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onSaved: () => void;
+  category: GrievanceCategoryRow | null;
+  users: GrievanceUserOption[];
+}) {
+  const [form, setForm] = useState(EMPTY_CATEGORY_FORM);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setForm(
+      category
+        ? {
+            name: category.name,
+            isActive: category.isActive,
+            sortOrder: category.sortOrder,
+            defaultSeverity: category.defaultSeverity,
+            defaultAssigneeUserId: category.defaultAssigneeUserId,
+            forceConfidential: category.forceConfidential,
+            acknowledgeSlaHours: category.acknowledgeSlaHours,
+            resolveSlaDays: category.resolveSlaDays,
+            escalationUserId: category.escalationUserId,
+            escalationAfterDays: category.escalationAfterDays,
+          }
+        : EMPTY_CATEGORY_FORM,
+    );
+  }, [isOpen, category]);
+
+  function set<K extends keyof typeof EMPTY_CATEGORY_FORM>(key: K, value: (typeof EMPTY_CATEGORY_FORM)[K]) {
+    setForm((f) => ({ ...f, [key]: value }));
+  }
+
+  const escalationMismatch = (form.escalationUserId === null) !== (form.escalationAfterDays === null);
+
+  async function handleSave() {
+    if (!form.name.trim()) {
+      showError("Missing information", "Category name is required.");
+      return;
+    }
+    if (escalationMismatch) {
+      showError("Invalid escalation setup", "Escalation user and escalation window must be set together, or not at all.");
+      return;
+    }
+    setSaving(true);
+    try {
+      await axios.post("/grievance-config/categories/save", {
+        id: category?.id ?? null,
+        action: category ? "UPDATE" : "ADD",
+        name: form.name.trim(),
+        isActive: form.isActive,
+        sortOrder: form.sortOrder,
+        defaultSeverity: form.defaultSeverity,
+        defaultAssigneeUserId: form.defaultAssigneeUserId,
+        defaultAssigneeRoleId: null,
+        forceConfidential: form.forceConfidential,
+        acknowledgeSlaHours: form.acknowledgeSlaHours,
+        resolveSlaDays: form.resolveSlaDays,
+        escalationUserId: form.escalationUserId,
+        escalationAfterDays: form.escalationAfterDays,
+      });
+      showSuccess(category ? "Category updated" : "Category created", `"${form.name}" saved successfully.`);
+      onSaved();
+    } catch (err: any) {
+      showError("Save failed", err?.response?.data?.message ?? err?.response?.data?.error ?? "Could not save this category.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Dialog isOpen={isOpen} onClose={onClose} onRequestClose={onClose}>
+      <h5 className="mb-5">{category ? "Edit Grievance Category" : "New Grievance Category"}</h5>
+      <div className="space-y-4 max-h-[65vh] overflow-y-auto pr-1">
+        <div>
+          <label className="form-label">Category Name <span className="text-rose-500">*</span></label>
+          <Input value={form.name} onChange={(e) => set("name", e.target.value)} placeholder="e.g. Harassment" />
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="form-label">Default Severity</label>
+            <select className="select w-full" value={form.defaultSeverity} onChange={(e) => set("defaultSeverity", e.target.value)}>
+              {GRIEVANCE_SEVERITIES.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="form-label">Sort Order</label>
+            <Input type="number" value={String(form.sortOrder)} onChange={(e) => set("sortOrder", Number(e.target.value) || 0)} />
+          </div>
+        </div>
+        <ToggleRow
+          label="Force Confidential"
+          description="Every case in this category is treated as confidential, regardless of the submitter's own choice. This overrides upward only."
+          checked={form.forceConfidential}
+          onChange={(v) => set("forceConfidential", v)}
+        />
+        <SectionTitle>SLA Targets</SectionTitle>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="form-label">Acknowledge SLA (hours)</label>
+            <Input
+              type="number"
+              value={form.acknowledgeSlaHours === null ? "" : String(form.acknowledgeSlaHours)}
+              onChange={(e) => set("acknowledgeSlaHours", e.target.value === "" ? null : Number(e.target.value))}
+              placeholder="e.g. 4"
+              min={1}
+            />
+          </div>
+          <div>
+            <label className="form-label">Resolve SLA (days)</label>
+            <Input
+              type="number"
+              value={form.resolveSlaDays === null ? "" : String(form.resolveSlaDays)}
+              onChange={(e) => set("resolveSlaDays", e.target.value === "" ? null : Number(e.target.value))}
+              placeholder="e.g. 5"
+              min={1}
+            />
+          </div>
+        </div>
+        <SectionTitle>Routing</SectionTitle>
+        <GrievanceUserPickerField
+          label="Default Assignee"
+          users={users}
+          value={form.defaultAssigneeUserId}
+          onChange={(id) => set("defaultAssigneeUserId", id)}
+          helperText="New cases in this category are auto-assigned to this user if no one else is assigned."
+        />
+        <div className="grid grid-cols-2 gap-4 items-start">
+          <GrievanceUserPickerField
+            label="Escalation Contact"
+            users={users}
+            value={form.escalationUserId}
+            onChange={(id) => set("escalationUserId", id)}
+          />
+          <div>
+            <label className="form-label">Escalate After (days past deadline)</label>
+            <Input
+              type="number"
+              value={form.escalationAfterDays === null ? "" : String(form.escalationAfterDays)}
+              onChange={(e) => set("escalationAfterDays", e.target.value === "" ? null : Number(e.target.value))}
+              min={1}
+              disabled={!form.escalationUserId}
+              placeholder={form.escalationUserId ? "e.g. 3" : "Pick an escalation contact first"}
+            />
+          </div>
+        </div>
+        {escalationMismatch && (
+          <p className="text-xs text-rose-500">Escalation contact and escalation window must be set together, or both left empty.</p>
+        )}
+        {category && (
+          <ToggleRow
+            label="Active"
+            description={
+              category.caseCount > 0
+                ? `This category has ${category.caseCount} case(s) and cannot be deleted — deactivating hides it from new intake without affecting existing cases.`
+                : "Inactive categories are hidden from new intake but existing cases are unaffected."
+            }
+            checked={form.isActive}
+            onChange={(v) => set("isActive", v)}
+          />
+        )}
+      </div>
+      <div className="flex justify-end gap-2 mt-5">
+        <Button variant="plain" onClick={onClose}>Cancel</Button>
+        <Button variant="solid" color="primary" loading={saving} onClick={handleSave}>
+          {category ? "Save Changes" : "Create Category"}
+        </Button>
+      </div>
+    </Dialog>
+  );
+}
+
+function GrievanceSettingsTab({ canManage }: { canManage: boolean }) {
+  type InnerTab = "categories" | "policy" | "notifications";
+  const [inner, setInner] = useState<InnerTab>("categories");
+
+  const [categories, setCategories] = useState<GrievanceCategoryRow[]>([]);
+  const [users, setUsers] = useState<GrievanceUserOption[]>([]);
+  const [catLoading, setCatLoading] = useState(true);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editing, setEditing] = useState<GrievanceCategoryRow | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<GrievanceCategoryRow | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const [policy, setPolicy] = useState<GrievancePolicyForm | null>(null);
+  const [policyOriginal, setPolicyOriginal] = useState<GrievancePolicyForm | null>(null);
+  const [policySaving, setPolicySaving] = useState(false);
+
+  const initialized = useRef(false);
+
+  useEffect(() => {
+    if (initialized.current) return;
+    initialized.current = true;
+    loadCategories();
+    loadUsers();
+    loadPolicy();
+  }, []);
+
+  async function loadCategories() {
+    setCatLoading(true);
+    try {
+      const res = await axios.get("/grievance-config/categories", { params: { activeOnly: false } });
+      setCategories(
+        res.data.map((c: any) => ({
+          ...c,
+          id: String(c.id),
+          defaultAssigneeUserId: c.defaultAssigneeUserId != null ? String(c.defaultAssigneeUserId) : null,
+          escalationUserId: c.escalationUserId != null ? String(c.escalationUserId) : null,
+        })),
+      );
+    } catch (err: any) {
+      showError("Load failed", err?.response?.data?.error ?? "Could not load grievance categories.");
+    } finally {
+      setCatLoading(false);
+    }
+  }
+
+  async function loadUsers() {
+    try {
+      const res = await axios.get("/users");
+      setUsers(res.data.map((u: any) => ({ id: String(u.id), email: u.email, firstName: u.firstName, lastName: u.lastName })));
+    } catch {
+      // Non-fatal — category list still works, only the pickers degrade.
+    }
+  }
+
+  async function loadPolicy() {
+    try {
+      const res = await axios.get("/grievance-config/policy");
+      setPolicy(res.data);
+      setPolicyOriginal(res.data);
+    } catch (err: any) {
+      showError("Load failed", err?.response?.data?.error ?? "Could not load grievance policy.");
+    }
+  }
+
+  function setPolicyField<K extends keyof GrievancePolicyForm>(key: K, value: GrievancePolicyForm[K]) {
+    setPolicy((f) => (f ? { ...f, [key]: value } : f));
+  }
+
+  const policyDirty = policy && policyOriginal && JSON.stringify(policy) !== JSON.stringify(policyOriginal);
+
+  async function handleSavePolicy() {
+    if (!policy) return;
+    setPolicySaving(true);
+    try {
+      await axios.post("/grievance-config/policy/save", {
+        moduleEnabled: policy.moduleEnabled,
+        allowAnonymous: policy.allowAnonymous,
+        allowEmployeeWithdraw: policy.allowEmployeeWithdraw,
+        requireResolutionNotes: policy.requireResolutionNotes,
+        satisfactionCaptureEnabled: policy.satisfactionCaptureEnabled,
+        autoCloseAfterDays: policy.autoCloseAfterDays,
+        slaWarningThresholdPct: policy.slaWarningThresholdPct,
+        notifyOnAssigned: policy.notifyOnAssigned,
+        notifyOnStatusChange: policy.notifyOnStatusChange,
+        notifyOnSlaWarning: policy.notifyOnSlaWarning,
+        notifyOnSlaBreach: policy.notifyOnSlaBreach,
+      });
+      showSuccess("Policy saved", "Grievance policy updated successfully.");
+      await loadPolicy();
+    } catch (err: any) {
+      showError("Save failed", err?.response?.data?.error ?? "Could not save grievance policy.");
+    } finally {
+      setPolicySaving(false);
+    }
+  }
+
+  async function handleDeleteCategory() {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await axios.post("/grievance-config/categories/save", { id: deleteTarget.id, action: "DELETE" });
+      showSuccess("Category deleted", `"${deleteTarget.name}" was removed.`);
+      setDeleteTarget(null);
+      loadCategories();
+    } catch (err: any) {
+      showError("Delete failed", err?.response?.data?.message ?? err?.response?.data?.error ?? "This category may have existing cases — deactivate it instead.");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  return (
+    <div>
+      <div className="flex gap-1 mb-6 border-b border-gray-200 dark:border-gray-700">
+        {(["categories", "policy", "notifications"] as InnerTab[]).map((t) => (
+          <button
+            key={t}
+            onClick={() => setInner(t)}
+            className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
+              inner === t ? "border-primary text-primary" : "border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+            }`}
+          >
+            {t === "categories" ? "Categories" : t === "policy" ? "General Policy" : "Notification Hooks"}
+          </button>
+        ))}
+      </div>
+
+      {inner === "categories" && (
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <p className="text-xs text-gray-500 dark:text-gray-400 max-w-lg">
+              Categories drive default severity, confidentiality, SLA targets, and auto-routing for new grievance cases.
+            </p>
+            {canManage && (
+              <Button size="sm" variant="solid" color="primary" icon={<Plus size={14} />} onClick={() => { setEditing(null); setDialogOpen(true); }}>
+                New Category
+              </Button>
+            )}
+          </div>
+          {catLoading ? (
+            <div className="flex justify-center py-10">
+              <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+            </div>
+          ) : (
+            <table className="table-default table-hover w-full">
+              <thead>
+                <tr>
+                  <th>Name</th><th>Severity</th><th>SLA (Ack / Resolve)</th><th>Default Assignee</th><th>Escalation</th><th>Cases</th><th>Status</th>
+                  {canManage && <th>Actions</th>}
+                </tr>
+              </thead>
+              <tbody>
+                {categories.length === 0 ? (
+                  <tr><td colSpan={8} className="text-center py-10 text-gray-400">No categories configured yet.</td></tr>
+                ) : (
+                  categories.slice().sort((a, b) => a.sortOrder - b.sortOrder).map((cat) => (
+                    <tr key={cat.id}>
+                      <td className="font-medium">
+                        {cat.name}
+                        {cat.forceConfidential && <ShieldCheck size={13} className="inline ml-1.5 text-amber-500" aria-label="Force confidential" />}
+                      </td>
+                      <td className="text-sm">{cat.defaultSeverity}</td>
+                      <td className="text-sm whitespace-nowrap">
+                        {cat.acknowledgeSlaHours ? `${cat.acknowledgeSlaHours}h` : "—"} / {cat.resolveSlaDays ? `${cat.resolveSlaDays}d` : "—"}
+                      </td>
+                      <td className="text-sm">{cat.defaultAssigneeName ?? "—"}</td>
+                      <td className="text-sm">{cat.escalationUserName ? `${cat.escalationUserName} (+${cat.escalationAfterDays}d)` : "—"}</td>
+                      <td className="text-sm">{cat.caseCount}</td>
+                      <td><span className={`xp-badge ${cat.isActive ? "xp-badge-success" : "xp-badge-neutral"}`}>{cat.isActive ? "Active" : "Inactive"}</span></td>
+                      {canManage && (
+                        <td>
+                          <div className="flex items-center gap-1">
+                            <button className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500" onClick={() => { setEditing(cat); setDialogOpen(true); }} title="Edit">
+                              <Pencil size={14} />
+                            </button>
+                            <button
+                              className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-red-400 disabled:opacity-30 disabled:hover:bg-transparent"
+                              onClick={() => setDeleteTarget(cat)}
+                              disabled={cat.caseCount > 0}
+                              title={cat.caseCount > 0 ? "Has cases — deactivate instead" : "Delete"}
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </td>
+                      )}
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          )}
+          <GrievanceCategoryDialog
+            isOpen={dialogOpen}
+            onClose={() => setDialogOpen(false)}
+            onSaved={() => { setDialogOpen(false); loadCategories(); }}
+            category={editing}
+            users={users}
+          />
+          {deleteTarget && (
+            <Dialog isOpen onClose={() => setDeleteTarget(null)} onRequestClose={() => setDeleteTarget(null)}>
+              <h5 className="mb-3">Delete Category</h5>
+              <p className="text-sm text-gray-600 dark:text-gray-300">Delete <strong>{deleteTarget.name}</strong>? This cannot be undone.</p>
+              <div className="flex justify-end gap-2 mt-5">
+                <Button variant="plain" onClick={() => setDeleteTarget(null)}>Cancel</Button>
+                <Button variant="solid" loading={deleting} className="bg-red-500 hover:bg-red-600" onClick={handleDeleteCategory}>Delete</Button>
+              </div>
+            </Dialog>
+          )}
+        </div>
+      )}
+
+      {inner === "policy" && (
+        policy ? (
+          <div className="space-y-6">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-xs text-gray-500 dark:text-gray-400 max-w-lg">
+                  Governs module-wide grievance behaviour — anonymity, withdrawal, resolution requirements, and SLA warning thresholds.
+                </p>
+                {policy.updatedAt && (
+                  <p className="text-xs text-gray-400 mt-1">
+                    Last updated {new Date(policy.updatedAt).toLocaleString()}{policy.updatedByName ? ` by ${policy.updatedByName}` : ""}
+                  </p>
+                )}
+              </div>
+              {canManage && (
+                <Button variant="solid" size="sm" loading={policySaving} disabled={!policyDirty} onClick={handleSavePolicy}>
+                  {policyDirty ? "Save Changes" : "Saved"}
+                </Button>
+              )}
+            </div>
+            <SectionTitle>Module</SectionTitle>
+            <ToggleRow
+              label="Grievance Module"
+              description="When off, no new grievances can be submitted through any channel. Existing cases remain visible and actionable."
+              checked={policy.moduleEnabled}
+              onChange={(v) => setPolicyField("moduleEnabled", v)}
+              disabled={!canManage}
+            />
+            <SectionTitle>Submission</SectionTitle>
+            <ToggleRow
+              label="Allow Anonymous Submissions"
+              description="Employees may submit a grievance without their identity being captured anywhere, including the audit trail."
+              checked={policy.allowAnonymous}
+              onChange={(v) => setPolicyField("allowAnonymous", v)}
+              disabled={!canManage}
+            />
+            <ToggleRow
+              label="Allow Employee Withdrawal"
+              description="A complainant may withdraw their own open or in-progress case. Anonymous cases can never be withdrawn."
+              checked={policy.allowEmployeeWithdraw}
+              onChange={(v) => setPolicyField("allowEmployeeWithdraw", v)}
+              disabled={!canManage}
+            />
+            <SectionTitle>Resolution</SectionTitle>
+            <ToggleRow
+              label="Require Resolution Notes"
+              description="A case cannot be marked Resolved without written notes explaining the outcome."
+              checked={policy.requireResolutionNotes}
+              onChange={(v) => setPolicyField("requireResolutionNotes", v)}
+              disabled={!canManage}
+            />
+            <ToggleRow
+              label="Capture Satisfaction Rating"
+              description="Allow the complainant to rate their resolved or closed case from 1–5. Anonymous cases are never eligible."
+              checked={policy.satisfactionCaptureEnabled}
+              onChange={(v) => setPolicyField("satisfactionCaptureEnabled", v)}
+              disabled={!canManage}
+            />
+            <div className="mt-4">
+              <label className="form-label">Auto-Close After (days)</label>
+              <div className="flex items-center gap-3">
+                <Input
+                  type="number"
+                  value={policy.autoCloseAfterDays === null ? "" : String(policy.autoCloseAfterDays)}
+                  onChange={(e) => setPolicyField("autoCloseAfterDays", e.target.value === "" ? null : Number(e.target.value))}
+                  disabled={!canManage}
+                  className="w-32"
+                  min={1}
+                  placeholder="Off"
+                />
+                <span className="text-sm text-gray-500">days after resolution, if the complainant takes no further action</span>
+              </div>
+              <p className="text-xs text-gray-400 mt-1">Leave blank to disable auto-close entirely.</p>
+            </div>
+            <SectionTitle>SLA</SectionTitle>
+            <div>
+              <label className="form-label">Warning Threshold</label>
+              <div className="flex items-center gap-4">
+                <input
+                  type="range"
+                  min={1}
+                  max={99}
+                  step={1}
+                  value={policy.slaWarningThresholdPct}
+                  onChange={(e) => setPolicyField("slaWarningThresholdPct", Number(e.target.value))}
+                  disabled={!canManage}
+                  className="flex-1 accent-primary"
+                />
+                <span className="w-14 text-center font-semibold text-primary tabular-nums">{policy.slaWarningThresholdPct}%</span>
+              </div>
+              <p className="text-xs text-gray-400 mt-1">
+                A warning fires once this percentage of the acknowledge or resolve window has elapsed without action. A case already past its deadline goes straight to breach.
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-4 animate-pulse">{[...Array(5)].map((_, i) => <div key={i} className="h-10 rounded bg-gray-200 dark:bg-gray-700" />)}</div>
+        )
+      )}
+
+      {inner === "notifications" && (
+        policy ? (
+          <div className="space-y-2">
+            <div className="flex items-start justify-between mb-4">
+              <p className="text-xs text-gray-500 dark:text-gray-400 max-w-lg">
+                Controls which grievance events send an email. These flags don't stop the underlying stamp or action — they only suppress the message.
+              </p>
+              {canManage && (
+                <Button variant="solid" size="sm" loading={policySaving} disabled={!policyDirty} onClick={handleSavePolicy}>
+                  {policyDirty ? "Save Changes" : "Saved"}
+                </Button>
+              )}
+            </div>
+            <ToggleRow label="Case Assigned" description="Notify the assignee when a case is routed or reassigned to them." checked={policy.notifyOnAssigned} onChange={(v) => setPolicyField("notifyOnAssigned", v)} disabled={!canManage} />
+            <ToggleRow label="Status Change" description="Notify relevant parties when a case moves between statuses." checked={policy.notifyOnStatusChange} onChange={(v) => setPolicyField("notifyOnStatusChange", v)} disabled={!canManage} />
+            <ToggleRow label="SLA Warning" description="Send an email when a case crosses the SLA warning threshold, before it breaches." checked={policy.notifyOnSlaWarning} onChange={(v) => setPolicyField("notifyOnSlaWarning", v)} disabled={!canManage} />
+            <ToggleRow label="SLA Breach" description="Send an email the moment a case passes its acknowledge or resolve deadline." checked={policy.notifyOnSlaBreach} onChange={(v) => setPolicyField("notifyOnSlaBreach", v)} disabled={!canManage} />
+            <div className="mt-4 p-3 rounded-lg bg-blue-50 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-900">
+              <p className="text-xs text-blue-700 dark:text-blue-300">
+                <strong>Note:</strong> Auto-close never sends an email in this version. Escalation always notifies the escalation contact regardless of these toggles.
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-4 animate-pulse">{[...Array(5)].map((_, i) => <div key={i} className="h-10 rounded bg-gray-200 dark:bg-gray-700" />)}</div>
+        )
       )}
     </div>
   );
