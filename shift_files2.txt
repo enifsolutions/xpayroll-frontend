@@ -1,7 +1,0 @@
-src/configs/navigation.config.ts
-src/configs/navigation.config.ts.bak.20260714_174753
-src/configs/navigation.config.ts.bak.20260715_075633
-src/data/searchIndex.ts
-src/lib/permissions.ts
-src/lib/permissions.ts.bak-phase6
-src/lib/permissions.ts.bak.overridescorelimit
