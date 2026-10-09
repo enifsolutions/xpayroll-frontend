@@ -239,7 +239,7 @@ export default function CompanySettingsPage() {
         isActive: d.isActive ?? true,
         payrollCycleType: d.payrollCycleType ?? "Monthly",
         approvalChainType: d.approvalChainType ?? "DirectToHR",
-        financialYearStart: d.financialYearStart ?? "01-01",
+        financialYearStart: normalizeFyStart(d.financialYearStart),
         attendanceDeductionEnabled: d.attendanceDeductionEnabled ?? true,
         dsrLimitPercent: d.dsrLimitPercent ?? 40,
         tempPasswordExpiryHours: d.tempPasswordExpiryHours ?? 24,
@@ -537,14 +537,10 @@ export default function CompanySettingsPage() {
                 onChange={(v) => setCreateField("payrollCycleType", v)}
                 options={CYCLES.map((c) => ({ value: c, label: c }))}
               />
-              <Field label="Financial Year Start (MM-DD)">
-                <Input
+              <Field label="Financial Year Start">
+                <FinancialYearStartPicker
                   value={createForm.financialYearStart}
-                  onChange={(e) =>
-                    setCreateField("financialYearStart", e.target.value)
-                  }
-                  placeholder="01-01"
-                  maxLength={5}
+                  onChange={(v) => setCreateField("financialYearStart", v)}
                 />
               </Field>
             </div>
@@ -751,6 +747,87 @@ function SelectField({
         ))}
       </select>
     </Field>
+  );
+}
+
+// ── Financial year start picker ────────────────────────────────────────────────
+// The database only accepts 'MM-DD' (chk_financial_year_start_format) and
+// rejects 02-29, so this offers real months and only the days that exist in a
+// non-leap year. It cannot produce a value the database refuses.
+const DAYS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]; // Feb = 28 on purpose
+
+function parseFyStart(v: string | null | undefined): { month: number; day: number } {
+  const m = /^(\d{2})-(\d{2})$/.exec(v ?? "");
+  const month = m ? Number(m[1]) : 1;
+  const day = m ? Number(m[2]) : 1;
+  if (month < 1 || month > 12) return { month: 1, day: 1 };
+  return { month, day: Math.min(Math.max(day, 1), DAYS_IN_MONTH[month - 1]) };
+}
+
+function formatFyStart(month: number, day: number): string {
+  const safeDay = Math.min(Math.max(day, 1), DAYS_IN_MONTH[month - 1]);
+  return `${String(month).padStart(2, "0")}-${String(safeDay).padStart(2, "0")}`;
+}
+
+// Anything stored in an odd shape is shown (and later saved) as a valid MM-DD.
+function normalizeFyStart(v: string | null | undefined): string {
+  const { month, day } = parseFyStart(v);
+  return formatFyStart(month, day);
+}
+
+function fyEndLabel(month: number, day: number): string {
+  // The year ends the day before the next one starts.
+  if (day === 1) {
+    const endMonth = month === 1 ? 12 : month - 1;
+    return `${DAYS_IN_MONTH[endMonth - 1]} ${MONTHS[endMonth - 1]}`;
+  }
+  return `${day - 1} ${MONTHS[month - 1]}`;
+}
+
+function FinancialYearStartPicker({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  disabled?: boolean;
+}) {
+  const { month, day } = parseFyStart(value);
+  return (
+    <div>
+      <div className="grid grid-cols-2 gap-3">
+        <select
+          value={month}
+          onChange={(e) => onChange(formatFyStart(Number(e.target.value), day))}
+          disabled={disabled}
+          className="select w-full"
+          aria-label="Financial year start month"
+        >
+          {MONTHS.map((name, i) => (
+            <option key={name} value={i + 1}>
+              {name}
+            </option>
+          ))}
+        </select>
+        <select
+          value={day}
+          onChange={(e) => onChange(formatFyStart(month, Number(e.target.value)))}
+          disabled={disabled}
+          className="select w-full"
+          aria-label="Financial year start day"
+        >
+          {Array.from({ length: DAYS_IN_MONTH[month - 1] }, (_, i) => i + 1).map((d) => (
+            <option key={d} value={d}>
+              {d}
+            </option>
+          ))}
+        </select>
+      </div>
+      <p className="text-xs text-gray-400 mt-1">
+        Financial year runs {day} {MONTHS[month - 1]} to {fyEndLabel(month, day)}. Most companies use 1 January or 1 April.
+      </p>
+    </div>
   );
 }
 
@@ -979,14 +1056,18 @@ function PayrollTab({
           options={CYCLES.map((c) => ({ value: c, label: c }))}
           disabled={!canManage}
         />
-        <Field label="Financial Year Start (MM-DD)">
-          <Input
+        <Field label="Financial Year Start">
+          <FinancialYearStartPicker
             value={data.financialYearStart}
-            onChange={(e) => set("financialYearStart", e.target.value)}
+            onChange={(v) => set("financialYearStart", v)}
             disabled={!canManage}
-            placeholder="01-01"
-            maxLength={5}
           />
+          {canManage && (
+            <p className="text-xs text-gray-400 mt-1">
+              Also decides the period that is locked for work-pattern changes
+              once payroll has run. Change it only at the start of a new year.
+            </p>
+          )}
         </Field>
         <Field label="Retirement Age (years)">
           <div className="flex items-center gap-3">
