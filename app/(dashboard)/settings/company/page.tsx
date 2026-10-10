@@ -188,6 +188,7 @@ export default function CompanySettingsPage() {
   );
   const userId = useAuthStore((s) => s.user?.userId);
   const initialized = useRef(false);
+  const savedFy = useRef("01-01"); 
 
   const [activeTab, setActiveTab] = useState<TabKey>("profile");
   const [data, setData] = useState<CompanySettings | null>(null);
@@ -263,6 +264,7 @@ export default function CompanySettingsPage() {
         createdAt: d.createdAt ?? "",
         updatedAt: d.updatedAt ?? null,
       });
+            savedFy.current = normalizeFyStart(d.financialYearStart);
     } catch (err: any) {
       showError(
         "Load Failed",
@@ -400,10 +402,11 @@ export default function CompanySettingsPage() {
       showSuccess("Settings saved successfully.");
       await fetchSettings();
     } catch (err: any) {
-      showError(
-        "Save failed",
-        err?.response?.data?.error ?? "Failed to save settings.",
-      );
+      const msg = err?.response?.data?.error ?? "Failed to save settings.";
+      if (/financial year start cannot be changed/i.test(msg)) {
+        set("financialYearStart", savedFy.current);
+      }
+      showError("Save failed", msg);
     } finally {
       setSaving(false);
     }

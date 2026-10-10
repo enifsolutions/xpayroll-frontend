@@ -225,6 +225,22 @@ export default function OverviewPage() {
     }
   }
 
+    const [readiness, setReadiness] = useState<{
+      coverFrom: string;
+      shiftOk: boolean;
+      contractOk: boolean;
+      payRateOk: boolean;
+      ready: boolean;
+    } | null>(null);
+
+    useEffect(() => {
+      if (employee?.status !== "Onboarding") return;
+      api
+        .get(`/employees/${employeeId}/activation-readiness`)
+        .then((r) => setReadiness(r.data))
+        .catch(() => setReadiness(null));
+    }, [employeeId, employee?.status]);
+  
   if (loading) {
     return (
       <div className="flex justify-center py-16">
@@ -251,25 +267,60 @@ export default function OverviewPage() {
   return (
     <div className="space-y-5">
       {employee.status === "Onboarding" && (
-        <div className="flex flex-col gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 sm:flex-row sm:items-center sm:justify-between dark:border-amber-800 dark:bg-amber-900/20">
-          <div>
-            <p className="font-semibold text-amber-800 dark:text-amber-300">
-              Not live yet: Onboarding
-            </p>
-            <p className="text-sm text-amber-700 dark:text-amber-400">
-              Left out of attendance, payroll and the portal until activated.
-              Assign a shift covering the join date, then set Status to Active
-              or Probation.
-            </p>
-          </div>
-          <button
-            onClick={() =>
-              router.push(`/employees/${employeeId}/shift-assignments`)
-            }
-            className="btn btn-solid btn-sm shrink-0"
-          >
-            Assign shift
-          </button>
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-900/20">
+          <p className="font-semibold text-amber-800 dark:text-amber-300">
+            Not live yet: Onboarding
+          </p>
+          <p className="text-sm text-amber-700 dark:text-amber-400">
+            Left out of attendance, payroll and the portal until activated.
+            Complete all three, then set Status to Active or Probation.
+          </p>
+          <ul className="mt-3 space-y-2 text-sm">
+            {[
+              {
+                ok: readiness?.shiftOk,
+                label: "Shift covering the join date",
+                to: `/employees/${employeeId}/shift-assignments`,
+                action: "Assign shift",
+              },
+              {
+                ok: readiness?.contractOk,
+                label: "Active contract covering the join date",
+                to: `/employees?contractFor=${employeeId}`,
+                action: "Add contract",
+              },
+              {
+                ok: readiness?.payRateOk,
+                label:
+                  "Pay rate on the contract (salary, hourly or daily rate)",
+                to: `/employees?contractFor=${employeeId}`,
+                action: "Fix contract",
+              },
+            ].map((item) => (
+              <li
+                key={item.label}
+                className="flex items-center justify-between gap-3"
+              >
+                <span
+                  className={
+                    item.ok
+                      ? "text-green-700 dark:text-green-400"
+                      : "text-amber-800 dark:text-amber-300"
+                  }
+                >
+                  {item.ok ? "✓" : "○"} {item.label}
+                </span>
+                {!item.ok && (
+                  <button
+                    onClick={() => router.push(item.to)}
+                    className="btn btn-solid btn-sm shrink-0"
+                  >
+                    {item.action}
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
         </div>
       )}
       <ProfileCompletion

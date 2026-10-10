@@ -468,7 +468,9 @@ export default function EmployeesPage() {
   const [createdId, setCreatedId] = useState<string | null>(null);
 
   const [resumeDraftOpen, setResumeDraftOpen] = useState(false);
-  const [pendingDraft, setPendingDraft] = useState<EmployeeWizardDraft | null>(null);
+  const [pendingDraft, setPendingDraft] = useState<EmployeeWizardDraft | null>(
+    null,
+  );
 
   const [nicChecking, setNicChecking] = useState(false);
   const [nicError, setNicError] = useState("");
@@ -580,6 +582,16 @@ export default function EmployeesPage() {
           (d) => !d.branchId || String(d.branchId) === String(branchId),
         );
 
+  // Deep link from the employee overview checklist: /employees?contractFor=<id>
+  useEffect(() => {
+    if (loading || items.length === 0) return;
+    const id = new URLSearchParams(window.location.search).get("contractFor");
+    if (!id) return;
+    window.history.replaceState(null, "", window.location.pathname);
+    const target = items.find((e) => String(e.id) === id);
+    if (target) openEdit(target).then(() => setEditTab("contract"));
+  }, [loading, items]);
+
   /* ── load ──────────────────────────────────────────────────────────────── */
 
   const load = async () => {
@@ -616,7 +628,8 @@ export default function EmployeesPage() {
           groupId: e.groupId != null ? String(e.groupId) : null,
           branchId: e.branchId != null ? String(e.branchId) : null,
           departmentId: e.departmentId != null ? String(e.departmentId) : null,
-          designationId: e.designationId != null ? String(e.designationId) : null,
+          designationId:
+            e.designationId != null ? String(e.designationId) : null,
           managerId: e.managerId != null ? String(e.managerId) : null,
         })),
       );

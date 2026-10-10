@@ -17,10 +17,8 @@ import {
   ShiftAssignmentForm,
   ShiftOption,
   PolicyOption,
-  PatternOption,
   defaultForm,
-} from './shift-assignments.types'
-import { summariseWeek } from "@/lib/workPattern";
+} from "./shift-assignments.types";
 import { getErrorMessage } from "@/lib/apiError";
 
 export default function ShiftAssignmentsPage() {
@@ -33,7 +31,6 @@ export default function ShiftAssignmentsPage() {
   const [assignments, setAssignments] = useState<ShiftAssignment[]>([]);
   const [shifts, setShifts] = useState<ShiftOption[]>([]);
   const [policies, setPolicies] = useState<PolicyOption[]>([]);
-  const [patterns, setPatterns] = useState<PatternOption[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -60,14 +57,6 @@ export default function ShiftAssignmentsPage() {
       setAssignments(aRes.data);
       setShifts(sRes.data);
       setPolicies(pRes.data);
-      // Override dropdown only — never block the page if patterns can't load
-      // (e.g. user lacks Settings.WorkPattern.View).
-      try {
-        const wRes = await api.get("work-patterns");
-        setPatterns(wRes.data);
-      } catch {
-        setPatterns([]);
-      }
     } catch (err) {
       showError(
         "Load Failed",
@@ -100,7 +89,6 @@ export default function ShiftAssignmentsPage() {
       effectiveFrom: a.effectiveFrom,
       effectiveTo: a.effectiveTo ?? "",
       isActive: a.isActive,
-      workPatternId: a.workPatternId ?? "",
     });
     setError("");
     setDialogOpen(true);
@@ -113,19 +101,33 @@ export default function ShiftAssignmentsPage() {
 
   const validate = (): boolean => {
     if (!form.shiftId) {
-      setError("Shift is required.");
+      showError("Error", "Shift is required. Please select a shift to assign.");
       return false;
     }
     if (!form.attendancePolicyId) {
-      setError("Attendance Policy is required.");
+      showError(
+        "Error",
+        "Attendance Policy is required. Please select an attendance policy to assign.",
+      );
       return false;
     }
     if (!form.effectiveFrom) {
-      setError("Effective From is required.");
+      showError(
+        "Error",
+        "Effective From is required. Please select a start date for the assignment.",
+      );
+      return false;
+    }
+    if (editing?.effectiveTo && !form.effectiveTo) {
+      showError(
+        "End Date Required",
+        "This assignment already has an end date, so it can't be made open-ended here. " +
+          "Set a later end date, or add a new assignment starting after it.",
+      );
       return false;
     }
     if (form.effectiveTo && form.effectiveTo <= form.effectiveFrom) {
-      setError("Effective To must be after Effective From.");
+      showError("Error", "Effective To must be after Effective From.");
       return false;
     }
     return true;
@@ -144,8 +146,6 @@ export default function ShiftAssignmentsPage() {
         effectiveFrom: form.effectiveFrom,
         effectiveTo: form.effectiveTo || null,
         isActive: form.isActive,
-        // Override is set on ADD only; the server rejects it on UPDATE/DELETE.
-        ...(editing ? {} : { workPatternId: form.workPatternId || null }),
       });
       closeDialog();
       await load();
@@ -155,10 +155,10 @@ export default function ShiftAssignmentsPage() {
           ? "Shift assignment has been updated."
           : "Shift assignment has been created.",
       );
-    } catch (err) {
+    } catch (e: unknown) {
       showError(
-        "Save failed",
-        getErrorMessage(err, "Could not save shift assignment."),
+        "Save Failed",
+        getErrorMessage(e, "Could not save shift assignment."),
       );
     } finally {
       setSaving(false);
@@ -207,21 +207,16 @@ export default function ShiftAssignmentsPage() {
   };
 
   // is_active now means "not cancelled". Whether an assignment is current is
-  // decided by its dates, the same rule attendance and payroll use. The server
-  // supplies isCurrent; the date comparison below only separates Upcoming/Ended.
+  // decided by its dates, the same rule attendance and payroll use.
   const today = new Date().toLocaleDateString("en-CA"); // local YYYY-MM-DD
 
   const assignmentState = (a: ShiftAssignment) => {
     const from = a.effectiveFrom.slice(0, 10);
+    const to = a.effectiveTo ? a.effectiveTo.slice(0, 10) : null;
     if (!a.isActive) return { label: "Cancelled", cls: "xp-badge-neutral" };
-    if (a.isCurrent) return { label: "Current", cls: "xp-badge-success" };
     if (from > today) return { label: "Upcoming", cls: "xp-badge-warning" };
-    return { label: "Ended", cls: "xp-badge-neutral" };
-  };
-
-  const patternLabel = (id: string) => {
-    const p = patterns.find((x) => x.id === id);
-    return p ? `${p.name} — ${summariseWeek(p.dayFractions)}` : id;
+    if (to && to < today) return { label: "Ended", cls: "xp-badge-neutral" };
+    return { label: "Current", cls: "xp-badge-success" };
   };
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -262,7 +257,6 @@ export default function ShiftAssignmentsPage() {
             <tr>
               <th>Shift</th>
               <th>Attendance Policy</th>
-              <th>Work Pattern</th>
               <th>Effective From</th>
               <th>Effective To</th>
               <th>Status</th>
@@ -281,13 +275,6 @@ export default function ShiftAssignmentsPage() {
                   </span>
                 </td>
                 <td>{a.attendancePolicyName}</td>
-                <td className="text-sm">
-                  {a.workPatternName ? (
-                    <span className="heading-text">{a.workPatternName}</span>
-                  ) : (
-                    <span className="text-gray-400">From shift</span>
-                  )}
-                </td>
                 <td>{fmt(a.effectiveFrom)}</td>
                 <td>{fmt(a.effectiveTo)}</td>
                 <td>
@@ -378,43 +365,6 @@ export default function ShiftAssignmentsPage() {
 
             <div>
               <label className="form-label">
-                Work Pattern override
-                <span className="text-gray-400 text-xs ml-1">
-                  (optional — otherwise the shift&apos;s pattern applies)
-                </span>
-              </label>
-              {editing ? (
-                <p className="text-sm text-gray-600 dark:text-gray-300">
-                  {form.workPatternId
-                    ? patternLabel(form.workPatternId)
-                    : "Uses the shift's pattern"}
-                  <span className="block text-xs text-gray-400 mt-1">
-                    To change the pattern, add a new assignment starting on the
-                    day it should take effect.
-                  </span>
-                </p>
-              ) : (
-                <select
-                  className="input w-full"
-                  value={form.workPatternId}
-                  onChange={(e) =>
-                    setForm({ ...form, workPatternId: e.target.value })
-                  }
-                >
-                  <option value="">Use the shift&apos;s pattern</option>
-                  {patterns
-                    .filter((p) => p.isActive)
-                    .map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name} — {summariseWeek(p.dayFractions)}
-                      </option>
-                    ))}
-                </select>
-              )}
-            </div>
-
-            <div>
-              <label className="form-label">
                 Effective From <span className="text-red-500">*</span>
               </label>
               <Input
@@ -429,9 +379,11 @@ export default function ShiftAssignmentsPage() {
             <div>
               <label className="form-label">
                 Effective To
-                <span className="text-gray-400 text-xs ml-1">
-                  (leave blank for open-ended)
-                </span>
+                {!editing?.effectiveTo && (
+                  <span className="text-gray-400 text-xs ml-1">
+                    (leave blank for open-ended)
+                  </span>
+                )}
               </label>
               <Input
                 type="date"
